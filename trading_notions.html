@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMC · Trading Encyclopedia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0A0A0A;--bg2:#111;--surface:#181818;--border:#252525;--border2:#333;
+  --text:#ffffff;--muted:#dddddd;--subtle:#666660;
+  --acid:#ffffff;--red:#ffffff;--green:#ffffff;--gold:#ffffff;
+  --blue:#ffffff;--purple:#ffffff;--orange:#ffffff;
+  --sidebar-w:255px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;display:flex;min-height:100vh;overflow-x:hidden}
+
+/* SIDEBAR */
+.sidebar{width:var(--sidebar-w);min-height:100vh;background:var(--bg2);border-right:1px solid var(--border);position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:50;overflow-y:auto}
+.sidebar-logo{padding:22px 20px 18px;border-bottom:1px solid var(--border)}
+.sidebar-logo-main{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;color:var(--acid);letter-spacing:.15em}
+.sidebar-logo-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:.12em;margin-top:3px}
+.sidebar-section-label{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--subtle);padding:16px 20px 6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 20px;cursor:pointer;transition:background .15s;border-left:2px solid transparent}
+.nav-item:hover{background:var(--surface)}
+.nav-item.active{background:var(--surface);border-left-color:var(--acid)}
+.nav-num{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--subtle);width:18px;flex-shrink:0}
+.nav-item.active .nav-num{color:var(--acid)}
+.nav-label{font-size:12.5px;color:var(--muted);font-weight:500;transition:color .15s}
+.nav-item:hover .nav-label,.nav-item.active .nav-label{color:var(--text)}
+.nav-dot{width:6px;height:6px;border-radius:50%;margin-left:auto;flex-shrink:0}
+.sidebar-footer{margin-top:auto;padding:14px 20px;border-top:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--subtle);letter-spacing:.08em;line-height:1.8}
+
+/* MAIN */
+.main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;overflow-y:auto}
+
+/* TICKER */
+.ticker-wrap{background:var(--acid);padding:5px 0;overflow:hidden}
+.ticker-track{display:flex;animation:tick 32s linear infinite;white-space:nowrap}
+.ticker-item{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;color:#000;padding:0 28px;letter-spacing:.06em}
+.ticker-item span{opacity:.45;margin-left:6px}
+@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* TOPBAR */
+.topbar{height:46px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 32px;gap:14px;position:sticky;top:0;background:rgba(10,10,10,.96);backdrop-filter:blur(6px);z-index:40}
+.topbar-bc{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.topbar-bc span{color:var(--text)}
+.topbar-sep{color:var(--subtle)}
+.topbar-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 8px;border:1px solid currentColor;margin-left:auto}
+
+/* PAGE */
+.page{display:none}
+.page.active{display:block}
+
+/* NOTION HERO */
+.notion-hero{padding:44px 32px 32px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;gap:28px;align-items:start}
+.notion-eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:.2em;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.notion-eyebrow::before{content:'';display:inline-block;width:18px;height:1px;background:currentColor}
+.notion-title{font-family:'Playfair Display',serif;font-size:clamp(34px,4vw,52px);font-weight:700;line-height:1.05;color:var(--text);margin-bottom:6px}
+.notion-subtitle{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:.1em;margin-bottom:16px}
+.notion-desc{font-size:14px;color:var(--text);line-height:1.75;max-width:580px}
+.notion-meta{display:flex;flex-direction:column;gap:8px;text-align:right;min-width:130px}
+.meta-badge{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;padding:5px 11px;border:1px solid var(--border);color:var(--muted);text-transform:uppercase;text-align:center}
+.meta-badge.accent{border-color:var(--accent,var(--acid));color:var(--accent,var(--acid))}
+
+/* CONTENT */
+.content-area{padding:0 32px 56px}
+.block{border-bottom:1px solid var(--border);padding:28px 0}
+.block:last-child{border-bottom:none}
+.block-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:18px;display:flex;align-items:center;gap:10px}
+.block-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* GRIDS */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border)}
+.col-cell{background:var(--bg);padding:18px 20px}
+.col-cell:hover{background:var(--bg2)}
+.col-cell-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px}
+.col-cell-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px}
+.col-cell-text{font-size:12px;color:var(--text);line-height:1.65}
+
+/* RULES */
+.rules{display:flex;flex-direction:column}
+.rule{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);align-items:start}
+.rule:last-child{border-bottom:none}
+.rule-icon{font-family:'IBM Plex Mono',monospace;font-size:12px;padding-top:1px}
+.rule-text{font-size:13px;color:var(--text);line-height:1.6}
+.rule-text strong{color:var(--text);font-weight:600}
+.ok .rule-icon{color:var(--green)}.no .rule-icon{color:var(--red)}.note .rule-icon{color:var(--gold)}.step .rule-icon{color:var(--acid);font-weight:500}
+
+/* STEPS */
+.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border)}
+.step-cell{background:var(--bg);padding:16px 14px;position:relative}
+.step-cell::after{content:'→';position:absolute;right:-10px;top:50%;transform:translateY(-50%);font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--subtle);z-index:1}
+.step-cell:last-child::after{display:none}
+.step-num{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:500;color:var(--acid);margin-bottom:5px;line-height:1}
+.step-title{font-size:11px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.step-desc{font-size:11px;color:var(--text);line-height:1.5}
+
+/* HIGHLIGHT */
+.hl-box{background:var(--surface);border-left:2px solid var(--acid);padding:13px 16px;margin-top:12px}
+.hl-box p{font-size:13px;color:var(--text);line-height:1.7}
+.hl-box strong{color:var(--text)}
+
+/* TABLE */
+.ct{width:100%;border-collapse:collapse}
+.ct th{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:left;padding:9px 13px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.ct td{font-size:12px;color:var(--text);padding:10px 13px;border-bottom:1px solid var(--border);vertical-align:top}
+.ct td:first-child{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text);font-weight:500}
+.ct tr:hover td{background:var(--surface)}
+
+/* TAG */
+.tag{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 8px;border:1px solid currentColor;letter-spacing:.06em;margin:2px 2px 2px 0}
+
+/* HOME */
+.home-hero{padding:54px 32px 36px;border-bottom:1px solid var(--border)}
+.home-eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--acid);letter-spacing:.25em;text-transform:uppercase;margin-bottom:16px}
+.home-title{font-family:'Playfair Display',serif;font-size:clamp(38px,5vw,60px);font-weight:700;line-height:1.05;color:var(--text);margin-bottom:14px}
+.home-title em{font-style:italic;color:var(--acid)}
+.home-desc{font-size:13px;color:var(--text);line-height:1.75;max-width:520px;margin-bottom:0}
+.ov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1px;background:var(--border);margin:0}
+.ov-card{background:var(--bg);padding:18px 20px;cursor:pointer;transition:background .15s;border-left:2px solid transparent}
+.ov-card:hover{background:var(--surface);border-left-color:var(--accent,var(--acid))}
+.ov-tag{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px}
+.ov-title{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:var(--text);margin-bottom:5px;line-height:1.2}
+.ov-desc{font-size:11px;color:var(--text);line-height:1.6}
+.ov-arrow{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--subtle);margin-top:9px;transition:color .15s}
+.ov-card:hover .ov-arrow{color:var(--acid)}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-main">SMC</div>
+    <div class="sidebar-logo-sub">SMART MONEY CONCEPTS</div>
+  </div>
+  <div class="sidebar-section-label">// Index</div>
+  <div class="nav-item active" onclick="go('home',this)"><span class="nav-num">00</span><span class="nav-label">Vue d'ensemble</span><span class="nav-dot" style="background:var(--acid)"></span></div>
+  <div class="sidebar-section-label">// Structure</div>
+  <div class="nav-item" onclick="go('structure',this)"><span class="nav-num">01</span><span class="nav-label">Structure de marché</span><span class="nav-dot" style="background:var(--gold)"></span></div>
+  <div class="nav-item" onclick="go('cycle',this)"><span class="nav-num">02</span><span class="nav-label">Cycle de marché</span><span class="nav-dot" style="background:var(--orange)"></span></div>
+  <div class="sidebar-section-label">// Signaux</div>
+  <div class="nav-item" onclick="go('bos',this)"><span class="nav-num">03</span><span class="nav-label">BOS</span><span class="nav-dot" style="background:var(--green)"></span></div>
+  <div class="nav-item" onclick="go('choch',this)"><span class="nav-num">04</span><span class="nav-label">CHoCH</span><span class="nav-dot" style="background:var(--red)"></span></div>
+  <div class="sidebar-section-label">// Zones</div>
+  <div class="nav-item" onclick="go('liquidite',this)"><span class="nav-num">05</span><span class="nav-label">Liquidité</span><span class="nav-dot" style="background:var(--blue)"></span></div>
+  <div class="nav-item" onclick="go('ob',this)"><span class="nav-num">06</span><span class="nav-label">Order Block</span><span class="nav-dot" style="background:var(--green)"></span></div>
+  <div class="nav-item" onclick="go('fvg',this)"><span class="nav-num">07</span><span class="nav-label">FVG</span><span class="nav-dot" style="background:var(--purple)"></span></div>
+  <div class="nav-item" onclick="go('sr',this)"><span class="nav-num">08</span><span class="nav-label">Support & Résistance</span><span class="nav-dot" style="background:var(--orange)"></span></div>
+  <div class="sidebar-section-label">// Outils</div>
+  <div class="nav-item" onclick="go('orderflow',this)"><span class="nav-num">09</span><span class="nav-label">Order Flow</span><span class="nav-dot" style="background:var(--blue)"></span></div>
+  <div class="nav-item" onclick="go('pd',this)"><span class="nav-num">10</span><span class="nav-label">Premium & Discount</span><span class="nav-dot" style="background:var(--gold)"></span></div>
+  <div class="nav-item" onclick="go('dom',this)"><span class="nav-num">11</span><span class="nav-label">DOM</span><span class="nav-dot" style="background:var(--purple)"></span></div>
+  <div class="sidebar-footer">PATIENCE · DISCIPLINE<br>PRÉCISION · GESTION DU RISQUE</div>
+</aside>
+
+<main class="main">
+<div class="ticker-wrap"><div class="ticker-track">
+  <span class="ticker-item">BOS<span>CONTINUATION</span></span><span class="ticker-item">CHOCH<span>RETOURNEMENT</span></span><span class="ticker-item">ORDER BLOCK<span>INSTITUTIONNEL</span></span><span class="ticker-item">FVG<span>IMBALANCE</span></span><span class="ticker-item">LIQUIDITÉ<span>SSL/BSL</span></span><span class="ticker-item">PREMIUM<span>CHER</span></span><span class="ticker-item">DISCOUNT<span>BON MARCHÉ</span></span><span class="ticker-item">HTF→LTF<span>ALIGNEMENT</span></span><span class="ticker-item">BOS<span>CONTINUATION</span></span><span class="ticker-item">CHOCH<span>RETOURNEMENT</span></span><span class="ticker-item">ORDER BLOCK<span>INSTITUTIONNEL</span></span><span class="ticker-item">FVG<span>IMBALANCE</span></span><span class="ticker-item">LIQUIDITÉ<span>SSL/BSL</span></span><span class="ticker-item">PREMIUM<span>CHER</span></span><span class="ticker-item">DISCOUNT<span>BON MARCHÉ</span></span><span class="ticker-item">HTF→LTF<span>ALIGNEMENT</span></span>
+</div></div>
+
+<!-- 00 HOME -->
+<div class="page active" id="page-home">
+  <div class="home-hero">
+    <p class="home-eyebrow">// Bibliothèque SMC — 10 notions</p>
+    <h1 class="home-title">Lire le marché<br>comme les <em>institutions.</em></h1>
+    <p class="home-desc">Chaque notion dispose de sa propre page complète — définition, règles, setup, ce qu'il faut faire et éviter. Utilise la barre de gauche pour naviguer directement vers un concept.</p>
+  </div>
+  <div class="ov-grid">
+    <div class="ov-card" style="--accent:var(--gold)" onclick="go('structure',document.querySelectorAll('.nav-item')[1])"><div class="ov-tag" style="color:var(--gold)">Structure</div><div class="ov-title">Structure de Marché</div><div class="ov-desc">HH, HL, LH, LL. La base absolue de toute analyse SMC.</div><div class="ov-arrow">Ouvrir →</div></div>
+    <div class="ov-card" style="--accent:var(--orange)" onclick="go('cycle',document.querySelectorAll('.nav-item')[2])"><div class="ov-tag" style="color:var(--orange)">Structure</div><div class="ov-title">Cycle de Marché</div><div class="ov-desc">Accumulation → expansion → distribution → baisse. Le cycle institutionnel en 4 phases.</div><div class="ov-arrow">Ouvrir →</div></div>
+    <div class="ov-card" style="--accent:var(--green)" onclick="go('bos',document.querySelectorAll('.nav-item')[3])"><div class="ov-tag" style="color:var(--green)">Signal</div><div class="ov-title">BOS</div><div class="ov-desc">Break of Structure — confirmation que la tendance en cours reste intacte.</div><div class="ov-arrow">Ouvrir →</div></div>
+    <div class="ov-card" style="--accent:var(--red)" onclick="go('choch',document.querySelectorAll('.nav-item')[4])"><div class="ov-tag" style="color:var(--red)">Signal</div><div class="ov-title">CHoCH</div><div class="ov-desc">Change of Character — premier signal d'un retournement de tendance.</div><div class="ov-arrow">Ouvrir →</div></div>
+    <div class="ov-card" style="--accent:var(--blue)" onclick="go('liquidite',document.querySelectorAll('.nav-item')[5])"><div class="ov-tag" style="color:var(--blue)">Zone</div><div class="ov-title">Liquidité</div><div class="ov-desc">SSL, BSL, EQH/EQL. Les institutions chassent la liquidité avant tout mouvement fort.</div><div class="ov-arrow">Ouvrir →</div></div>
+    <div class="ov-card" style="--accent:var(--green)" onclick="go('ob',document.querySelectorAll('.nav-item')[6])"><div class="ov-tag" style="color:var(--green)">Zone</div><div class="ov-title">Order Block</div><div class="ov-desc">Zones institutionnelles d'achat/vente. Dernière bougie opposée avant l'impulsion.</div><div class="ov-arrow">Ouvrir →</div></div>
+    <div class="ov-card" style="--accent:var(--purple)" onclick="go('fvg',document.querySelectorAll('.nav-item')[7])"><div class="ov-tag" style="color:var(--purple)">Zone</div><div class="ov-title">Fair Value Gap</div><div class="ov-desc">Déséquilibre créé par une impulsion forte. Le marché cherche à le combler.</div><div class="ov-arrow">Ouvrir →</div></div>
+    <div class="ov-card" style="--accent:var(--orange)" onclick="go('sr',document.querySelectorAll('.nav-item')[8])"><div class="ov-tag" style="color:var(--orange)">Zone</div><div class="ov-title">Support & Résistance</div><div class="ov-desc">Niveaux clés pour anticiper rebonds et cassures.</div><div class="ov-arrow">Ouvrir →</div></div>
+    <div class="ov-card" style="--accent:var(--blue)" onclick="go('orderflow',document.querySelectorAll('.nav-item')[9])"><div class="ov-tag" style="color:var(--blue)">Outil</div><div class="ov-title">Order Flow</div><div class="ov-desc">Footprint, delta, carnet d'ordres. Lire les ordres exécutés en temps réel.</div><div class="ov-arrow">Ouvrir →</div></div>
+    <div class="ov-card" style="--accent:var(--gold)" onclick="go('pd',document.querySelectorAll('.nav-item')[10])"><div class="ov-tag" style="color:var(--gold)">Outil</div><div class="ov-title">Premium & Discount</div><div class="ov-desc">Le 50% Fibonacci. Acheter en discount, vendre en premium.</div><div class="ov-arrow">Ouvrir →</div></div>
+    <div class="ov-card" style="--accent:var(--purple)" onclick="go('dom',document.querySelectorAll('.nav-item')[11])"><div class="ov-tag" style="color:var(--purple)">Outil</div><div class="ov-title">DOM — Depth of Market</div><div class="ov-desc">Carnet d'ordres en temps réel. BID, ASK, spread, profondeur — lire la liquidité disponible.</div><div class="ov-arrow">Ouvrir →</div></div>
+  </div>
+</div>
+
+<!-- 01 STRUCTURE -->
+<div class="page" id="page-structure">
+  <div class="topbar"><div class="topbar-bc">SMC <span class="topbar-sep">/</span> <span>Structure de Marché</span></div><span class="topbar-tag" style="color:var(--gold)">STRUCTURE</span></div>
+  <div class="notion-hero">
+    <div><p class="notion-eyebrow">01 — Structure</p><h1 class="notion-title">Structure<br>de Marché</h1><p class="notion-subtitle">HH · HL · LH · LL — LA BASE DE TOUTE ANALYSE</p><p class="notion-desc">Le marché se déplace en créant une structure. Comprendre cette structure permet d'identifier la tendance dominante, les zones d'intérêt et les probabilités les plus élevées. Sans elle, aucun outil SMC ne peut être utilisé correctement.</p></div>
+    <div class="notion-meta"><div class="meta-badge accent" style="--accent:var(--gold)">FONDAMENTAL</div><div class="meta-badge">NIVEAU BASE</div><div class="meta-badge">HTF → LTF</div></div>
+  </div>
+  <div class="content-area">
+    <div class="block">
+      <div class="block-label">Définition des 4 pivots</div>
+      <div class="two-col">
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--green)">HH — Higher High</div><div class="col-cell-title">Plus haut sommet</div><div class="col-cell-text">Chaque nouveau sommet dépasse le précédent. Les acheteurs poussent le marché vers de nouveaux hauts — signal de force haussière.</div></div>
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--green)">HL — Higher Low</div><div class="col-cell-title">Plus haut creux</div><div class="col-cell-text">Chaque creux est plus haut que le précédent. Confirme la tendance haussière — les vendeurs perdent du terrain à chaque correction.</div></div>
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--red)">LH — Lower High</div><div class="col-cell-title">Plus bas sommet</div><div class="col-cell-text">Chaque sommet est plus bas que le précédent. Les acheteurs échouent à dépasser les anciens hauts — signal de faiblesse.</div></div>
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--red)">LL — Lower Low</div><div class="col-cell-title">Plus bas creux</div><div class="col-cell-text">Chaque creux est plus bas que le précédent. Les vendeurs dominent et poussent le marché vers de nouveaux bas.</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Les 3 structures</div>
+      <div class="three-col">
+        <div class="col-cell" style="border-top:2px solid var(--green)"><div class="col-cell-label" style="color:var(--green)">Bullish — HH/HL</div><div class="col-cell-title">Tendance haussière</div><div class="col-cell-text">Acheteurs dominants. Chercher uniquement des longs sur les pullbacks (HL) ou après un BOS haussier confirmé.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--red)"><div class="col-cell-label" style="color:var(--red)">Bearish — LH/LL</div><div class="col-cell-title">Tendance baissière</div><div class="col-cell-text">Vendeurs dominants. Chercher uniquement des shorts sur les retracements (LH) ou après un BOS baissier confirmé.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--gold)"><div class="col-cell-label" style="color:var(--gold)">Range</div><div class="col-cell-title">Consolidation</div><div class="col-cell-text">Ni HH ni LL — phase d'accumulation ou de distribution. Attendre la cassure avec BOS et volume avant d'entrer.</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Analyse multi-timeframes</div>
+      <table class="ct"><tr><th>Timeframe</th><th>Rôle</th><th>Ce qu'on cherche</th></tr><tr><td>Mensuel/Hebdo</td><td>Tendance de fond</td><td>Direction macro — ne jamais trader contre</td></tr><tr><td>Journalier (D1)</td><td>Structure principale</td><td>Confirme HTF + zones d'intérêt majeures</td></tr><tr><td>H4/H1</td><td>Pullback dans la tendance</td><td>BOS, CHoCH, zones d'entrée probables</td></tr><tr><td>15min/5min</td><td>Entrée de précision</td><td>Confirmation + placement SL précis</td></tr></table>
+    </div>
+    <div class="block">
+      <div class="block-label">Règles</div>
+      <div class="rules">
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text"><strong>HTF décide</strong>, LTF confirme — toujours analyser du grand vers le petit timeframe.</div></div>
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Identifier la structure <strong>avant</strong> de chercher une entrée — la tendance prime sur tout.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text">Ne jamais trader contre la tendance HTF sans raison institutionnelle forte et confirmée.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text">Ne pas confondre un pullback (HL en uptrend) avec un retournement — attendre le CHoCH.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 02 CYCLE -->
+<div class="page" id="page-cycle">
+  <div class="topbar"><div class="topbar-bc">SMC <span class="topbar-sep">/</span> <span>Cycle de Marché</span></div><span class="topbar-tag" style="color:var(--orange)">STRUCTURE</span></div>
+  <div class="notion-hero">
+    <div><p class="notion-eyebrow">02 — Structure</p><h1 class="notion-title">Cycle<br>de Marché</h1><p class="notion-subtitle">ACCUMULATION · EXPANSION · DISTRIBUTION · RÉPÉTITION</p><p class="notion-desc">Le marché se déplace en cycles et en fractales. La même structure se répète à toutes les échelles de temps. Comprendre ce cycle permet d'aligner chaque décision avec le flux institutionnel et d'anticiper les prochains mouvements.</p></div>
+    <div class="notion-meta"><div class="meta-badge accent" style="--accent:var(--orange)">FRACTAL</div><div class="meta-badge">NIVEAU AVANCÉ</div></div>
+  </div>
+  <div class="content-area">
+    <div class="block">
+      <div class="block-label">4 phases du cycle institutionnel</div>
+      <div class="two-col">
+        <div class="col-cell" style="border-top:2px solid var(--blue)"><div class="col-cell-label" style="color:var(--blue)">Phase 1 — Accumulation</div><div class="col-cell-title">Range / Consolidation</div><div class="col-cell-text">Les institutions se positionnent en achetant discrètement dans la zone basse. Prix sans direction claire — stop hunts des deux côtés pour piéger les traders retail et récupérer leur liquidité.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--green)"><div class="col-cell-label" style="color:var(--green)">Phase 2 — Expansion haussière</div><div class="col-cell-title">BOS successifs vers le haut</div><div class="col-cell-text">Les institutions poussent le prix via des BOS successifs. Structure HH/HL en développement. La phase la plus rentable pour les positions longues — trader dans le sens des BOS.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--orange)"><div class="col-cell-label" style="color:var(--orange)">Phase 3 — Distribution</div><div class="col-cell-title">Range / Consolidation haute</div><div class="col-cell-text">Les institutions prennent leurs profits en vendant dans la zone haute. Consolidation visible sur HTF. Divergences delta possibles — signal d'alerte pour les positions longues.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--red)"><div class="col-cell-label" style="color:var(--red)">Phase 4 — Expansion baissière</div><div class="col-cell-title">BOS successifs vers le bas</div><div class="col-cell-text">Les institutions se repositionnent short. Structure LH/LL en développement. Phase des positions courtes — trader dans le sens des BOS baissiers.</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">5 phases de la structure de marché</div>
+      <div class="steps">
+        <div class="step-cell"><div class="step-num">①</div><div class="step-title">Équilibre</div><div class="step-desc">Range, liquidité accumulée des deux côtés</div></div>
+        <div class="step-cell"><div class="step-num">②</div><div class="step-title">BOS</div><div class="step-desc">Cassure — direction confirmée</div></div>
+        <div class="step-cell"><div class="step-num">③</div><div class="step-title">CHoCH</div><div class="step-desc">Signal de retournement possible</div></div>
+        <div class="step-cell"><div class="step-num">④</div><div class="step-title">Continuation</div><div class="step-desc">Tendance en expansion, BOS successifs</div></div>
+        <div class="step-cell"><div class="step-num">⑤</div><div class="step-title">Extrême</div><div class="step-desc">Stop hunt + retournement ou continuation</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Fractalité — même structure, différentes échelles</div>
+      <div class="hl-box"><p>Un uptrend mensuel contient des downtrends hebdomadaires, qui contiennent des uptrends journaliers. <strong>Toujours s'aligner avec la structure HTF</strong> — un short sur H1 peut être parfaitement valide dans un uptrend D1 si c'est un pullback vers un HL.</p></div>
+      <div class="rules" style="margin-top:16px">
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Identifier dans quelle phase du cycle tu te trouves <strong>sur le HTF</strong> avant toute analyse LTF.</div></div>
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Les phases d'accumulation et de distribution sont les plus risquées — attendre la cassure directionnelle.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text">Ne pas trader à l'intérieur d'un range sans BOS confirmé — les faux breakouts y sont très fréquents.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 03 BOS -->
+<div class="page" id="page-bos">
+  <div class="topbar"><div class="topbar-bc">SMC <span class="topbar-sep">/</span> <span>BOS — Break of Structure</span></div><span class="topbar-tag" style="color:var(--green)">SIGNAL</span></div>
+  <div class="notion-hero">
+    <div><p class="notion-eyebrow">03 — Signal</p><h1 class="notion-title">BOS</h1><p class="notion-subtitle">BREAK OF STRUCTURE — CONTINUATION DE TENDANCE</p><p class="notion-desc">Le Break of Structure se produit quand le prix casse un plus haut en uptrend ou un plus bas en downtrend. Il confirme que la tendance en cours est intacte et que le camp dominant garde le contrôle du marché.</p></div>
+    <div class="notion-meta"><div class="meta-badge accent" style="--accent:var(--green)">CONTINUATION</div><div class="meta-badge">NIVEAU BASE</div></div>
+  </div>
+  <div class="content-area">
+    <div class="block">
+      <div class="block-label">Les 2 types de BOS</div>
+      <div class="two-col">
+        <div class="col-cell" style="border-top:2px solid var(--green)"><div class="col-cell-label" style="color:var(--green)">BOS Haussier (Bullish)</div><div class="col-cell-title">Cassure du dernier HH</div><div class="col-cell-text" style="margin-bottom:12px">En uptrend, le prix casse au-dessus du dernier Higher High. Les acheteurs gardent le contrôle — chaque BOS confirme la tendance.</div><span class="tag" style="color:var(--green)">HH → HL → BOS</span><div class="col-cell-text" style="margin-top:10px"><strong>Setup :</strong> long sur le retest du niveau cassé (ancien HH devenu support) ou sur l'OB/FVG formé lors du mouvement.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--red)"><div class="col-cell-label" style="color:var(--red)">BOS Baissier (Bearish)</div><div class="col-cell-title">Cassure du dernier LL</div><div class="col-cell-text" style="margin-bottom:12px">En downtrend, le prix casse en dessous du dernier Lower Low. Les vendeurs gardent le contrôle — chaque BOS confirme la tendance.</div><span class="tag" style="color:var(--red)">LH → LL → BOS</span><div class="col-cell-text" style="margin-top:10px"><strong>Setup :</strong> short sur le retest du niveau cassé (ancien LL devenu résistance) ou sur l'OB/FVG formé lors du mouvement.</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">BOS vs CHoCH — la distinction fondamentale</div>
+      <table class="ct"><tr><th></th><th>BOS</th><th>CHoCH</th></tr><tr><td>Direction</td><td>Dans le sens de la tendance</td><td>Contre la tendance en cours</td></tr><tr><td>Signal</td><td>Continuation</td><td>Retournement potentiel</td></tr><tr><td>Exemple bullish</td><td>Prix casse un HH en uptrend</td><td>Prix casse un HL en uptrend</td></tr><tr><td>Action</td><td>Renforcer le biais directionnel</td><td>Préparer un scénario opposé</td></tr></table>
+    </div>
+    <div class="block">
+      <div class="block-label">Process d'entrée après un BOS</div>
+      <div class="steps">
+        <div class="step-cell"><div class="step-num">①</div><div class="step-title">Tendance HTF</div><div class="step-desc">Confirmer uptrend/downtrend sur H4 ou D1</div></div>
+        <div class="step-cell"><div class="step-num">②</div><div class="step-title">CHoCH repéré</div><div class="step-desc">Point de départ de la nouvelle structure</div></div>
+        <div class="step-cell"><div class="step-num">③</div><div class="step-title">BOS confirmé</div><div class="step-desc">Clôture de bougie au-dessus/en-dessous</div></div>
+        <div class="step-cell"><div class="step-num">④</div><div class="step-title">Retest</div><div class="step-desc">Prix revient sur le niveau cassé</div></div>
+        <div class="step-cell"><div class="step-num">⑤</div><div class="step-title">Stop / TP</div><div class="step-desc">Stop sous le HL récent, TP sur liquidité</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Règles</div>
+      <div class="rules">
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Attendre une <strong>clôture de bougie</strong> au-dessus/en-dessous du niveau — pas un simple wick.</div></div>
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Idéalement, attendre le <strong>retest du niveau cassé</strong> pour entrer avec un R/R optimal.</div></div>
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Un BOS valide se fait après un <strong>CHoCH</strong> — le changement de caractère est le point de départ.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text">Ne pas entrer en anticipation avant la clôture — les faux BOS intraday sont fréquents.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text">Ne pas trader un BOS contre la tendance HTF sans raison institutionnelle confirmée.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 04 CHOCH -->
+<div class="page" id="page-choch">
+  <div class="topbar"><div class="topbar-bc">SMC <span class="topbar-sep">/</span> <span>CHoCH — Change of Character</span></div><span class="topbar-tag" style="color:var(--red)">SIGNAL</span></div>
+  <div class="notion-hero">
+    <div><p class="notion-eyebrow">04 — Signal</p><h1 class="notion-title">CHoCH</h1><p class="notion-subtitle">CHANGE OF CHARACTER — POINT DE BASCULE</p><p class="notion-desc">Le CHoCH signale un changement de direction du marché. C'est le premier signe qu'une tendance est sur le point de s'inverser — avant même qu'un BOS dans la nouvelle direction soit confirmé. Le point de bascule entre deux structures opposées.</p></div>
+    <div class="notion-meta"><div class="meta-badge accent" style="--accent:var(--red)">RETOURNEMENT</div><div class="meta-badge">NIVEAU INTERMÉDIAIRE</div></div>
+  </div>
+  <div class="content-area">
+    <div class="block">
+      <div class="block-label">Les 2 types de CHoCH</div>
+      <div class="two-col">
+        <div class="col-cell" style="border-top:2px solid var(--green)"><div class="col-cell-label" style="color:var(--green)">CHoCH Haussier</div><div class="col-cell-title">En tendance baissière</div><div class="col-cell-text" style="margin-bottom:12px">Le prix casse au-dessus du dernier LH (Lower High). Premier signal d'un retournement haussier. Après ce CHoCH, chaque cassure de plus bas sera un BOS haussier.</div><div class="hl-box" style="margin-top:0"><p><strong>Contexte requis :</strong> tendance baissière en cours (LH → LL successifs).</p></div></div>
+        <div class="col-cell" style="border-top:2px solid var(--red)"><div class="col-cell-label" style="color:var(--red)">CHoCH Baissier</div><div class="col-cell-title">En tendance haussière</div><div class="col-cell-text" style="margin-bottom:12px">Le prix casse en dessous du dernier HL (Higher Low). Premier signal d'un retournement baissier. Après ce CHoCH, chaque cassure de plus haut sera un BOS baissier.</div><div class="hl-box" style="margin-top:0"><p><strong>Contexte requis :</strong> tendance haussière en cours (HH → HL successifs).</p></div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Règle clé selon la tendance</div>
+      <table class="ct"><tr><th>Tendance en cours</th><th>CHoCH à chercher</th><th>Signal</th><th>Suite attendue</th></tr><tr><td>Baissière (LH→LL)</td><td>Haussier — cassure d'un LH</td><td>Retournement potentiel ↑</td><td>BOS haussiers successifs</td></tr><tr><td>Haussière (HH→HL)</td><td>Baissier — cassure d'un HL</td><td>Retournement potentiel ↓</td><td>BOS baissiers successifs</td></tr></table>
+    </div>
+    <div class="block">
+      <div class="block-label">Process d'entrée après un CHoCH</div>
+      <div class="steps">
+        <div class="step-cell"><div class="step-num">①</div><div class="step-title">Tendance HTF</div><div class="step-desc">Identifier la direction en cours</div></div>
+        <div class="step-cell"><div class="step-num">②</div><div class="step-title">CHoCH</div><div class="step-desc">Cassure dans le sens opposé</div></div>
+        <div class="step-cell"><div class="step-num">③</div><div class="step-title">BOS confirm.</div><div class="step-desc">Premier BOS dans la nouvelle direction</div></div>
+        <div class="step-cell"><div class="step-num">④</div><div class="step-title">OB / FVG</div><div class="step-desc">Revenir sur une zone dans la région du CHoCH</div></div>
+        <div class="step-cell"><div class="step-num">⑤</div><div class="step-title">Entrée</div><div class="step-desc">Confirmation + stop derrière le CHoCH</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Règles</div>
+      <div class="rules">
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Un CHoCH seul ne suffit pas — attendre un <strong>BOS dans la nouvelle direction</strong> pour confirmer.</div></div>
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Entrer sur un OB ou FVG formé <strong>dans la zone du CHoCH</strong> pour un R/R optimal.</div></div>
+        <div class="rule note"><span class="rule-icon">!</span><div class="rule-text">CHoCH + BOS de confirmation = séquence complète de retournement. L'un sans l'autre augmente le risque.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text">Ne pas entrer immédiatement au CHoCH — c'est un signal d'alerte, pas encore une confirmation.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 05 LIQUIDITE -->
+<div class="page" id="page-liquidite">
+  <div class="topbar"><div class="topbar-bc">SMC <span class="topbar-sep">/</span> <span>Liquidité</span></div><span class="topbar-tag" style="color:var(--blue)">ZONE</span></div>
+  <div class="notion-hero">
+    <div><p class="notion-eyebrow">05 — Zone</p><h1 class="notion-title">Liquidité</h1><p class="notion-subtitle">SSL · BSL · EQH / EQL — L'AIMANT DU MARCHÉ</p><p class="notion-desc">La liquidité est composée des ordres en attente (stop loss, limit orders) placés par tous les participants. Les institutions ont besoin de cette liquidité pour entrer et sortir — elles la chassent avant tout mouvement fort et directionnel.</p></div>
+    <div class="notion-meta"><div class="meta-badge accent" style="--accent:var(--blue)">INSTITUTIONNEL</div><div class="meta-badge">NIVEAU INTERMÉDIAIRE</div></div>
+  </div>
+  <div class="content-area">
+    <div class="block">
+      <div class="block-label">4 zones de liquidité clés</div>
+      <div class="two-col">
+        <div class="col-cell" style="border-top:2px solid var(--red)"><div class="col-cell-label" style="color:var(--red)">SSL — Sell Side Liquidity</div><div class="col-cell-title">Au-dessus des plus hauts</div><div class="col-cell-text">Stop loss des acheteurs + ordres vendeurs des breakout traders. Les institutions vendent dans cette liquidité avant un retournement baissier fort.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--green)"><div class="col-cell-label" style="color:var(--green)">BSL — Buy Side Liquidity</div><div class="col-cell-title">En-dessous des plus bas</div><div class="col-cell-text">Stop loss des vendeurs + ordres acheteurs. Les institutions achètent dans cette liquidité avant un retournement haussier fort.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--gold)"><div class="col-cell-label" style="color:var(--gold)">EQH / EQL</div><div class="col-cell-title">Égalités de sommets/creux</div><div class="col-cell-text">Equal Highs et Equal Lows créent des zones de liquidité très visibles. Le prix est attiré vers ces niveaux avant de poursuivre sa direction réelle.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--purple)"><div class="col-cell-label" style="color:var(--purple)">FVG / Imbalances</div><div class="col-cell-title">Liquidité cachée</div><div class="col-cell-text">Les gaps et déséquilibres de prix représentent une liquidité cachée. Le marché cherche souvent à les combler avant de reprendre sa direction principale.</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Processus stratégique en 5 étapes</div>
+      <div class="steps">
+        <div class="step-cell"><div class="step-num">①</div><div class="step-title">Identifier</div><div class="step-desc">Repérer SSL, BSL, EQH/EQL sur HTF</div></div>
+        <div class="step-cell"><div class="step-num">②</div><div class="step-title">Planifier</div><div class="step-desc">Vers quelle liquidité le prix va-t-il ?</div></div>
+        <div class="step-cell"><div class="step-num">③</div><div class="step-title">Attendre</div><div class="step-desc">Attendre la prise effective de liquidité</div></div>
+        <div class="step-cell"><div class="step-num">④</div><div class="step-title">Confirmer</div><div class="step-desc">CHoCH ou rejet sur OB après prise</div></div>
+        <div class="step-cell"><div class="step-num">⑤</div><div class="step-title">Gérer</div><div class="step-desc">Stop au-delà — TP sur liquidité opposée</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Règles</div>
+      <div class="rules">
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">La liquidité <strong>attire le prix comme un aimant</strong> — identifier les zones SSL/BSL avant toute analyse.</div></div>
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Les institutions prennent la liquidité <strong>avant</strong> de provoquer un mouvement directionnel fort.</div></div>
+        <div class="rule note"><span class="rule-icon">!</span><div class="rule-text">Ne jamais anticiper. Attendre que le prix prenne effectivement la liquidité et donne un signal de confirmation.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text">Ne pas entrer en direction d'une zone de liquidité — attendre qu'elle soit prise pour trader le retournement.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 06 ORDER BLOCK -->
+<div class="page" id="page-ob">
+  <div class="topbar"><div class="topbar-bc">SMC <span class="topbar-sep">/</span> <span>Order Block</span></div><span class="topbar-tag" style="color:var(--green)">ZONE</span></div>
+  <div class="notion-hero">
+    <div><p class="notion-eyebrow">06 — Zone</p><h1 class="notion-title">Order Block</h1><p class="notion-subtitle">ZONES INSTITUTIONNELLES D'ACHAT / VENTE</p><p class="notion-desc">Les Order Blocks représentent les dernières bougies opposées avant une impulsion forte. Ce sont les zones où les institutions ont passé de gros ordres avant de provoquer le mouvement — le prix y revient souvent pour compléter les ordres restants en attente.</p></div>
+    <div class="notion-meta"><div class="meta-badge accent" style="--accent:var(--green)">INSTITUTIONNEL</div><div class="meta-badge">NIVEAU INTERMÉDIAIRE</div></div>
+  </div>
+  <div class="content-area">
+    <div class="block">
+      <div class="block-label">Les 2 types d'Order Block</div>
+      <div class="two-col">
+        <div class="col-cell" style="border-top:2px solid var(--green)"><div class="col-cell-label" style="color:var(--green)">OB Haussier (Bullish OB)</div><div class="col-cell-title">Zone d'achat institutionnelle</div><div class="col-cell-text" style="margin-bottom:12px">Dernière bougie <strong>baissière</strong> avant une impulsion haussière forte. Les institutions ont acheté massivement dans cette zone avant de pousser le prix.</div><div class="rules"><div class="rule step"><span class="rule-icon">①</span><div class="rule-text">Tendance baissière en cours</div></div><div class="rule step"><span class="rule-icon">②</span><div class="rule-text">Dernière bougie baissière identifiée</div></div><div class="rule step"><span class="rule-icon">③</span><div class="rule-text">Impulsion haussière forte (BOS)</div></div><div class="rule step"><span class="rule-icon">④</span><div class="rule-text">Retest de l'OB = zone d'achat</div></div></div></div>
+        <div class="col-cell" style="border-top:2px solid var(--red)"><div class="col-cell-label" style="color:var(--red)">OB Baissier (Bearish OB)</div><div class="col-cell-title">Zone de vente institutionnelle</div><div class="col-cell-text" style="margin-bottom:12px">Dernière bougie <strong>haussière</strong> avant une impulsion baissière forte. Les institutions ont vendu massivement dans cette zone avant de faire baisser le prix.</div><div class="rules"><div class="rule step"><span class="rule-icon">①</span><div class="rule-text">Tendance haussière en cours</div></div><div class="rule step"><span class="rule-icon">②</span><div class="rule-text">Dernière bougie haussière identifiée</div></div><div class="rule step"><span class="rule-icon">③</span><div class="rule-text">Impulsion baissière forte (BOS)</div></div><div class="rule step"><span class="rule-icon">④</span><div class="rule-text">Retest de l'OB = zone de vente</div></div></div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Conditions idéales — confluences</div>
+      <div class="three-col">
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--acid)">Structure BOS/CHoCH</div><div class="col-cell-text">L'OB doit être dans le sens de la tendance HTF. Un OB haussier en downtrend fort sans CHoCH = piège probable.</div></div>
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--purple)">FVG adjacent</div><div class="col-cell-text">OB + FVG dans la même zone = confluence très forte. Les deux attirent le prix et augmentent la probabilité de réaction nette.</div></div>
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--blue)">Liquidité prise avant</div><div class="col-cell-text">L'impulsion créant l'OB doit avoir pris de la liquidité (stop hunt). Confirme que les institutions ont rempli leurs ordres dans cette zone.</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Règles</div>
+      <div class="rules">
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Toujours attendre le retest de l'OB avec <strong>confirmation</strong> (rejet de bougie, engulfing) avant d'entrer.</div></div>
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text"><strong>Stop derrière l'OB</strong>. TP sur la prochaine zone de liquidité ou résistance majeure.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text">Ne jamais entrer en aveugle dans l'OB — une bougie de confirmation est indispensable.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text">Éviter les OB sur LTF si le HTF est en tendance opposée forte sans CHoCH confirmé.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 07 FVG -->
+<div class="page" id="page-fvg">
+  <div class="topbar"><div class="topbar-bc">SMC <span class="topbar-sep">/</span> <span>FVG — Fair Value Gap</span></div><span class="topbar-tag" style="color:var(--purple)">ZONE</span></div>
+  <div class="notion-hero">
+    <div><p class="notion-eyebrow">07 — Zone</p><h1 class="notion-title">Fair Value Gap</h1><p class="notion-subtitle">DÉSÉQUILIBRE DE PRIX = OPPORTUNITÉ D'ENTRÉE PRÉCISE</p><p class="notion-desc">Un FVG est un déséquilibre entre l'offre et la demande créé par un mouvement impulsif fort. Le prix a quitté une zone trop rapidement, laissant un vide qu'il a tendance à combler plus tard. C'est une inefficacité de marché — une zone où peu ou pas d'échanges ont eu lieu correctement.</p></div>
+    <div class="notion-meta"><div class="meta-badge accent" style="--accent:var(--purple)">IMBALANCE</div><div class="meta-badge">NIVEAU INTERMÉDIAIRE</div></div>
+  </div>
+  <div class="content-area">
+    <div class="block">
+      <div class="block-label">Règle des 3 bougies — identification</div>
+      <div class="two-col">
+        <div class="col-cell" style="border-top:2px solid var(--green)"><div class="col-cell-label" style="color:var(--green)">FVG Haussier (Demand Side FVG)</div><div class="col-cell-title">Zone d'achat potentielle</div><div class="col-cell-text" style="margin-bottom:12px">Formation sur 3 bougies lors d'un mouvement haussier impulsif.</div><div class="rules"><div class="rule step"><span class="rule-icon">B1</span><div class="rule-text">Bougie 1 — point de référence bas</div></div><div class="rule step"><span class="rule-icon">B2</span><div class="rule-text">Bougie 2 — impulsion haussière forte</div></div><div class="rule step"><span class="rule-icon">B3</span><div class="rule-text">Plus bas de B3 > plus haut de B1</div></div></div><div class="hl-box"><p>La zone entre le <strong>plus haut de B1</strong> et le <strong>plus bas de B3</strong> = le FVG haussier. Le prix y revient pour combler le déséquilibre avant de repartir à la hausse.</p></div></div>
+        <div class="col-cell" style="border-top:2px solid var(--red)"><div class="col-cell-label" style="color:var(--red)">FVG Baissier (Supply Side FVG)</div><div class="col-cell-title">Zone de vente potentielle</div><div class="col-cell-text" style="margin-bottom:12px">Formation sur 3 bougies lors d'un mouvement baissier impulsif.</div><div class="rules"><div class="rule step"><span class="rule-icon">B1</span><div class="rule-text">Bougie 1 — point de référence haut</div></div><div class="rule step"><span class="rule-icon">B2</span><div class="rule-text">Bougie 2 — impulsion baissière forte</div></div><div class="rule step"><span class="rule-icon">B3</span><div class="rule-text">Plus haut de B3 < plus bas de B1</div></div></div><div class="hl-box"><p>La zone entre le <strong>plus bas de B1</strong> et le <strong>plus haut de B3</strong> = le FVG baissier. Le prix y revient avant de repartir à la baisse.</p></div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Les 2 types de FVG selon le timeframe</div>
+      <div class="two-col">
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--blue)">FVG Intrabar — Minor FVG</div><div class="col-cell-title">Petits timeframes (M1, M5)</div><div class="col-cell-text">Fréquents mais moins fiables. Utile pour affiner une entrée sur un niveau HTF ou en scalping. Moins de force institutionnelle derrière.</div></div>
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--gold)">FVG Interbar — Major FVG</div><div class="col-cell-title">Grands timeframes (H1, H4, D1)</div><div class="col-cell-text">Plus puissants et fiables. Souvent alignés avec les niveaux institutionnels. À privilégier pour les setups swing et position trading.</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">5 caractéristiques clés</div>
+      <div class="rules">
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Créé par un <strong>mouvement impulsif fort</strong> — pas un mouvement lent et progressif sans volume.</div></div>
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Le prix <strong>tend à y revenir</strong> pour combler le déséquilibre — principe d'équilibre du marché.</div></div>
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Peut agir comme <strong>support ou résistance</strong> selon la direction : haussier = support, baissier = résistance.</div></div>
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text"><strong>Plus le FVG est grand</strong>, plus le déséquilibre est fort et plus la zone de retour est probable.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text">Tous les FVG ne seront pas comblés — rester sélectif. FVG contre la tendance HTF = fiabilité faible.</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Process d'utilisation</div>
+      <div class="steps">
+        <div class="step-cell"><div class="step-num">①</div><div class="step-title">Identifier</div><div class="step-desc">Repérer le FVG sur un mouvement impulsif</div></div>
+        <div class="step-cell"><div class="step-num">②</div><div class="step-title">Analyser</div><div class="step-desc">Vérifier structure, tendance HTF, liquidité</div></div>
+        <div class="step-cell"><div class="step-num">③</div><div class="step-title">Attendre</div><div class="step-desc">Attendre le retour du prix dans la zone</div></div>
+        <div class="step-cell"><div class="step-num">④</div><div class="step-title">Confirmer</div><div class="step-desc">Rejet dans le FVG (CHoCH LTF, engulf)</div></div>
+        <div class="step-cell"><div class="step-num">⑤</div><div class="step-title">Gérer</div><div class="step-desc">Stop au-delà du FVG, TP sur liquidité</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Confluences qui renforcent le FVG</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:4px">
+        <span class="tag" style="color:var(--green)">Order Block</span>
+        <span class="tag" style="color:var(--blue)">Liquidity Pool</span>
+        <span class="tag" style="color:var(--orange)">Support / Résistance</span>
+        <span class="tag" style="color:var(--gold)">Trendline</span>
+        <span class="tag" style="color:var(--purple)">POI / Premium & Discount</span>
+        <span class="tag" style="color:var(--red)">CHoCH sur LTF</span>
+        <span class="tag" style="color:var(--acid)">Zone de liquidité prise</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 08 S/R -->
+<div class="page" id="page-sr">
+  <div class="topbar"><div class="topbar-bc">SMC <span class="topbar-sep">/</span> <span>Support & Résistance</span></div><span class="topbar-tag" style="color:var(--orange)">ZONE</span></div>
+  <div class="notion-hero">
+    <div><p class="notion-eyebrow">08 — Zone</p><h1 class="notion-title">Support &<br>Résistance</h1><p class="notion-subtitle">NIVEAUX CLÉS — ANTICIPER LES RÉACTIONS DU PRIX</p><p class="notion-desc">Les résistances sont des zones où l'offre (vendeurs) est forte et le prix a tendance à baisser. Les supports sont des zones où la demande (acheteurs) est forte et le prix a tendance à rebondir. Ce sont les repères fondamentaux de toute analyse de marché.</p></div>
+    <div class="notion-meta"><div class="meta-badge accent" style="--accent:var(--orange)">NIVEAUX CLÉS</div><div class="meta-badge">NIVEAU BASE</div></div>
+  </div>
+  <div class="content-area">
+    <div class="block">
+      <div class="block-label">3 types de niveaux</div>
+      <div class="three-col">
+        <div class="col-cell" style="border-top:2px solid var(--text)"><div class="col-cell-label">Horizontaux</div><div class="col-cell-title">Les plus fiables</div><div class="col-cell-text">Basés sur des sommets ou creux historiques significatifs. Plus le niveau a été testé (rebondi) souvent, plus il est fort et à surveiller.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--orange)"><div class="col-cell-label" style="color:var(--orange)">Dynamiques (obliques)</div><div class="col-cell-title">Lignes de tendance</div><div class="col-cell-text">Résistances et supports dynamiques — le prix les teste lors des retracements avant de reprendre sa direction principale.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--blue)"><div class="col-cell-label" style="color:var(--blue)">Zones</div><div class="col-cell-title">Plus réalistes</div><div class="col-cell-text">Plages de prix où le prix a réagi plusieurs fois. Plus adaptées à la réalité du marché — qui n'est jamais précis au pip.</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">3 réactions possibles</div>
+      <table class="ct"><tr><th>Réaction</th><th>Description</th><th>Setup</th></tr><tr><td>Rebond sur résistance</td><td>Vendeurs dominent — prix repart à la baisse</td><td>Short au rejet. Stop au-dessus. TP sur prochain support.</td></tr><tr><td>Rebond sur support</td><td>Acheteurs dominent — prix repart à la hausse</td><td>Long au rebond. Stop en dessous. TP sur prochaine résistance.</td></tr><tr><td>Cassure + changement de rôle</td><td>Résistance cassée = nouveau support (et vice versa)</td><td>Attendre retest du niveau cassé. Entrer dans le sens de la cassure.</td></tr></table>
+    </div>
+    <div class="block">
+      <div class="block-label">Règles</div>
+      <div class="rules">
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Plus le niveau est testé, <strong>plus il est important</strong> — touché 4 fois est plus fort que touché 2 fois.</div></div>
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text"><strong>Les confluences augmentent la fiabilité</strong> : support + Fibonacci + OB + FVG = zone très forte.</div></div>
+        <div class="rule note"><span class="rule-icon">!</span><div class="rule-text">Un support en tendance baissière forte sera souvent cassé — toujours analyser le contexte HTF avant d'entrer.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text">Même le meilleur niveau peut être cassé — protège toujours ton capital avec un stop logique placé au-delà.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 09 ORDER FLOW -->
+<div class="page" id="page-orderflow">
+  <div class="topbar"><div class="topbar-bc">SMC <span class="topbar-sep">/</span> <span>Order Flow</span></div><span class="topbar-tag" style="color:var(--blue)">OUTIL</span></div>
+  <div class="notion-hero">
+    <div><p class="notion-eyebrow">09 — Outil</p><h1 class="notion-title">Order Flow</h1><p class="notion-subtitle">FOOTPRINT · DELTA · CARNET D'ORDRES — TEMPS RÉEL</p><p class="notion-desc">L'order flow consiste à lire les ordres exécutés en temps réel pour comprendre qui est agressif sur le marché. Contrairement à l'analyse technique classique, l'order flow montre ce qui se passe maintenant — pas ce qui s'est passé.</p></div>
+    <div class="notion-meta"><div class="meta-badge accent" style="--accent:var(--blue)">TEMPS RÉEL</div><div class="meta-badge">NIVEAU AVANCÉ</div></div>
+  </div>
+  <div class="content-area">
+    <div class="block">
+      <div class="block-label">Concepts fondamentaux</div>
+      <table class="ct"><tr><th>Concept</th><th>Définition</th><th>Interprétation</th></tr><tr><td>Market Buy</td><td>Exécuté à l'ASK — acheteur paye le prix du vendeur</td><td>Achat agressif — pression haussière immédiate</td></tr><tr><td>Market Sell</td><td>Exécuté au BID — vendeur accepte le prix acheteur</td><td>Vente agressive — pression baissière immédiate</td></tr><tr><td>Delta</td><td>Achats agressifs − Ventes agressives sur une bougie</td><td>Delta + = pression haussière / Delta − = pression baissière</td></tr><tr><td>Absorption</td><td>Un côté absorbe l'autre sans mouvement de prix</td><td>Zone de résistance forte — retournement probable</td></tr></table>
+    </div>
+    <div class="block">
+      <div class="block-label">Les 3 outils de l'order flow</div>
+      <div class="three-col">
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--acid)">Footprint</div><div class="col-cell-title">Volume par prix</div><div class="col-cell-text">Volumes exécutés à chaque niveau de prix, bougie par bougie. Vert = achats agressifs, Rouge = ventes agressives. Les imbalances révèlent les déséquilibres forts.</div></div>
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--blue)">Delta</div><div class="col-cell-title">Pression nette</div><div class="col-cell-text">Différence entre achats et ventes agressives. Delta positif = upward pressure. Delta négatif = downward pressure. La divergence delta est le signal le plus puissant.</div></div>
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--purple)">Order Book</div><div class="col-cell-title">Ordres en attente</div><div class="col-cell-text">Affiche les ordres limit en attente (BID et ASK). Peut être manipulé (spoofing) — toujours croiser avec le footprint avant de tirer des conclusions.</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">4 patterns clés</div>
+      <div class="rules">
+        <div class="rule ok"><span class="rule-icon">▲</span><div class="rule-text"><strong>Absorption BUY</strong> — Gros volume d'achats absorbe les ventes au même prix → signal haussier fort. Setup : long au-dessus du niveau d'absorption.</div></div>
+        <div class="rule no"><span class="rule-icon">▼</span><div class="rule-text"><strong>Absorption SELL</strong> — Gros volume de ventes absorbe les achats → signal baissier fort. Setup : short en dessous du niveau d'absorption.</div></div>
+        <div class="rule ok"><span class="rule-icon">▲</span><div class="rule-text"><strong>Breakout + delta positif</strong> — Cassure d'une résistance avec delta fort → breakout validé institutionnellement, pas un fakeout.</div></div>
+        <div class="rule note"><span class="rule-icon">!</span><div class="rule-text"><strong>Divergence delta</strong> — Prix monte mais delta baisse → faiblesse cachée sous la surface → risque de retournement à surveiller.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 10 PREMIUM & DISCOUNT -->
+<div class="page" id="page-pd">
+  <div class="topbar"><div class="topbar-bc">SMC <span class="topbar-sep">/</span> <span>Premium & Discount</span></div><span class="topbar-tag" style="color:var(--gold)">OUTIL</span></div>
+  <div class="notion-hero">
+    <div><p class="notion-eyebrow">10 — Outil</p><h1 class="notion-title">Premium &<br>Discount</h1><p class="notion-subtitle">50% / FIBONACCI — CHER OU BON MARCHÉ ?</p><p class="notion-desc">Le concept de Premium & Discount permet d'identifier si le prix se situe dans la partie haute (cher) ou basse (bon marché) du range de référence. Le 50% Fibonacci est la ligne d'équilibre. Objectif : acheter bas, vendre haut — comme n'importe quel business rentable.</p></div>
+    <div class="notion-meta"><div class="meta-badge accent" style="--accent:var(--gold)">FIBONACCI</div><div class="meta-badge">NIVEAU INTERMÉDIAIRE</div></div>
+  </div>
+  <div class="content-area">
+    <div class="block">
+      <div class="block-label">Les 3 zones</div>
+      <div class="three-col">
+        <div class="col-cell" style="border-top:2px solid var(--red)"><div class="col-cell-label" style="color:var(--red)">Premium — Au-dessus du 50%</div><div class="col-cell-title">Prix CHER</div><div class="col-cell-text">Zone de vente privilégiée. Risque d'achat élevé. Chercher des opportunités SELL avec confirmation structurelle (OB baissier, CHoCH).</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--gold)"><div class="col-cell-label" style="color:var(--gold)">Équilibre — 50%</div><div class="col-cell-title">Zone neutre</div><div class="col-cell-text">Le prix peut réagir des deux côtés. Attendre une confirmation claire (structure, OB, CHoCH, FVG) avant d'entrer en position.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--green)"><div class="col-cell-label" style="color:var(--green)">Discount — En-dessous du 50%</div><div class="col-cell-title">Prix BON MARCHÉ</div><div class="col-cell-text">Zone d'achat privilégiée. Risque de vente élevé. Chercher des opportunités BUY avec confirmation structurelle (OB haussier, CHoCH).</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Niveaux Fibonacci clés</div>
+      <table class="ct"><tr><th>Niveau</th><th>Zone</th><th>Interprétation</th><th>Utilisation</th></tr><tr><td>0% (High)</td><td style="color:var(--red)">Premium extrême</td><td>Sommet du range</td><td>Zone de vente extrême / liquidité SSL</td></tr><tr><td>23.6% — 38.2%</td><td style="color:var(--red)">Premium fort</td><td>Prix encore cher</td><td>Chercher ventes avec confluence OB/structure</td></tr><tr><td>50%</td><td style="color:var(--gold)">Équilibre</td><td>Ligne de bascule</td><td>Attendre confirmation des deux côtés</td></tr><tr><td>61.8% — 78.6%</td><td style="color:var(--green)">Discount fort</td><td>Prix bon marché</td><td>Chercher achats avec confluence OB/FVG</td></tr><tr><td>100% (Low)</td><td style="color:var(--green)">Discount extrême</td><td>Base du range</td><td>Zone d'achat extrême / liquidité BSL</td></tr></table>
+    </div>
+    <div class="block">
+      <div class="block-label">Exemples pratiques</div>
+      <div class="two-col">
+        <div class="col-cell" style="border-top:2px solid var(--green)"><div class="col-cell-label" style="color:var(--green)">Achat en Discount — BUY Setup</div><div class="col-cell-text" style="margin-bottom:12px">Le prix arrive en zone discount (sous le 50%), réagit sur un Order Block haussier avec une structure haussière (CHoCH confirmé sur LTF).</div><div class="hl-box"><p><strong>Long</strong> sur retest OB en zone discount. Stop sous l'OB. TP sur le 50% puis sur le High du range (SSL).</p></div></div>
+        <div class="col-cell" style="border-top:2px solid var(--red)"><div class="col-cell-label" style="color:var(--red)">Vente en Premium — SELL Setup</div><div class="col-cell-text" style="margin-bottom:12px">Le prix arrive en zone premium (au-dessus du 50%), réagit sur un Order Block baissier avec une structure baissière (CHoCH confirmé sur LTF).</div><div class="hl-box"><p><strong>Short</strong> sur retest OB en zone premium. Stop au-dessus de l'OB. TP sur le 50% puis sur le Low du range (BSL).</p></div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Règles</div>
+      <div class="rules">
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Définir un range clair : <strong>swing high (0%) et swing low (100%)</strong> sur le HTF avant de tracer le Fibonacci.</div></div>
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text">Le marché tend à revenir vers la <strong>moyenne (50%)</strong> — s'en souvenir pour les objectifs de Take Profit.</div></div>
+        <div class="rule note"><span class="rule-icon">!</span><div class="rule-text">Premium & Discount est un <strong>filtre de zone</strong>, pas un signal en soi — toujours besoin d'une confirmation structurelle.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text">Ne pas acheter en premium ou vendre en discount sans confirmation forte — la zone seule ne suffit pas.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 11 DOM -->
+<div class="page" id="page-dom">
+  <div class="topbar"><div class="topbar-bc">SMC <span class="topbar-sep">/</span> <span>DOM — Depth of Market</span></div><span class="topbar-tag" style="color:var(--purple)">OUTIL</span></div>
+  <div class="notion-hero">
+    <div><p class="notion-eyebrow">11 — Outil</p><h1 class="notion-title">DOM</h1><p class="notion-subtitle">DEPTH OF MARKET — CARNET D'ORDRES EN TEMPS RÉEL</p><p class="notion-desc">Le DOM affiche en temps réel tous les ordres d'achat (BID) et de vente (ASK) en attente à chaque niveau de prix. C'est la représentation visuelle de la liquidité disponible autour du prix actuel — un outil clé pour comprendre la pression directionnelle du marché avant qu'elle ne se manifeste sur le graphique.</p></div>
+    <div class="notion-meta"><div class="meta-badge accent" style="--accent:var(--purple)">TEMPS RÉEL</div><div class="meta-badge">NIVEAU AVANCÉ</div></div>
+  </div>
+  <div class="content-area">
+    <div class="block">
+      <div class="block-label">Les 3 composants fondamentaux</div>
+      <div class="three-col">
+        <div class="col-cell" style="border-top:2px solid var(--green)"><div class="col-cell-label" style="color:var(--green)">BID — Ordres d'achat</div><div class="col-cell-title">Côté gauche du DOM</div><div class="col-cell-text">Ordres d'achat en attente à des prix inférieurs au marché. Les acheteurs veulent acheter à ces prix. Affiché en vert — volume croissant vers le bas.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--red)"><div class="col-cell-label" style="color:var(--red)">ASK — Ordres de vente</div><div class="col-cell-title">Côté droit du DOM</div><div class="col-cell-text">Ordres de vente en attente à des prix supérieurs au marché. Les vendeurs veulent vendre à ces prix. Affiché en rouge — volume croissant vers le haut.</div></div>
+        <div class="col-cell" style="border-top:2px solid var(--gold)"><div class="col-cell-label" style="color:var(--gold)">SPREAD</div><div class="col-cell-title">Meilleur ASK − Meilleur BID</div><div class="col-cell-text">Coût implicite d'une entrée en market order. Plus le spread est faible, plus le marché est liquide et moins l'exécution coûte cher.</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Composants clés du DOM</div>
+      <table class="ct">
+        <tr><th>Composant</th><th>Définition</th><th>Ce qu'il révèle</th></tr>
+        <tr><td>Meilleur BID</td><td>Plus haut prix auquel un acheteur est prêt à acheter</td><td>Prix d'exécution si tu vends en market order maintenant</td></tr>
+        <tr><td>Meilleur ASK</td><td>Plus bas prix auquel un vendeur est prêt à vendre</td><td>Prix d'exécution si tu achètes en market order maintenant</td></tr>
+        <tr><td>Prix du marché</td><td>Dernier prix auquel une transaction a été exécutée</td><td>Le prix actuel affiché sur ton graphique en temps réel</td></tr>
+        <tr><td>Profondeur</td><td>Volume disponible à chaque niveau de prix</td><td>Zones de liquidité — où les gros ordres institutionnels attendent</td></tr>
+        <tr><td>Spread</td><td>Écart entre meilleur ASK et meilleur BID</td><td>Coût implicite + indicateur de liquidité du marché</td></tr>
+      </table>
+    </div>
+    <div class="block">
+      <div class="block-label">4 utilités du DOM en trading</div>
+      <div class="two-col">
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--blue)">Pression directionnelle</div><div class="col-cell-title">BID vs ASK</div><div class="col-cell-text">Si le volume BID dépasse largement l'ASK → pression haussière. L'inverse → pression baissière. Lecture directe de l'équilibre offre/demande en temps réel.</div></div>
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--green)">Zones de liquidité</div><div class="col-cell-title">Niveaux à gros volumes</div><div class="col-cell-text">Les niveaux avec de gros volumes BID ou ASK sont des zones de liquidité importantes. Le prix est souvent attiré vers ces niveaux — intégrable avec l'analyse SMC.</div></div>
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--orange)">Supports & résistances dynamiques</div><div class="col-cell-title">Murs d'ordres</div><div class="col-cell-text">Un mur ASK épais = résistance dynamique. Un mur BID épais = support dynamique. Attention : ces niveaux peuvent disparaître instantanément (spoofing).</div></div>
+        <div class="col-cell"><div class="col-cell-label" style="color:var(--gold)">Gestion d'exécution</div><div class="col-cell-title">Timing d'entrée</div><div class="col-cell-text">Voir à quel prix tu seras exécuté avant de placer ton ordre. Utile pour éviter le slippage sur les actifs peu liquides et optimiser le timing d'entrée.</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">Signaux de lecture clés</div>
+      <div class="rules">
+        <div class="rule ok"><span class="rule-icon">✓</span><div class="rule-text"><strong>Gros volumes BID</strong> à un niveau = support dynamique — acheteurs institutionnels en attente en force.</div></div>
+        <div class="rule no"><span class="rule-icon">✓</span><div class="rule-text"><strong>Gros volumes ASK</strong> à un niveau = résistance dynamique — vendeurs institutionnels en attente en force.</div></div>
+        <div class="rule note"><span class="rule-icon">!</span><div class="rule-text"><strong>Déséquilibre BID >> ASK</strong> = pression haussière → potentiel mouvement à la hausse imminent.</div></div>
+        <div class="rule note"><span class="rule-icon">!</span><div class="rule-text"><strong>Absorption</strong> = gros ordres market buy consomment l'ASK sans faire monter le prix → signal de retournement fort.</div></div>
+        <div class="rule note"><span class="rule-icon">!</span><div class="rule-text"><strong>Break des niveaux</strong> BID/ASK avec volume = continuation dans le sens du break — confirme le mouvement.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text"><strong>Spoofing</strong> — de gros ordres apparaissent pour simuler une pression puis disparaissent. Manipulation fréquente — ne jamais se fier au DOM seul.</div></div>
+        <div class="rule no"><span class="rule-icon">✗</span><div class="rule-text">Ne jamais utiliser le DOM seul — toujours <strong>combiner avec le footprint</strong> (ordres réellement exécutés) et la structure de marché.</div></div>
+      </div>
+    </div>
+    <div class="block">
+      <div class="block-label">DOM + Footprint — la combinaison complète</div>
+      <div class="hl-box">
+        <p>Le DOM montre les ordres <strong>en attente</strong>. Le Footprint montre les ordres <strong>exécutés</strong>. Ensemble, ils donnent une image complète de ce qui se passe vraiment sur le marché — ce que les participants veulent faire ET ce qu'ils font réellement. C'est la lecture la plus précise possible du flux institutionnel.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+<script>
+function go(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.querySelector('.main').scrollTo(0, 0);
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+}
+</script>
+</body>
+</html>
