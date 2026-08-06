@@ -149,6 +149,28 @@ def test_source_de_donnees_obligatoire():
         main(["backtest"])
 
 
+def test_csv_absent_donne_un_message_lisible(tmp_path, capsys):
+    """Un export raté ne doit pas se solder par une trace Python."""
+    (tmp_path / "autre.csv").write_text("time,open,high,low,close\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as sortie:
+        main(["check", "--csv", str(tmp_path / "manquant.csv"),
+              "--symbol-preset", "xauusd"])
+
+    message = str(sortie.value)
+    assert "introuvable" in message
+    assert "download" in message          # oriente vers la commande fautive
+    assert "autre.csv" in message         # rattrape une faute de frappe
+
+
+def test_csv_vide(tmp_path):
+    csv = tmp_path / "vide.csv"
+    csv.write_text("time,open,high,low,close,volume\n", encoding="utf-8")
+    with pytest.raises(SystemExit) as sortie:
+        main(["check", "--csv", str(csv), "--symbol-preset", "xauusd"])
+    assert "Aucune bougie" in str(sortie.value)
+
+
 def test_optimize(capsys):
     code = main(["optimize", "--demo", "--demo-bars", "1500",
                  "--grid-tp", "2", "--grid-swing", "2,3"])

@@ -156,13 +156,27 @@ def download_mt5(
         raise ValueError(f"Unité de temps inconnue : {timeframe}")
 
     if not mt5.initialize():  # pragma: no cover - dépend de la plateforme
-        raise RuntimeError(f"Connexion à MT5 impossible : {mt5.last_error()}")
+        raise RuntimeError(
+            f"Connexion à MT5 impossible : {mt5.last_error()}\n"
+            f"Vérifie que le terminal MetaTrader 5 est ouvert et connecté à ton "
+            f"compte, puis relance la commande."
+        )
     try:  # pragma: no cover - dépend de la plateforme
         tf = getattr(mt5, f"TIMEFRAME_{timeframe}")
+        if not mt5.symbol_select(symbol, True):
+            connus = mt5.symbols_get(f"*{symbol[:3]}*") or []
+            proches = ", ".join(s.name for s in connus[:8]) or "aucun"
+            raise RuntimeError(
+                f"Symbole {symbol} introuvable chez ton courtier.\n"
+                f"Les noms varient (XAUUSD, XAUUSD.a, GOLD...). Symboles "
+                f"approchants : {proches}"
+            )
         rates = mt5.copy_rates_from_pos(symbol, tf, 0, bars)
         if rates is None or len(rates) == 0:
             raise RuntimeError(
-                f"Aucune donnée pour {symbol} en {timeframe} : {mt5.last_error()}"
+                f"Aucune donnée pour {symbol} en {timeframe} : {mt5.last_error()}\n"
+                f"Ouvre un graphique {symbol} sur cette unité de temps et fais "
+                f"défiler vers la gauche pour charger l'historique."
             )
         return [
             Candle(

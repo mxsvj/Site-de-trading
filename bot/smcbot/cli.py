@@ -271,12 +271,32 @@ def make_config(args: argparse.Namespace) -> BotConfig:
     return cfg
 
 
+def _csv_voisins(chemin: Path) -> str:
+    """Liste les CSV du dossier visé, pour rattraper une faute de frappe."""
+    dossier = chemin.parent if str(chemin.parent) else Path(".")
+    try:
+        noms = sorted(p.name for p in dossier.glob("*.csv"))
+    except OSError:
+        return "(dossier illisible)"
+    return ", ".join(noms) if noms else "aucun"
+
+
 def load_candles(args: argparse.Namespace, cfg: BotConfig) -> list[Candle]:
     """Charge les bougies depuis un CSV ou génère la série de démo."""
     if getattr(args, "csv", None):
-        candles = load_csv(args.csv)
+        chemin = Path(args.csv)
+        if not chemin.exists():
+            # Cas le plus fréquent : l'export qui devait produire ce fichier a
+            # échoué. Le dire, plutôt que de laisser remonter une trace Python.
+            raise SystemExit(
+                f"Fichier introuvable : {chemin}\n"
+                f"Si tu viens de lancer `download`, c'est cette commande-là qui a "
+                f"échoué — relance-la et lis son message d'erreur.\n"
+                f"Fichiers CSV présents ici : {_csv_voisins(chemin)}"
+            )
+        candles = load_csv(chemin)
         if not candles:
-            raise SystemExit(f"Aucune bougie lue dans {args.csv}")
+            raise SystemExit(f"Aucune bougie lue dans {chemin}")
         decalage = getattr(args, "tz_shift", 0.0)
         return shift_times(candles, decalage) if decalage else candles
     if getattr(args, "demo", False):
@@ -402,10 +422,24 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 def cmd_download(args: argparse.Namespace) -> int:
     candles = download_mt5(args.symbol, args.timeframe, args.bars)
-    save_csv(candles, args.out)
+
+    sortie = Path(args.out)
+    if sortie.parent and not sortie.parent.exists():
+        sortie.parent.mkdir(parents=True, exist_ok=True)
+    save_csv(candles, sortie)
+
     print(
-        f"{len(candles)} bougies {args.symbol} {args.timeframe} "
-        f"écrites dans {args.out}"
+        f"{len(candles)} bougies {args.symbol} {args.timeframe} écrites dans "
+        f"{sortie.resolve()}"
+    )
+    if len(candles) < args.bars:
+        print(
+            f"Note : {args.bars} demandées, {len(candles)} disponibles. Fais "
+            f"défiler le graphique vers la gauche dans MT5 pour en charger plus."
+        )
+    print(
+        "Les horodatages sont à l'heure du serveur. Lance `check` pour trouver "
+        "le décalage à appliquer."
     )
     return 0
 
@@ -474,6 +508,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return COMMANDS[args.command](args)
     except (RuntimeError, ValueError) as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        # Fichier absent, illisible, disque plein : un message, pas une trace.
+        print(f"Erreur d'accès au fichier : {exc}", file=sys.stderr)
         return 1
 
 
