@@ -1,0 +1,9 @@
+# Le cœur du bot (moteur SMC, backtest, paper trading) n'a aucune dépendance :
+# il tourne avec Python 3.10+ seul, sur n'importe quel système.
+
+# Connexion à MetaTrader 5 — Windows uniquement, nécessaire seulement pour
+# télécharger l'historique réel et alimenter le paper trading en direct.
+MetaTrader5>=5.0.45 ; sys_platform == "win32"
+
+# Développement
+pytest>=7.4

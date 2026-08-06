@@ -1,0 +1,25 @@
+[project]
+name = "smcbot"
+version = "1.0.0"
+description = "Bot de trading SMC pour MetaTrader 5 : backtest et paper trading"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+mt5 = ["MetaTrader5>=5.0.45 ; sys_platform == 'win32'"]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+smcbot = "smcbot.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["smcbot*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
