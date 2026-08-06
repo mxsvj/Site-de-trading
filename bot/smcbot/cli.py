@@ -21,6 +21,7 @@ from .data import (
     synthetic_series,
 )
 from .paper import PaperTrader, setup_logging
+from .quality import inspect_series, shift_times
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -43,6 +44,13 @@ def build_parser() -> argparse.ArgumentParser:
             "--demo-bars", type=int, default=3000, help="taille de la série de démo"
         )
         src.add_argument("--seed", type=int, default=7, help="graine de la démo")
+        src.add_argument(
+            "--tz-shift",
+            type=float,
+            default=0.0,
+            help="décalage horaire à appliquer aux bougies, en heures "
+            "(ex. -3 pour ramener un serveur UTC+3 en UTC)",
+        )
 
         cf = p.add_argument_group("configuration")
         cf.add_argument("--config", help="fichier JSON de configuration")
@@ -141,6 +149,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--warmup", type=int, default=300, help="bougies d'historique de préchauffe"
     )
 
+    p_check = sub.add_parser(
+        "check", help="contrôler la qualité d'un historique avant de le backtester"
+    )
+    add_common(p_check)
+
     p_dl = sub.add_parser("download", help="exporter un historique MT5 en CSV")
     p_dl.add_argument("--symbol", required=True)
     p_dl.add_argument("--timeframe", default="M15")
@@ -238,7 +251,8 @@ def load_candles(args: argparse.Namespace, cfg: BotConfig) -> list[Candle]:
         candles = load_csv(args.csv)
         if not candles:
             raise SystemExit(f"Aucune bougie lue dans {args.csv}")
-        return candles
+        decalage = getattr(args, "tz_shift", 0.0)
+        return shift_times(candles, decalage) if decalage else candles
     if getattr(args, "demo", False):
         # La série de démo suit l'échelle de prix et la cadence du symbole visé.
         return synthetic_series(
@@ -331,6 +345,35 @@ def cmd_paper(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_check(args: argparse.Namespace) -> int:
+    cfg = make_config(args)
+    candles = load_candles(args, cfg)
+    report = inspect_series(candles, cfg.symbol)
+    print(report.to_text())
+
+    if report.inferred_minutes and cfg.timeframe in TIMEFRAMES:
+        attendu = TIMEFRAMES[cfg.timeframe]
+        if attendu != report.inferred_minutes:
+            print(
+                f"\n⚠ Tu annonces {cfg.timeframe} ({attendu} min) mais le fichier "
+                f"contient des bougies de {report.inferred_minutes} min."
+            )
+
+    if cfg.filters.min_stop_points and report.median_range_points:
+        bougies = cfg.filters.min_stop_points / report.median_range_points
+        print(
+            f"\nLe plancher de stop ({cfg.filters.min_stop_points:.0f} pts) vaut "
+            f"{bougies:.1f} bougie(s) d'amplitude médiane."
+        )
+        if bougies < 1:
+            print(
+                "  → Très serré au regard de la volatilité : la plupart des stops "
+                "seront touchés par le bruit."
+            )
+
+    return 0 if report.clean else 2
+
+
 def cmd_download(args: argparse.Namespace) -> int:
     candles = download_mt5(args.symbol, args.timeframe, args.bars)
     save_csv(candles, args.out)
@@ -390,6 +433,7 @@ def cmd_init_config(args: argparse.Namespace) -> int:
 
 COMMANDS = {
     "backtest": cmd_backtest,
+    "check": cmd_check,
     "paper": cmd_paper,
     "download": cmd_download,
     "demo-data": cmd_demo_data,

@@ -89,6 +89,49 @@ Les champs à vérifier en priorité dans `symbol` : `point`, `digits`,
 symbole dans la fenêtre *Observation du marché* → **Spécification**.
 Un `value_per_point_per_lot` faux fausse **tout** le dimensionnement.
 
+## Contrôle des données — à faire avant tout backtest
+
+```bash
+python -m smcbot check --csv data/xauusd_m1.csv --preset xauusd-scalp
+```
+
+Un backtest sur des données trouées, dupliquées ou horodatées dans le fuseau du
+serveur produit des chiffres parfaitement présentables et faux. `check` cherche
+ce qui ne se voit pas à l'œil nu :
+
+```
+├─ Horaires ─────────────────────────────────
+│ Heure creuse        : 00h
+│ Décalage supposé    : UTC+3
+└────────────────────────────────────────────
+
+⚠ À traiter avant de tirer la moindre conclusion :
+  - les horodatages semblent en UTC+3 et non en UTC : les filtres de session
+    porteraient sur les mauvaises heures. Corrige avec --tz-shift -3
+```
+
+**C'est le piège numéro un.** Un serveur MT5 est presque toujours en UTC+2 ou
+UTC+3, jamais en UTC. Le décalage est deviné à partir de la pause quotidienne du
+marché (21:00-22:00 UTC pour l'or et le forex) : l'heure la plus vide de la
+journée révèle le fuseau. Applique ensuite la correction partout :
+
+```bash
+python -m smcbot backtest --csv data/xauusd_m1.csv --preset xauusd-scalp --tz-shift -3
+```
+
+Sans elle, la session « Londres 07:00-11:00 » filtre en réalité 04:00-08:00 UTC.
+Les trades sont pris, le rapport s'affiche, et rien ne signale l'erreur.
+
+`check` détecte aussi les doublons d'horodatage, les bougies hors séquence, les
+OHLC incohérents, les trous intra-session (qui faussent les bougies supérieures
+reconstruites), les bougies de samedi, et l'écart entre les décimales réelles et
+le `digits` déclaré. Il renvoie le code de sortie 2 si quelque chose cloche,
+0 sinon — utilisable dans un script.
+
+Enfin il rapporte l'amplitude médiane des bougies, pour juger si ton plancher de
+stop est réaliste : un `min_stop_points` inférieur à une bougie médiane signifie
+que la plupart des stops seront touchés par le bruit.
+
 ## Paper trading
 
 Hors ligne, en rejouant un historique à pleine vitesse (utile pour voir le
@@ -319,9 +362,10 @@ bot/
 │   ├── broker.py      courtier simulé : exécution, spread, stops, kill switch
 │   ├── backtest.py    boucle de backtest et exports CSV
 │   ├── metrics.py     winrate, profit factor, drawdown, espérance, Sharpe
+│   ├── quality.py     contrôle des données : fuseau, trous, doublons
 │   ├── paper.py       boucle de paper trading, journal, persistance de l'état
 │   └── cli.py         interface en ligne de commande
-└── tests/             81 tests
+└── tests/            100 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -335,12 +379,12 @@ cd bot && python -m pytest
 ```
 
 ```
-81 passed
+100 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),
 le dimensionnement des positions, la mécanique d'exécution (spread, priorité du
-stop, breakeven, kill switch), l'absence de lookahead et la cohérence
+stop, breakeven, kill switch), le contrôle qualité des données, l'absence de lookahead et la cohérence
 backtest ↔ paper trading.
 
 ## Utiliser le bot depuis du code
