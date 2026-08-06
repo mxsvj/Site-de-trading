@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import argparse
 import itertools
+import json
 import sys
+from dataclasses import fields
 from pathlib import Path
 from typing import Sequence
 
 from .backtest import run_backtest
-from .config import PRESETS, BotConfig, eurusd, xauusd
+from .config import PRESETS, BotConfig, SymbolSpec, eurusd, xauusd
 from .data import (
     TIMEFRAMES,
     Candle,
@@ -64,6 +66,10 @@ def build_parser() -> argparse.ArgumentParser:
             "--symbol-preset",
             choices=("eurusd", "xauusd"),
             help="caractéristiques du contrat (point, lot, spread typique)",
+        )
+        cf.add_argument(
+            "--symbol-spec",
+            help="fichier JSON de spécification produit par mt5/ExportBars.mq5",
         )
         cf.add_argument("--timeframe", default=None, help="unité de temps (ex. M15)")
         cf.add_argument(
@@ -187,6 +193,24 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def load_symbol_spec(path: str) -> SymbolSpec:
+    """Charge la spécification écrite par mt5/ExportBars.mq5.
+
+    Les champs inconnus sont ignorés plutôt que de faire échouer la commande :
+    une version ultérieure du script peut en ajouter.
+    """
+    try:
+        brut = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Spécification illisible ({path}) : {exc}") from exc
+
+    connus = {f.name for f in fields(SymbolSpec)}
+    inconnus = sorted(set(brut) - connus)
+    if inconnus:
+        print(f"Champs ignorés dans {path} : {', '.join(inconnus)}")
+    return SymbolSpec(**{k: v for k, v in brut.items() if k in connus})
+
+
 def make_config(args: argparse.Namespace) -> BotConfig:
     """Construit la configuration : preset, puis fichier JSON, puis CLI."""
     if getattr(args, "config", None):
@@ -198,6 +222,8 @@ def make_config(args: argparse.Namespace) -> BotConfig:
 
     if getattr(args, "symbol_preset", None):
         cfg.symbol = {"eurusd": eurusd, "xauusd": xauusd}[args.symbol_preset]()
+    if getattr(args, "symbol_spec", None):
+        cfg.symbol = load_symbol_spec(args.symbol_spec)
     if getattr(args, "symbol", None):
         cfg.symbol.name = args.symbol
     if getattr(args, "timeframe", None):

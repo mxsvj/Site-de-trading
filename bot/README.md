@@ -54,40 +54,67 @@ Signaux générés : 43
 
 ## Avec tes vraies données
 
-### Option A — export manuel depuis MT5 (fonctionne partout)
+### Option A — script MQL5, sans installer Python sur la machine MT5
 
-Exporte l'historique en CSV depuis MT5 (ou depuis n'importe quelle autre source
-de données OHLC). Ensuite :
+C'est la voie la plus simple si MT5 tourne sur une autre machine que ton code,
+ou si tu ne veux rien installer à côté du terminal.
+
+1. Copie `bot/mt5/ExportBars.mq5` dans `MQL5/Scripts` du dossier de données du
+   terminal (*Fichier → Ouvrir le dossier de données*).
+2. Ouvre-le dans MetaEditor, compile avec **F7**.
+3. Dans MT5, glisse le script sur un graphique. Choisis le symbole, l'unité de
+   temps et le nombre de bougies.
+
+Il écrit deux fichiers dans `MQL5/Files` :
+
+| Fichier | Contenu |
+|---|---|
+| `XAUUSD_M1.csv` | les bougies, directement lisibles par smcbot |
+| `XAUUSD_spec.json` | les caractéristiques du contrat, calculées par MT5 |
+
+Le second t'évite de recopier des valeurs à la main — **`value_per_point_per_lot`
+en particulier, qui fausse tout le dimensionnement s'il est erroné** — et il
+s'injecte directement :
 
 ```bash
-python -m smcbot backtest --csv EURUSD_M15.csv --symbol EURUSD --timeframe M15
+python -m smcbot check --csv XAUUSD_M1.csv --symbol-spec XAUUSD_spec.json --timeframe M1
 ```
 
-Le chargeur accepte les en-têtes usuels (`time,open,high,low,close,volume`) comme
-le format tabulé de MT5 (`<DATE>  <TIME>  <OPEN> ...`).
+> Le script n'a pas pu être compilé lors de son écriture (pas de MT5 disponible).
+> Le format de ses deux fichiers de sortie, lui, est vérifié par des tests. Si la
+> compilation échoue chez toi, signale-le.
+
+MT5 ne publie pas la commission : `commission_per_lot` reste à 0, à corriger
+d'après ce que facture ton courtier.
 
 ### Option B — téléchargement direct (Windows, MT5 ouvert)
 
+Nécessite Python **sur la machine où tourne MT5**. Le module `MetaTrader5`
+n'existe que sous Windows.
+
 ```bash
-python -m smcbot download --symbol EURUSD --timeframe M15 --bars 20000 --out data/eurusd_m15.csv
-python -m smcbot backtest --csv data/eurusd_m15.csv --symbol EURUSD
+pip install MetaTrader5
+python -m smcbot download --symbol XAUUSD --timeframe M1 --bars 50000 --out data/xauusd_m1.csv
 ```
 
-### Renseigner ton instrument
+### Option C — n'importe quel CSV
 
-Les valeurs par défaut correspondent à EURUSD 5 digits sur un compte en USD.
-Pour tout le reste, génère un fichier de configuration et corrige-le :
+Le chargeur accepte les en-têtes usuels (`time,open,high,low,close,volume`) comme
+le format tabulé de MT5 (`<DATE>  <TIME>  <OPEN> ...`), et les dates en
+`AAAA-MM-JJ`, `AAAA.MM.JJ` ou `JJ/MM/AAAA`.
+
+### Renseigner ton instrument à la main
+
+Si tu n'utilises pas `--symbol-spec`, pars d'une configuration et corrige-la :
 
 ```bash
-python -m smcbot init-config --out config.json
-python -m smcbot backtest --csv data/xauusd_m15.csv --config config.json
+python -m smcbot init-config --preset xauusd-scalp --out config.json
 ```
 
 Les champs à vérifier en priorité dans `symbol` : `point`, `digits`,
 `value_per_point_per_lot`, `min_lot`, `lot_step`, `spread_points` et
 `commission_per_lot`. Ils se lisent dans MT5 en faisant un clic droit sur le
 symbole dans la fenêtre *Observation du marché* → **Spécification**.
-Un `value_per_point_per_lot` faux fausse **tout** le dimensionnement.
 
 ## Contrôle des données — à faire avant tout backtest
 
@@ -365,7 +392,9 @@ bot/
 │   ├── quality.py     contrôle des données : fuseau, trous, doublons
 │   ├── paper.py       boucle de paper trading, journal, persistance de l'état
 │   └── cli.py         interface en ligne de commande
-└── tests/            100 tests
+├── mt5/
+│   └── ExportBars.mq5 export CSV + spécification, sans Python
+└── tests/            114 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -379,7 +408,7 @@ cd bot && python -m pytest
 ```
 
 ```
-100 passed
+114 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),

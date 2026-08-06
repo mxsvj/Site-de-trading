@@ -80,6 +80,56 @@ def test_coupure_de_week_end_n_est_pas_un_trou():
     assert report.gaps == []
 
 
+def test_pause_quotidienne_n_est_pas_un_trou():
+    """La pause de 21:00-22:00 est normale : une ligne par jour noierait les vrais trous.
+
+    L'exclusion doit se caler sur l'heure creuse **observée**, car sur un export
+    horodaté à l'heure du serveur la pause ne tombe pas à 21:00.
+    """
+    bougies: list[Candle] = []
+    for jour in range(5):
+        base = T0 + timedelta(days=jour)
+        for heure in range(24):
+            if heure == 21:
+                continue  # pause quotidienne
+            for minute in range(0, 60, 5):
+                bougies.append(
+                    Candle(
+                        base + timedelta(hours=heure, minutes=minute),
+                        2650.0, 2650.5, 2649.5, 2650.2,
+                    )
+                )
+
+    report = inspect_series(bougies, xauusd())
+    assert report.quiet_hour == 21
+    assert report.gaps == [], f"pause comptée comme trou : {report.gaps[:3]}"
+    assert report.clean
+
+
+def test_vrai_trou_toujours_detecte_malgre_la_pause():
+    """L'exclusion de la pause ne doit pas masquer une coupure réelle."""
+    bougies: list[Candle] = []
+    for jour in range(5):
+        base = T0 + timedelta(days=jour)
+        for heure in range(24):
+            if heure == 21:
+                continue
+            if jour == 2 and heure in (10, 11, 12):
+                continue  # trois heures manquantes en pleine session
+            for minute in range(0, 60, 5):
+                bougies.append(
+                    Candle(
+                        base + timedelta(hours=heure, minutes=minute),
+                        2650.0, 2650.5, 2649.5, 2650.2,
+                    )
+                )
+
+    report = inspect_series(bougies, xauusd())
+    assert report.quiet_hour == 21
+    assert len(report.gaps) == 1
+    assert report.gaps[0][1] >= 180
+
+
 def test_ohlc_incoherent():
     bougies = serie_m1(20)
     bougies[5] = Candle(bougies[5].time, 2650.0, 2649.0, 2651.0, 2650.0)  # high < low

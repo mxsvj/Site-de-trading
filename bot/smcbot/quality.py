@@ -131,14 +131,38 @@ def inspect_series(
 
     report.inferred_minutes = int(statistics.median(deltas)) if deltas else 0
 
-    # Trous : un écart supérieur au double du pas, hors coupure de week-end.
+    # Répartition horaire : la pause quotidienne du marché révèle le fuseau du
+    # serveur. Encore faut-il qu'elle existe — un flux continu 24 h/24 n'a pas
+    # d'heure creuse, et prendre le minimum d'une distribution plate reviendrait
+    # à suggérer un décalage au hasard.
+    presentes = Counter(c.time.hour for c in candles)
+    # Les 24 heures doivent figurer explicitement : une heure entièrement vide
+    # n'apparaît pas dans un Counter, et c'est justement celle qu'on cherche.
+    par_heure = {h: presentes.get(h, 0) for h in range(24)}
+    couvertes = len({c.time.date() for c in candles})
+    if couvertes >= 3 and len(presentes) >= 12:
+        creuse = min(par_heure, key=lambda h: par_heure[h])
+        mediane = statistics.median(par_heure.values())
+        if mediane > 0 and par_heure[creuse] < PAUSE_RATIO * mediane:
+            report.quiet_hour = creuse
+            brut = (creuse - QUIET_HOUR_UTC) % 24
+            report.suggested_tz_shift = brut - 24 if brut > 12 else brut
+
+    # Trous : un écart supérieur au double du pas. La coupure du week-end et la
+    # pause quotidienne sont normales — les compter en défauts noierait les
+    # vrais trous sous une ligne par jour.
     if report.inferred_minutes > 0:
         seuil = report.inferred_minutes * 2
         trous: list[tuple[datetime, int]] = []
         for previous, current in zip(candles, candles[1:]):
             minutes = int((current.time - previous.time).total_seconds() // 60)
-            if minutes > seuil and not _spans_weekend(previous.time, current.time):
-                trous.append((previous.time, minutes - report.inferred_minutes))
+            if minutes <= seuil:
+                continue
+            if _spans_weekend(previous.time, current.time):
+                continue
+            if _spans_daily_break(previous.time, current.time, report.quiet_hour):
+                continue
+            trous.append((previous.time, minutes - report.inferred_minutes))
         trous.sort(key=lambda g: g[1], reverse=True)
         report.gaps = trous
 
@@ -157,23 +181,6 @@ def inspect_series(
     report.p90_range_points = _percentile(ranges, 0.90)
 
     report.decimals_seen = max(_decimals(c.close) for c in candles)
-
-    # Répartition horaire : la pause quotidienne du marché révèle le fuseau du
-    # serveur. Encore faut-il qu'elle existe — un flux continu 24 h/24 n'a pas
-    # d'heure creuse, et prendre le minimum d'une distribution plate reviendrait
-    # à suggérer un décalage au hasard.
-    presentes = Counter(c.time.hour for c in candles)
-    # Les 24 heures doivent figurer explicitement : une heure entièrement vide
-    # n'apparaît pas dans un Counter, et c'est justement celle qu'on cherche.
-    par_heure = {h: presentes.get(h, 0) for h in range(24)}
-    couvertes = len({c.time.date() for c in candles})
-    if couvertes >= 3 and len(presentes) >= 12:
-        creuse = min(par_heure, key=lambda h: par_heure[h])
-        mediane = statistics.median(par_heure.values())
-        if mediane > 0 and par_heure[creuse] < PAUSE_RATIO * mediane:
-            report.quiet_hour = creuse
-            brut = (creuse - QUIET_HOUR_UTC) % 24
-            report.suggested_tz_shift = brut - 24 if brut > 12 else brut
 
     report.saturday_bars = sum(1 for c in candles if c.time.weekday() == 5)
     report.sunday_bars = sum(1 for c in candles if c.time.weekday() == 6)
@@ -239,6 +246,24 @@ def _add_warnings(report: DataReport, symbol: SymbolSpec) -> None:
 def _spans_weekend(start: datetime, end: datetime) -> bool:
     """L'écart traverse-t-il la coupure hebdomadaire ?"""
     return start.weekday() == 4 or end.weekday() == 6 or end.weekday() < start.weekday()
+
+
+def _spans_daily_break(start: datetime, end: datetime, quiet_hour: int) -> bool:
+    """L'écart correspond-il à la pause quotidienne du marché ?
+
+    L'heure de référence est celle réellement observée, pas 21:00 UTC : sur un
+    export horodaté à l'heure du serveur, la pause tombe ailleurs.
+    """
+    if quiet_hour < 0:
+        return False
+    if (end - start) > timedelta(hours=3):
+        return False  # trop long pour être la seule pause quotidienne
+    heure = start
+    while heure < end:
+        if heure.hour == quiet_hour:
+            return True
+        heure += timedelta(hours=1)
+    return end.hour == quiet_hour
 
 
 def _percentile(values: Sequence[float], q: float) -> float:

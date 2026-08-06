@@ -179,6 +179,21 @@ def download_mt5(
         mt5.shutdown()
 
 
+def market_open(when: datetime) -> bool:
+    """Le marché forex/or est-il ouvert à cet instant (en UTC) ?
+
+    Ouverture le dimanche 22:00 UTC, clôture le vendredi 21:00 UTC, avec une
+    pause quotidienne de 21:00 à 22:00.
+    """
+    if when.weekday() == 5:  # samedi
+        return False
+    if when.weekday() == 6 and when.hour < 22:  # dimanche avant l'ouverture
+        return False
+    if when.weekday() == 4 and when.hour >= 21:  # vendredi après la clôture
+        return False
+    return when.hour != 21  # pause quotidienne
+
+
 def synthetic_series(
     n: int = 3000,
     start: float = 1.1000,
@@ -191,9 +206,14 @@ def synthetic_series(
     Le processus alterne des phases de tendance et de range afin de produire des
     cassures de structure, des order blocks et des FVG exploitables — ce qu'un
     simple bruit blanc ne ferait pas.
+
+    Les horodatages suivent le calendrier réel du marché : ni samedi, ni pause
+    quotidienne. Une série de démonstration qui coterait 24 h/24 donnerait une
+    fausse idée du comportement des filtres horaires.
     """
     rng = random.Random(seed)
-    t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    step = timedelta(minutes=timeframe_minutes)
+    moment = datetime(2024, 1, 1, tzinfo=timezone.utc)  # lundi, marché ouvert
     candles: list[Candle] = []
 
     price = start
@@ -230,7 +250,7 @@ def synthetic_series(
         digits = max(0, int(round(-math.log10(point))))
         candles.append(
             Candle(
-                time=t0 + timedelta(minutes=timeframe_minutes * i),
+                time=moment,
                 open=round(o, digits),
                 high=round(h, digits),
                 low=round(l, digits),
@@ -239,6 +259,10 @@ def synthetic_series(
             )
         )
         price = c
+
+        moment += step
+        while not market_open(moment):
+            moment += step
 
     return candles
 
