@@ -243,6 +243,80 @@ def synthetic_series(
     return candles
 
 
+class Resampler:
+    """Agrège des bougies en une unité de temps supérieure, sans lookahead.
+
+    Une bougie supérieure n'est émise qu'à l'arrivée de la première bougie du
+    palier suivant : au moment où le moteur la reçoit, elle est réellement
+    terminée. Le biais issu de l'unité supérieure accuse donc le retard qu'il
+    aurait en direct — c'est voulu.
+    """
+
+    def __init__(self, minutes: int):
+        if minutes <= 0:
+            raise ValueError("La période de rééchantillonnage doit être positive.")
+        self.minutes = minutes
+        self._bucket: int | None = None
+        self._open = self._high = self._low = self._close = 0.0
+        self._volume = 0.0
+        self._start: datetime | None = None
+
+    def push(self, candle: Candle) -> list[Candle]:
+        """Ajoute une bougie et renvoie la bougie supérieure achevée, s'il y en a."""
+        bucket = self._bucket_of(candle.time)
+        done: list[Candle] = []
+
+        if self._bucket is None:
+            self._start_bucket(bucket, candle)
+        elif bucket != self._bucket:
+            done.append(self._flush())
+            self._start_bucket(bucket, candle)
+        else:
+            self._high = max(self._high, candle.high)
+            self._low = min(self._low, candle.low)
+            self._close = candle.close
+            self._volume += candle.volume
+
+        return done
+
+    @property
+    def pending(self) -> Candle | None:
+        """Bougie supérieure en cours de formation (jamais transmise au moteur)."""
+        if self._bucket is None or self._start is None:
+            return None
+        return Candle(
+            self._start, self._open, self._high, self._low, self._close, self._volume
+        )
+
+    def _bucket_of(self, when: datetime) -> int:
+        minutes = int(when.timestamp()) // 60
+        return (minutes // self.minutes) * self.minutes
+
+    def _start_bucket(self, bucket: int, candle: Candle) -> None:
+        self._bucket = bucket
+        self._start = datetime.fromtimestamp(bucket * 60, tz=timezone.utc)
+        self._open, self._high = candle.open, candle.high
+        self._low, self._close = candle.low, candle.close
+        self._volume = candle.volume
+
+    def _flush(self) -> Candle:
+        assert self._start is not None
+        return Candle(
+            self._start, self._open, self._high, self._low, self._close, self._volume
+        )
+
+
+def resample(candles: Sequence[Candle], minutes: int) -> list[Candle]:
+    """Version non incrémentale du rééchantillonnage (tests, analyses)."""
+    sampler = Resampler(minutes)
+    out: list[Candle] = []
+    for candle in candles:
+        out.extend(sampler.push(candle))
+    if sampler.pending is not None:
+        out.append(sampler.pending)  # dernière bougie, éventuellement incomplète
+    return out
+
+
 class ReplayFeed:
     """Rejoue une série de bougies, une par appel — utilisé par le paper trading."""
 

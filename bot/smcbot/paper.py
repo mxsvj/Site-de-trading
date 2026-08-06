@@ -65,6 +65,7 @@ class PaperTrader:
         self.state_path = Path(state_path) if state_path else None
         self.index = 0
         self.last_time: datetime | None = None
+        self._px = f"%.{self.cfg.symbol.digits}f"  # prix au format du symbole
 
         if self.state_path and self.state_path.exists():
             self._load_state()
@@ -99,12 +100,12 @@ class PaperTrader:
             position = self.broker.execute(signal, candle, i)
             if position is not None:
                 logger.info(
-                    "ENTREE %s %g lot @ %.5f | SL %.5f | TP %.5f | %s",
+                    "ENTREE %s %g lot @ %s | SL %s | TP %s | %s",
                     "achat" if position.direction == "bullish" else "vente",
                     position.lots,
-                    position.entry,
-                    position.stop,
-                    position.take_profit,
+                    self._px % position.entry,
+                    self._px % position.stop,
+                    self._px % position.take_profit,
                     position.reason,
                 )
                 # Une position peut être stoppée sur sa propre bougie d'entrée :
@@ -122,13 +123,12 @@ class PaperTrader:
             self._save_state()
         return closed
 
-    @staticmethod
-    def _log_exit(trade: Trade) -> None:
+    def _log_exit(self, trade: Trade) -> None:
         logger.info(
-            "SORTIE %s %g lot @ %.5f | %s | %+.2f (%+.2fR) | solde %.2f",
+            "SORTIE %s %g lot @ %s | %s | %+.2f (%+.2fR) | solde %.2f",
             "achat" if trade.direction == "bullish" else "vente",
             trade.lots,
-            trade.exit,
+            self._px % trade.exit,
             trade.exit_reason,
             trade.pnl,
             trade.r,

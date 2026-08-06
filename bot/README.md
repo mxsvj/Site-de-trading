@@ -56,8 +56,8 @@ Signaux générés : 43
 
 ### Option A — export manuel depuis MT5 (fonctionne partout)
 
-Dans MetaTrader 5 : *Affichage → Graphiques hors ligne* ou *Outils → Centre de
-données*, puis exporte en CSV. Ensuite :
+Exporte l'historique en CSV depuis MT5 (ou depuis n'importe quelle autre source
+de données OHLC). Ensuite :
 
 ```bash
 python -m smcbot backtest --csv EURUSD_M15.csv --symbol EURUSD --timeframe M15
@@ -85,7 +85,8 @@ python -m smcbot backtest --csv data/xauusd_m15.csv --config config.json
 
 Les champs à vérifier en priorité dans `symbol` : `point`, `digits`,
 `value_per_point_per_lot`, `min_lot`, `lot_step`, `spread_points` et
-`commission_per_lot`. Ils se lisent dans MT5 via *Vue → Symboles → Spécification*.
+`commission_per_lot`. Ils se lisent dans MT5 en faisant un clic droit sur le
+symbole dans la fenêtre *Observation du marché* → **Spécification**.
 Un `value_per_point_per_lot` faux fausse **tout** le dimensionnement.
 
 ## Paper trading
@@ -114,6 +115,99 @@ son état dans `runtime/paper_state.json` après chaque bougie.
 
 **Arrêt propre** : crée le fichier `runtime/STOP` (ou `Ctrl+C`). La boucle
 termine la bougie en cours puis s'arrête en affichant le rapport.
+
+## Mode scalping (XAUUSD M1, biais M15)
+
+```bash
+python -m smcbot backtest --preset xauusd-scalp --demo --demo-bars 20000
+```
+
+Le preset `xauusd-scalp` change trois choses par rapport au mode swing.
+
+### 1. Le biais vient d'une unité de temps supérieure
+
+La structure est lue sur **M15**, les entrées cherchées sur **M1**. Les bougies
+M15 sont reconstruites à partir des M1 et ne sont transmises au moteur qu'une
+fois **terminées** — le biais accuse donc le retard qu'il aurait en direct.
+Sans ça, la structure M1 prise seule n'est guère que du bruit.
+
+```bash
+python -m smcbot backtest --csv xauusd_m1.csv --timeframe M1 --htf M15 --symbol-preset xauusd
+```
+
+Option supplémentaire `--htf-zone` : n'entrer que si l'order block M1 recoupe un
+order block ou un FVG M15.
+
+### 2. Un filtre horaire
+
+Par défaut, uniquement Londres (07:00-11:00 UTC) et New York (13:00-17:00 UTC),
+du lundi au vendredi. Hors de ces plages, le spread s'élargit et le mouvement
+disparaît — deux raisons de ne pas payer le péage.
+
+> Les heures sont en **UTC**, pas dans le fuseau de ton serveur MT5 (souvent
+> UTC+2 ou UTC+3). Vérifie l'horodatage de tes bougies avant de régler les plages.
+
+### 3. Des filtres de coût — le point vraiment important
+
+Ton stop définit ton R ; le spread et la commission, eux, sont fixes. Plus le
+stop est serré, plus ils pèsent :
+
+| Stop (or) | Frais à 25 pts de spread | Part du risque |
+|---|---|---|
+| 500 pts (5,00 $) | 25 pts | 5 % |
+| 200 pts (2,00 $) | 25 pts | 13 % |
+| 100 pts (1,00 $) | 25 pts | **25 %** |
+| 50 pts (0,50 $) | 25 pts | **50 %** |
+
+À 50 points de stop, il te faut un avantage brut supérieur à 0,5 R avant de
+gagner le moindre dollar. D'où trois garde-fous : `min_stop_points` (plancher de
+stop), `max_cost_ratio` (part maximale du risque absorbée par les frais) et
+`max_spread_points` (refus quand le spread s'élargit).
+
+Ces deux premiers doivent rester **cohérents entre eux** : avec 25 points de
+spread et un plafond de frais à 30 %, le stop minimal réellement praticable est
+25 / 0,30 ≈ 84 points. Le preset le fixe à 100 points pour cette raison — sinon
+le plancher de stop ne servirait à rien, le plafond de frais rejetant tout avant
+lui. C'est vérifié par `test_preset_scalping_est_coherent`.
+
+Le backtest te dit ce que les filtres ont écarté :
+
+```
+Setups écartés par les filtres : 38
+     38 × stop trop serré
+```
+
+Effet mesuré sur 20 000 bougies M1 de démonstration :
+
+| Variante | Trades | Écartés |
+|---|---|---|
+| Aucun filtre | 230 | 0 |
+| Filtre horaire seul retiré | 84 | 80 |
+| Plancher de stop retiré | 49 | 25 |
+| Tous les filtres | 38 | 38 |
+
+Passer de 230 à 38 trades **est** l'objectif : chaque trade évité est un péage
+non payé.
+
+### Ce que le scalping coûte en fiabilité de backtest
+
+Mes règles conservatrices (stop prioritaire quand SL et TP tombent dans la même
+bougie, pas de TP sur la bougie d'entrée) sont des détails à M15. À M1, elles
+décident d'une part importante des trades, parce que le mouvement intrabar est
+grand par rapport à l'objectif. **Un backtest de scalping sur bougies M1 reste
+indicatif** ; seule une simulation sur données tick trancherait vraiment.
+
+Ajoute à cela ce que le backtest ne modélise pas et qui frappe plus fort en
+scalping qu'en swing : slippage, élargissement du spread sur news, requotes,
+délai d'exécution. Sur M1, ces coûts arrivent dix fois plus souvent que sur M15.
+
+### En paper trading
+
+```bash
+python -m smcbot paper --preset xauusd-scalp --mt5 --interval 5
+```
+
+Descends l'intervalle à 5 secondes : sur M1, une bougie clôture chaque minute.
 
 ## Recherche de paramètres
 
@@ -192,27 +286,42 @@ plausibilité, pas une prévision.
 | | `max_concurrent` | 1 | positions simultanées |
 | | `max_daily_loss_pct` | 3.0 | seuil d'arrêt pour la journée |
 | | `breakeven_at_r` | 0 | passage à BE à N R (0 = désactivé) |
+| `filters` | `sessions` | — | plages UTC autorisées, ex. `["07:00-11:00"]` |
+| | `weekdays` | lun→ven | jours autorisés (0 = lundi) |
+| | `max_spread_points` | 0 | spread maximal toléré (0 = off) |
+| | `max_cost_ratio` | 0 | part max. du risque en frais (0.30 = 30 %) |
+| | `min_stop_points` | 0 | distance minimale du stop |
+| | `max_trades_per_day` | 0 | plafond quotidien (0 = illimité) |
+| (racine) | `timeframe` | M15 | unité de temps des entrées |
+| | `htf` | — | unité de temps du biais (vide = mono-timeframe) |
 
 Tout est aussi surchargeable en ligne de commande : `--risk`, `--tp-r`,
 `--swing`, `--spread`, `--sl-buffer`, `--breakeven`, `--no-fvg`, `--sweep`,
-`--equilibrium`. `python -m smcbot backtest --help` liste le reste.
+`--equilibrium`, `--htf`, `--htf-zone`, `--sessions`, `--no-sessions`,
+`--max-spread`, `--max-cost`, `--min-stop`, `--max-trades-day`.
+`python -m smcbot backtest --help` liste le reste.
+
+Deux configurations prêtes à l'emploi via `--preset` : `eurusd-m15` (swing) et
+`xauusd-scalp` (scalping M1/M15). `--symbol-preset eurusd|xauusd` ne reprend que
+les caractéristiques du contrat.
 
 ## Structure du code
 
 ```
 bot/
 ├── smcbot/
-│   ├── config.py      configuration (instrument, SMC, risque)
-│   ├── data.py        bougies, CSV, MT5, série synthétique, flux
+│   ├── config.py      configuration (instrument, SMC, risque, filtres, presets)
+│   ├── data.py        bougies, CSV, MT5, rééchantillonnage, flux
 │   ├── smc.py         moteur SMC : swings, BOS/CHoCH, order blocks, FVG, liquidité
-│   ├── strategy.py    traduction des états SMC en signaux
+│   ├── strategy.py    signaux, biais multi-timeframe
+│   ├── filters.py     sessions, spread, coût relatif, plafond quotidien
 │   ├── risk.py        dimensionnement des positions, P&L, R
 │   ├── broker.py      courtier simulé : exécution, spread, stops, kill switch
 │   ├── backtest.py    boucle de backtest et exports CSV
 │   ├── metrics.py     winrate, profit factor, drawdown, espérance, Sharpe
 │   ├── paper.py       boucle de paper trading, journal, persistance de l'état
 │   └── cli.py         interface en ligne de commande
-└── tests/             51 tests
+└── tests/             81 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -226,7 +335,7 @@ cd bot && python -m pytest
 ```
 
 ```
-51 passed
+81 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),

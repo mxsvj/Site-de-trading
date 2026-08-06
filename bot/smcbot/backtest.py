@@ -22,6 +22,11 @@ class BacktestResult:
     candles: int = 0
     signals: int = 0
     rejected: list[str] = field(default_factory=list)
+    skipped: dict[str, int] = field(default_factory=dict)
+    """Setups écartés par motif — le tableau de bord des filtres."""
+
+    digits: int = 5
+    """Décimales du symbole, pour l'affichage et les exports."""
 
     def save_trades(self, path: str | Path) -> None:
         """Exporte le journal des trades en CSV."""
@@ -44,16 +49,17 @@ class BacktestResult:
                     "solde",
                 ]
             )
+            px = f"%.{self.digits}f"
             for t in self.trades:
                 writer.writerow(
                     [
                         t.open_time.strftime("%Y-%m-%d %H:%M"),
                         t.close_time.strftime("%Y-%m-%d %H:%M"),
                         "achat" if t.direction == "bullish" else "vente",
-                        f"{t.entry:.5f}",
-                        f"{t.stop:.5f}",
-                        f"{t.take_profit:.5f}",
-                        f"{t.exit:.5f}",
+                        px % t.entry,
+                        px % t.stop,
+                        px % t.take_profit,
+                        px % t.exit,
                         t.lots,
                         f"{t.pnl:.2f}",
                         f"{t.r:.3f}",
@@ -112,4 +118,6 @@ def run_backtest(
         candles=len(candles),
         signals=signals,
         rejected=broker.rejected,
+        skipped=broker.skipped,
+        digits=cfg.symbol.digits,
     )

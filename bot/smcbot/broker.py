@@ -16,7 +16,8 @@ from datetime import date, datetime
 
 from .config import BotConfig
 from .data import Candle
-from .risk import position_size, r_multiple, trade_pnl
+from .filters import Rejection, TradeFilters
+from .risk import points, position_size, r_multiple, trade_pnl
 from .smc import BULLISH
 from .strategy import Signal
 
@@ -85,10 +86,15 @@ class PaperBroker:
         self.trades: list[Trade] = []
         self.equity_curve: list[EquityPoint] = []
         self.rejected: list[str] = []
+        self.filters = TradeFilters(self.cfg.filters, self.cfg.symbol)
+        self.skipped: dict[str, int] = {}
+        """Compte des setups écartés par motif — utile pour régler les filtres."""
 
         self._day: date | None = None
         self._day_start_balance = self.balance
         self._day_locked = False
+        self._day_trades = 0
+        self._session_open = True
 
     # ------------------------------------------------------------------ API
 
@@ -98,9 +104,12 @@ class PaperBroker:
 
     @property
     def can_open(self) -> bool:
+        max_daily = self.cfg.filters.max_trades_per_day
         return (
             not self._day_locked
+            and self._session_open
             and len(self.positions) < self.cfg.risk.max_concurrent
+            and (max_daily <= 0 or self._day_trades < max_daily)
         )
 
     def equity(self, candle: Candle) -> float:
@@ -118,6 +127,7 @@ class PaperBroker:
     def on_candle(self, candle: Candle, index: int) -> list[Trade]:
         """Gère la journée de trading et les sorties, avant tout nouveau signal."""
         self._roll_day(candle)
+        self._session_open = self.filters.session_allows(candle.time)
         closed = self._check_exits(candle, index)
         self._apply_breakeven(candle)
         self.equity_curve.append(
@@ -134,16 +144,20 @@ class PaperBroker:
         stop = signal.stop
         risk_distance = abs(entry - stop)
         if risk_distance <= 0:
-            self.rejected.append(f"{candle.time}: stop invalide")
+            self._reject(candle, "stop invalide")
+            return None
+
+        # Filtres de coût : ils portent sur le risque réel, spread inclus.
+        refus = self.filters.check_trade(points(risk_distance, self.cfg.symbol))
+        if refus is not None:
+            self._reject(candle, refus)
             return None
 
         lots = position_size(
             self.balance, entry, stop, self.cfg.risk, self.cfg.symbol
         )
         if lots <= 0:
-            self.rejected.append(
-                f"{candle.time}: volume sous le lot minimal (risque trop faible)"
-            )
+            self._reject(candle, "volume sous le lot minimal (risque trop faible)")
             return None
 
         if signal.direction == BULLISH:
@@ -163,6 +177,7 @@ class PaperBroker:
             initial_stop=stop,
         )
         self.positions.append(pos)
+        self._day_trades += 1
 
         # Une position ouverte en cours de bougie peut être stoppée sur cette
         # même bougie. En revanche on ne lui accorde pas le take profit : rien
@@ -278,12 +293,18 @@ class PaperBroker:
                 pos.stop = pos.entry
                 pos.breakeven_done = True
 
+    def _reject(self, candle: Candle, motif: Rejection | str) -> None:
+        code = motif.code if isinstance(motif, Rejection) else motif
+        self.rejected.append(f"{candle.time:%Y-%m-%d %H:%M} : {motif}")
+        self.skipped[code] = self.skipped.get(code, 0) + 1
+
     def _roll_day(self, candle: Candle) -> None:
         day = candle.time.date()
         if self._day != day:
             self._day = day
             self._day_start_balance = self.balance
             self._day_locked = False
+            self._day_trades = 0
 
     def _check_daily_limit(self) -> None:
         limit = self.cfg.risk.max_daily_loss_pct

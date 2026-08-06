@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import Sequence
 
 from .backtest import run_backtest
-from .config import BotConfig
+from .config import PRESETS, BotConfig, eurusd, xauusd
 from .data import (
+    TIMEFRAMES,
     Candle,
     Mt5Feed,
     ReplayFeed,
@@ -45,8 +46,22 @@ def build_parser() -> argparse.ArgumentParser:
 
         cf = p.add_argument_group("configuration")
         cf.add_argument("--config", help="fichier JSON de configuration")
+        cf.add_argument(
+            "--preset",
+            choices=sorted(PRESETS),
+            help="configuration prête à l'emploi (base, surchargeable ensuite)",
+        )
         cf.add_argument("--symbol", help="nom du symbole (ex. EURUSD)")
+        cf.add_argument(
+            "--symbol-preset",
+            choices=("eurusd", "xauusd"),
+            help="caractéristiques du contrat (point, lot, spread typique)",
+        )
         cf.add_argument("--timeframe", default=None, help="unité de temps (ex. M15)")
+        cf.add_argument(
+            "--htf",
+            help="unité de temps du biais, ex. M15 (vide = mono-timeframe)",
+        )
         cf.add_argument("--balance", type=float, help="capital de départ")
         cf.add_argument("--risk", type=float, help="risque par trade en %%")
         cf.add_argument("--tp-r", type=float, help="take profit en multiple de R")
@@ -70,6 +85,28 @@ def build_parser() -> argparse.ArgumentParser:
             action="store_true",
             help="entrer à 50 %% de l'order block",
         )
+        cf.add_argument(
+            "--htf-zone",
+            action="store_true",
+            help="n'entrer que dans une zone de l'unité de temps supérieure",
+        )
+
+        fl = p.add_argument_group("filtres (déterminants en scalping)")
+        fl.add_argument(
+            "--sessions",
+            help='plages UTC autorisées, ex. "07:00-11:00,13:00-17:00"',
+        )
+        fl.add_argument(
+            "--no-sessions", action="store_true", help="supprimer le filtre horaire"
+        )
+        fl.add_argument("--max-spread", type=float, help="spread maximal en points")
+        fl.add_argument(
+            "--max-cost",
+            type=float,
+            help="part maximale du risque absorbée par les frais (0.30 = 30 %%)",
+        )
+        fl.add_argument("--min-stop", type=float, help="distance minimale du stop")
+        fl.add_argument("--max-trades-day", type=int, help="plafond de trades par jour")
 
     p_bt = sub.add_parser("backtest", help="rejouer la stratégie sur un historique")
     add_common(p_bt)
@@ -127,18 +164,33 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_cfg = sub.add_parser("init-config", help="écrire une configuration par défaut")
     p_cfg.add_argument("--out", default="config.json")
+    p_cfg.add_argument(
+        "--preset",
+        choices=sorted(PRESETS),
+        default="eurusd-m15",
+        help="modèle de départ",
+    )
 
     return parser
 
 
 def make_config(args: argparse.Namespace) -> BotConfig:
-    """Construit la configuration : fichier JSON puis surcharges CLI."""
-    cfg = BotConfig.from_json(args.config) if getattr(args, "config", None) else BotConfig()
+    """Construit la configuration : preset, puis fichier JSON, puis CLI."""
+    if getattr(args, "config", None):
+        cfg = BotConfig.from_json(args.config)
+    elif getattr(args, "preset", None):
+        cfg = PRESETS[args.preset]()
+    else:
+        cfg = BotConfig()
 
+    if getattr(args, "symbol_preset", None):
+        cfg.symbol = {"eurusd": eurusd, "xauusd": xauusd}[args.symbol_preset]()
     if getattr(args, "symbol", None):
         cfg.symbol.name = args.symbol
     if getattr(args, "timeframe", None):
         cfg.timeframe = args.timeframe
+    if getattr(args, "htf", None) is not None:
+        cfg.htf = args.htf
     if getattr(args, "balance", None) is not None:
         cfg.risk.initial_balance = args.balance
     if getattr(args, "risk", None) is not None:
@@ -161,6 +213,21 @@ def make_config(args: argparse.Namespace) -> BotConfig:
         cfg.smc.require_sweep = True
     if getattr(args, "equilibrium", False):
         cfg.smc.entry_at_equilibrium = True
+    if getattr(args, "htf_zone", False):
+        cfg.smc.require_htf_zone = True
+
+    if getattr(args, "no_sessions", False):
+        cfg.filters.sessions = []
+    elif getattr(args, "sessions", None):
+        cfg.filters.sessions = [s.strip() for s in args.sessions.split(",") if s.strip()]
+    if getattr(args, "max_spread", None) is not None:
+        cfg.filters.max_spread_points = args.max_spread
+    if getattr(args, "max_cost", None) is not None:
+        cfg.filters.max_cost_ratio = args.max_cost
+    if getattr(args, "min_stop", None) is not None:
+        cfg.filters.min_stop_points = args.min_stop
+    if getattr(args, "max_trades_day", None) is not None:
+        cfg.filters.max_trades_per_day = args.max_trades_day
 
     return cfg
 
@@ -173,8 +240,13 @@ def load_candles(args: argparse.Namespace, cfg: BotConfig) -> list[Candle]:
             raise SystemExit(f"Aucune bougie lue dans {args.csv}")
         return candles
     if getattr(args, "demo", False):
+        # La série de démo suit l'échelle de prix et la cadence du symbole visé.
         return synthetic_series(
-            n=args.demo_bars, point=cfg.symbol.point, seed=args.seed
+            n=args.demo_bars,
+            start=2650.0 if cfg.symbol.point >= 0.01 else 1.10000,
+            point=cfg.symbol.point,
+            seed=args.seed,
+            timeframe_minutes=TIMEFRAMES.get(cfg.timeframe, 15),
         )
     raise SystemExit("Précise une source de données : --csv FICHIER ou --demo")
 
@@ -187,25 +259,34 @@ def cmd_backtest(args: argparse.Namespace) -> int:
     candles = load_candles(args, cfg)
     result = run_backtest(candles, cfg)
 
+    entete = f"{cfg.symbol.name} {cfg.timeframe}"
+    if cfg.htf:
+        entete += f" (biais {cfg.htf})"
     print(
-        f"{cfg.symbol.name} {cfg.timeframe} — {result.candles} bougies "
+        f"{entete} — {result.candles} bougies "
         f"du {candles[0].time:%Y-%m-%d} au {candles[-1].time:%Y-%m-%d}"
     )
+    if cfg.filters.sessions:
+        print(f"Sessions UTC : {', '.join(cfg.filters.sessions)}")
     print(f"Signaux générés : {result.signals}")
     print(result.report.to_text())
 
-    if result.rejected:
-        print(f"\n{len(result.rejected)} signal(aux) non exécuté(s). Exemples :")
-        for line in result.rejected[:3]:
-            print(f"  - {line}")
+    if result.skipped:
+        total = sum(result.skipped.values())
+        print(f"\nSetups écartés par les filtres : {total}")
+        for motif, nombre in sorted(
+            result.skipped.items(), key=lambda kv: kv[1], reverse=True
+        ):
+            print(f"  {nombre:>5} × {motif}")
 
     if args.list_trades:
+        px = f"%.{cfg.symbol.digits}f"
         print("\nDétail des trades :")
         for i, t in enumerate(result.trades, 1):
             sens = "achat " if t.direction == "bullish" else "vente "
             print(
                 f"{i:4d}. {t.open_time:%Y-%m-%d %H:%M} {sens}"
-                f"{t.lots:>5g}l @ {t.entry:.5f} → {t.exit:.5f} "
+                f"{t.lots:>5g}l @ {px % t.entry} → {px % t.exit} "
                 f"{t.exit_reason:<3} {t.pnl:+9.2f} ({t.r:+.2f}R)  {t.reason}"
             )
 
@@ -302,8 +383,8 @@ def cmd_optimize(args: argparse.Namespace) -> int:
 
 
 def cmd_init_config(args: argparse.Namespace) -> int:
-    BotConfig().to_json(args.out)
-    print(f"Configuration par défaut écrite dans {args.out}")
+    PRESETS[args.preset]().to_json(args.out)
+    print(f"Configuration « {args.preset} » écrite dans {args.out}")
     return 0
 
 
