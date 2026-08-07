@@ -22,6 +22,7 @@ from .data import (
     save_csv,
     synthetic_series,
 )
+from .doctor import run_diagnostics
 from .paper import PaperTrader, setup_logging
 from .quality import inspect_series, shift_times
 
@@ -159,6 +160,12 @@ def build_parser() -> argparse.ArgumentParser:
         "check", help="contrôler la qualité d'un historique avant de le backtester"
     )
     add_common(p_check)
+
+    p_doc = sub.add_parser(
+        "doctor", help="diagnostiquer l'installation et la connexion à MT5"
+    )
+    p_doc.add_argument("--symbol", default="XAUUSD")
+    p_doc.add_argument("--timeframe", default="M1")
 
     p_dl = sub.add_parser("download", help="exporter un historique MT5 en CSV")
     p_dl.add_argument("--symbol", required=True)
@@ -420,6 +427,12 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0 if report.clean else 2
 
 
+def cmd_doctor(args: argparse.Namespace) -> int:
+    diagnostic = run_diagnostics(args.symbol, args.timeframe)
+    print(diagnostic.to_text())
+    return 0 if diagnostic.ok else 1
+
+
 def cmd_download(args: argparse.Namespace) -> int:
     candles = download_mt5(args.symbol, args.timeframe, args.bars)
 
@@ -495,6 +508,7 @@ COMMANDS = {
     "backtest": cmd_backtest,
     "check": cmd_check,
     "paper": cmd_paper,
+    "doctor": cmd_doctor,
     "download": cmd_download,
     "demo-data": cmd_demo_data,
     "optimize": cmd_optimize,

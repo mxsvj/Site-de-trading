@@ -90,12 +90,29 @@ d'après ce que facture ton courtier.
 ### Option B — téléchargement direct (Windows, MT5 ouvert)
 
 Nécessite Python **sur la machine où tourne MT5**. Le module `MetaTrader5`
-n'existe que sous Windows.
+n'existe que sous Windows, mais il couvre Python 3.6 à 3.14.
 
 ```bash
 pip install MetaTrader5
+python -m smcbot doctor --symbol XAUUSD --timeframe M1
 python -m smcbot download --symbol XAUUSD --timeframe M1 --bars 50000 --out data/xauusd_m1.csv
 ```
+
+`doctor` vérifie toute la chaîne — version de Python, paquet installé, terminal
+connecté, existence du symbole, historique disponible — et s'arrête à la première
+rupture en disant quoi faire :
+
+```
+[OK   ] Paquet MetaTrader5           version 5.0.6090
+[OK   ] Terminal                     MetaTrader 5 — connecté
+[info ] Compte                       démo, devise USD
+[ECHEC] Symbole XAUUSD               introuvable chez ce courtier
+          → Essaie l'un de ceux-ci : XAUUSD.a, GOLD
+```
+
+Les noms de symboles varient d'un courtier à l'autre : `XAUUSD`, `XAUUSD.a`,
+`GOLD`, `XAUUSDm`. Le diagnostic propose ceux qu'il trouve. Il n'affiche ni
+numéro de compte, ni solde — sa sortie peut être partagée telle quelle.
 
 ### Option C — n'importe quel CSV
 
@@ -388,13 +405,14 @@ bot/
 │   ├── risk.py        dimensionnement des positions, P&L, R
 │   ├── broker.py      courtier simulé : exécution, spread, stops, kill switch
 │   ├── backtest.py    boucle de backtest et exports CSV
+│   ├── doctor.py      diagnostic : Python, paquet MT5, terminal, symbole
 │   ├── metrics.py     winrate, profit factor, drawdown, espérance, Sharpe
 │   ├── quality.py     contrôle des données : fuseau, trous, doublons
 │   ├── paper.py       boucle de paper trading, journal, persistance de l'état
 │   └── cli.py         interface en ligne de commande
 ├── mt5/
 │   └── ExportBars.mq5 export CSV + spécification, sans Python
-└── tests/            114 tests
+└── tests/            130 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -408,7 +426,7 @@ cd bot && python -m pytest
 ```
 
 ```
-114 passed
+130 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),
