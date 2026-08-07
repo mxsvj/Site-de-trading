@@ -112,7 +112,37 @@ rupture en disant quoi faire :
 
 Les noms de symboles varient d'un courtier à l'autre : `XAUUSD`, `XAUUSD.a`,
 `GOLD`, `XAUUSDm`. Le diagnostic propose ceux qu'il trouve. Il n'affiche ni
-numéro de compte, ni solde — sa sortie peut être partagée telle quelle.
+numéro de compte, ni solde, ni mot de passe — sa sortie peut être partagée telle
+quelle.
+
+#### `Authorization failed` (code -6)
+
+L'erreur la plus fréquente, et la plus trompeuse : le paquet Python parle bien au
+terminal, mais celui-ci n'est authentifié sur aucun compte. Deux causes :
+
+1. **MT5 est ouvert sans compte connecté.** Regarde en haut à gauche : ton numéro
+   de compte doit y figurer, et le coin bas-droite doit afficher un débit, pas
+   « Pas de connexion ».
+2. **Tu as plusieurs terminaux installés.** `initialize()` en ouvre un tout seul
+   s'il n'en trouve pas — et ce peut être un autre broker, jamais connecté.
+   Désigne le tien :
+
+```bash
+python -m smcbot doctor --mt5-path "C:\Program Files\MetaTrader 5\terminal64.exe"
+```
+
+Le diagnostic liste les terminaux qu'il détecte sur la machine. En dernier
+recours, les identifiants se passent par variables d'environnement — **jamais en
+ligne de commande**, où ils resteraient dans l'historique du shell :
+
+```bat
+set MT5_LOGIN=123456
+set MT5_PASSWORD=ton_mot_de_passe
+set MT5_SERVER=NomDuServeur
+python -m smcbot doctor
+```
+
+Ils ne sont ni affichés ni journalisés ; un test le vérifie.
 
 ### Option C — n'importe quel CSV
 
@@ -412,7 +442,7 @@ bot/
 │   └── cli.py         interface en ligne de commande
 ├── mt5/
 │   └── ExportBars.mq5 export CSV + spécification, sans Python
-└── tests/            130 tests
+└── tests/            135 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -426,7 +456,7 @@ cd bot && python -m pytest
 ```
 
 ```
-130 passed
+135 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),

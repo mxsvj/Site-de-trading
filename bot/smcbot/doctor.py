@@ -15,6 +15,8 @@ import struct
 import sys
 from dataclasses import dataclass, field
 
+from .data import init_mt5, terminaux_installes
+
 # Noms sous lesquels les courtiers commercialisent l'or.
 MOTIFS_OR = ("XAU", "GOLD", "OR.")
 
@@ -56,7 +58,9 @@ class Diagnostic:
         return "\n".join(lignes)
 
 
-def run_diagnostics(symbol: str = "XAUUSD", timeframe: str = "M1") -> Diagnostic:
+def run_diagnostics(
+    symbol: str = "XAUUSD", timeframe: str = "M1", path: str | None = None
+) -> Diagnostic:
     """Déroule les vérifications, en s'arrêtant net à la première bloquante."""
     diag = Diagnostic()
 
@@ -109,22 +113,22 @@ def run_diagnostics(symbol: str = "XAUUSD", timeframe: str = "M1") -> Diagnostic
             f"version {getattr(mt5, '__version__', 'inconnue')}",
         )
     )
-    _check_terminal(mt5, diag, symbol, timeframe)
+    _check_terminal(mt5, diag, symbol, timeframe, path)
     return diag
 
 
-def _check_terminal(mt5, diag: Diagnostic, symbol: str, timeframe: str) -> None:
+def _check_terminal(
+    mt5, diag: Diagnostic, symbol: str, timeframe: str, path: str | None = None
+) -> None:
     """Vérifications qui exigent un terminal MT5 en fonctionnement."""
-    if not mt5.initialize():  # pragma: no cover - dépend de la plateforme
+    try:
+        init_mt5(mt5, path)
+    except RuntimeError as exc:  # pragma: no cover - dépend de la plateforme
+        premiere, _, reste = str(exc).partition("\n")
         diag.checks.append(
-            Check(
-                "Connexion au terminal",
-                False,
-                f"échouée : {mt5.last_error()}",
-                "Ouvre MetaTrader 5, connecte-toi à ton compte, laisse-le "
-                "ouvert, puis relance.",
-            )
+            Check("Connexion au terminal", False, premiere, reste)
         )
+        _lister_terminaux(diag, path)
         return
 
     try:  # pragma: no cover - dépend de la plateforme
@@ -164,6 +168,34 @@ def _check_terminal(mt5, diag: Diagnostic, symbol: str, timeframe: str) -> None:
         _check_symbol(mt5, diag, symbol, timeframe)
     finally:  # pragma: no cover - dépend de la plateforme
         mt5.shutdown()
+
+
+def _lister_terminaux(diag: Diagnostic, path: str | None) -> None:
+    """Énumère les terminaux installés : en avoir plusieurs explique bien des échecs."""
+    if path:
+        diag.checks.append(
+            Check("Terminal désigné", None, path,
+                  "Vérifie que ce chemin est bien celui du MT5 où tu es connecté.")
+        )
+        return
+
+    installes = terminaux_installes()
+    if not installes:
+        return
+    if len(installes) == 1:
+        diag.checks.append(Check("Terminal installé", None, str(installes[0])))
+        return
+
+    diag.checks.append(
+        Check(
+            "Terminaux installés",
+            None,
+            f"{len(installes)} trouvés",
+            "Plusieurs terminaux : `initialize()` peut ouvrir le mauvais. "
+            "Désigne le tien avec --mt5-path \"" + str(installes[0]) + "\" "
+            "(les autres : " + ", ".join(str(p) for p in installes[1:4]) + ")",
+        )
+    )
 
 
 def _check_symbol(mt5, diag: Diagnostic, symbol: str, timeframe: str) -> None:

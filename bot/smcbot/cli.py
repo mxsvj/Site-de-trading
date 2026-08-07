@@ -136,6 +136,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_paper.add_argument(
         "--mt5", action="store_true", help="lire les bougies en direct depuis MT5"
     )
+    p_paper.add_argument("--mt5-path", help="chemin de terminal64.exe à utiliser")
     p_paper.add_argument(
         "--interval",
         type=float,
@@ -166,12 +167,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_doc.add_argument("--symbol", default="XAUUSD")
     p_doc.add_argument("--timeframe", default="M1")
+    p_doc.add_argument("--mt5-path", help="chemin de terminal64.exe à utiliser")
 
     p_dl = sub.add_parser("download", help="exporter un historique MT5 en CSV")
     p_dl.add_argument("--symbol", required=True)
     p_dl.add_argument("--timeframe", default="M15")
     p_dl.add_argument("--bars", type=int, default=5000)
     p_dl.add_argument("--out", required=True)
+    p_dl.add_argument("--mt5-path", help="chemin de terminal64.exe à utiliser")
 
     p_demo = sub.add_parser("demo-data", help="générer un CSV synthétique")
     p_demo.add_argument("--out", required=True)
@@ -374,7 +377,7 @@ def cmd_paper(args: argparse.Namespace) -> int:
     trader = PaperTrader(cfg, state_path=args.state)
 
     if args.mt5:
-        feed = Mt5Feed(cfg.symbol.name, cfg.timeframe)
+        feed = Mt5Feed(cfg.symbol.name, cfg.timeframe, args.mt5_path)
         trader.warmup(feed.history(args.warmup))
         interval = args.interval if args.interval > 0 else 30.0
     else:
@@ -428,13 +431,13 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
-    diagnostic = run_diagnostics(args.symbol, args.timeframe)
+    diagnostic = run_diagnostics(args.symbol, args.timeframe, args.mt5_path)
     print(diagnostic.to_text())
     return 0 if diagnostic.ok else 1
 
 
 def cmd_download(args: argparse.Namespace) -> int:
-    candles = download_mt5(args.symbol, args.timeframe, args.bars)
+    candles = download_mt5(args.symbol, args.timeframe, args.bars, args.mt5_path)
 
     sortie = Path(args.out)
     if sortie.parent and not sortie.parent.exists():

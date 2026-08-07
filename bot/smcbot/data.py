@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import math
+import os
 import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -136,8 +137,111 @@ def _parse_time(value: str) -> datetime:
         raise ValueError(f"Format de date non reconnu : {value!r}") from exc
 
 
+# Codes d'erreur renvoyés par mt5.initialize(), avec ce qu'il faut en faire.
+MT5_ERREURS = {
+    -6: (
+        "le terminal refuse l'authentification",
+        "MT5 est ouvert mais aucun compte n'y est connecté, ou bien "
+        "`initialize()` a ouvert un AUTRE terminal que le tien. "
+        "Vérifie que ton MT5 affiche bien ton compte en haut à gauche, puis "
+        "réessaie avec --mt5-path pour désigner le bon terminal.",
+    ),
+    -8: (
+        "trading algorithmique désactivé",
+        "Outils → Options → Expert Advisors → coche « Autoriser le trading "
+        "algorithmique ». (smcbot n'envoie aucun ordre, mais l'API l'exige.)",
+    ),
+    -4: (
+        "terminal introuvable",
+        "Indique son chemin avec --mt5-path "
+        r'"C:\Program Files\MetaTrader 5\terminal64.exe".',
+    ),
+    -10005: (
+        "le terminal ne répond pas",
+        "Ferme complètement MT5, rouvre-le, attends qu'il soit connecté, "
+        "puis relance la commande.",
+    ),
+}
+
+
+def terminaux_installes() -> list[Path]:
+    """Cherche les terminaux MT5 installés, pour aider à désigner le bon."""
+    racines = [
+        Path(os.environ.get("ProgramFiles", r"C:\Program Files")),
+        Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")),
+    ]
+    trouves: list[Path] = []
+    for racine in racines:
+        try:
+            if not racine.is_dir():
+                continue
+            for dossier in racine.iterdir():
+                exe = dossier / "terminal64.exe"
+                if exe.is_file() and exe not in trouves:
+                    trouves.append(exe)
+        except OSError:
+            continue
+    return trouves
+
+
+def init_mt5(mt5, path: str | None = None) -> None:
+    """Ouvre la connexion au terminal, avec un message utile en cas d'échec.
+
+    Les identifiants ne sont jamais passés en ligne de commande : s'ils sont
+    nécessaires, ils sont lus dans les variables d'environnement MT5_LOGIN,
+    MT5_PASSWORD et MT5_SERVER, et ne sont ni affichés ni journalisés.
+    """
+    options: dict = {}
+    if path:
+        options["path"] = path
+
+    login = os.environ.get("MT5_LOGIN")
+    mot_de_passe = os.environ.get("MT5_PASSWORD")
+    serveur = os.environ.get("MT5_SERVER")
+    if login and mot_de_passe and serveur:
+        try:
+            options["login"] = int(login)
+        except ValueError as exc:
+            raise RuntimeError("MT5_LOGIN doit être le numéro de compte.") from exc
+        options["password"] = mot_de_passe
+        options["server"] = serveur
+
+    if mt5.initialize(**options):
+        return
+
+    code, message = _erreur_mt5(mt5)
+    resume, conseil = MT5_ERREURS.get(code, ("connexion impossible", ""))
+    detail = f"Connexion à MT5 impossible — {resume} (code {code}: {message})"
+
+    if conseil:
+        detail += f"\n{conseil}"
+    if code == -6 and not (login and mot_de_passe and serveur):
+        detail += (
+            "\nEn dernier recours, donne les identifiants par variables "
+            "d'environnement (jamais en ligne de commande) :\n"
+            "  set MT5_LOGIN=123456\n"
+            "  set MT5_PASSWORD=ton_mot_de_passe\n"
+            '  set MT5_SERVER="NomDuServeur"'
+        )
+
+    installes = terminaux_installes()
+    if installes and code in (-6, -4):
+        liste = "\n".join(f"  --mt5-path \"{p}\"" for p in installes[:5])
+        detail += f"\nTerminaux détectés sur cette machine :\n{liste}"
+
+    raise RuntimeError(detail)
+
+
+def _erreur_mt5(mt5) -> tuple[int, str]:
+    """Normalise le retour de last_error() en (code, message)."""
+    brut = mt5.last_error()
+    if isinstance(brut, (tuple, list)) and len(brut) >= 2:
+        return int(brut[0]), str(brut[1])
+    return 0, str(brut)
+
+
 def download_mt5(
-    symbol: str, timeframe: str = "M15", bars: int = 5000
+    symbol: str, timeframe: str = "M15", bars: int = 5000, path: str | None = None
 ) -> list[Candle]:
     """Télécharge l'historique depuis un terminal MetaTrader 5 ouvert.
 
@@ -155,12 +259,7 @@ def download_mt5(
     if timeframe not in TIMEFRAMES:
         raise ValueError(f"Unité de temps inconnue : {timeframe}")
 
-    if not mt5.initialize():  # pragma: no cover - dépend de la plateforme
-        raise RuntimeError(
-            f"Connexion à MT5 impossible : {mt5.last_error()}\n"
-            f"Vérifie que le terminal MetaTrader 5 est ouvert et connecté à ton "
-            f"compte, puis relance la commande."
-        )
+    init_mt5(mt5, path)
     try:  # pragma: no cover - dépend de la plateforme
         tf = getattr(mt5, f"TIMEFRAME_{timeframe}")
         if not mt5.symbol_select(symbol, True):
@@ -384,14 +483,15 @@ class ReplayFeed:
 class Mt5Feed:
     """Flux live : interroge MT5 et n'émet que les bougies clôturées."""
 
-    def __init__(self, symbol: str, timeframe: str = "M15"):
+    def __init__(self, symbol: str, timeframe: str = "M15", path: str | None = None):
         self.symbol = symbol
         self.timeframe = timeframe
+        self.path = path
         self._last_time: datetime | None = None
 
     def history(self, bars: int = 500) -> list[Candle]:
         """Historique de préchauffe, hors bougie en cours."""
-        candles = download_mt5(self.symbol, self.timeframe, bars)
+        candles = download_mt5(self.symbol, self.timeframe, bars, self.path)
         closed = candles[:-1] if candles else []
         if closed:
             self._last_time = closed[-1].time
@@ -399,7 +499,7 @@ class Mt5Feed:
 
     def poll(self) -> list[Candle]:
         """Renvoie les bougies clôturées depuis le dernier appel."""
-        candles = download_mt5(self.symbol, self.timeframe, 50)
+        candles = download_mt5(self.symbol, self.timeframe, 50, self.path)
         closed = candles[:-1]  # la dernière bougie n'est pas terminée
         if self._last_time is None:
             fresh = closed[-1:]

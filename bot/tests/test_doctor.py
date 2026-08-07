@@ -35,6 +35,7 @@ class FauxMt5(types.ModuleType):
         bougies=5000,
         devise="USD",
         reel=False,
+        code_erreur=-10005,
     ):
         super().__init__("MetaTrader5")
         self.__version__ = "5.0.6090"
@@ -44,14 +45,18 @@ class FauxMt5(types.ModuleType):
         self._bougies = bougies
         self._devise = devise
         self._reel = reel
+        self._code_erreur = code_erreur
+        self.options = None
         self.arrete = False
         self.TIMEFRAME_M1 = 1
 
-    def initialize(self):
+    def initialize(self, **options):
+        self.options = options
         return self._init_ok
 
     def last_error(self):
-        return (-10005, "IPC timeout")
+        messages = {-6: "Terminal: Authorization failed", -10005: "IPC timeout"}
+        return (self._code_erreur, messages.get(self._code_erreur, "erreur"))
 
     def shutdown(self):
         self.arrete = True
@@ -149,8 +154,61 @@ def test_terminal_injoignable(installer_mt5):
 
     check = motif(diag, "Connexion au terminal")
     assert check.ok is False
-    assert "Ouvre MetaTrader" in check.hint
+    assert "ne répond pas" in check.detail
+    assert "Ferme complètement MT5" in check.hint
     assert not diag.ok
+
+
+def test_authorization_failed_est_expliquee(installer_mt5):
+    """Code -6 : le cas réellement rencontré. Le message doit être spécifique."""
+    installer_mt5(init_ok=False, code_erreur=-6)
+    diag = run_diagnostics()
+
+    check = motif(diag, "Connexion au terminal")
+    assert check.ok is False
+    assert "authentification" in check.detail
+    assert "aucun compte n'y est connecté" in check.hint
+    assert "--mt5-path" in check.hint
+    # La solution de repli par variables d'environnement doit être proposée
+    assert "MT5_LOGIN" in check.hint
+
+
+def test_trading_algo_desactive(installer_mt5):
+    installer_mt5(init_ok=False, code_erreur=-8)
+    check = motif(run_diagnostics(), "Connexion au terminal")
+    assert "algorithmique" in check.detail
+    assert "Expert Advisors" in check.hint
+
+
+def test_mt5_path_transmis_a_initialize(installer_mt5):
+    faux = installer_mt5()
+    run_diagnostics("XAUUSD", "M1", path=r"C:\MT5\terminal64.exe")
+    assert faux.options.get("path") == r"C:\MT5\terminal64.exe"
+
+
+def test_identifiants_lus_dans_l_environnement(installer_mt5, monkeypatch):
+    """Jamais en ligne de commande : uniquement par variables d'environnement."""
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secret")
+    monkeypatch.setenv("MT5_SERVER", "Broker-Demo")
+    faux = installer_mt5()
+
+    diag = run_diagnostics()
+    assert faux.options["login"] == 123456
+    assert faux.options["server"] == "Broker-Demo"
+    # Et surtout : le mot de passe ne doit apparaître nulle part dans la sortie
+    assert "secret" not in diag.to_text()
+
+
+def test_login_non_numerique_refuse(installer_mt5, monkeypatch):
+    monkeypatch.setenv("MT5_LOGIN", "mon-compte")
+    monkeypatch.setenv("MT5_PASSWORD", "x")
+    monkeypatch.setenv("MT5_SERVER", "y")
+    installer_mt5()
+
+    check = motif(run_diagnostics(), "Connexion au terminal")
+    assert check.ok is False
+    assert "numéro de compte" in check.detail
 
 
 def test_terminal_hors_ligne(installer_mt5):
