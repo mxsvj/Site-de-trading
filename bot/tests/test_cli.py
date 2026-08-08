@@ -176,3 +176,72 @@ def test_optimize(capsys):
                  "--grid-tp", "2", "--grid-swing", "2,3"])
     assert code == 0
     assert "esp.R" in capsys.readouterr().out
+
+
+# ------------------------------------------- optimisation avec validation
+
+
+def test_optimize_separe_apprentissage_et_validation(capsys):
+    code = main(["optimize", "--demo", "--demo-bars", "8000",
+                 "--grid-tp", "2", "--grid-swing", "2,3", "--split", "0.6"])
+    sortie = capsys.readouterr().out
+
+    assert code == 0
+    assert "Apprentissage" in sortie and "Validation" in sortie
+    assert "apprentissage" in sortie and "validation" in sortie
+
+
+def test_optimize_refuse_un_split_absurde():
+    with pytest.raises(SystemExit):
+        main(["optimize", "--demo", "--demo-bars", "8000", "--split", "1.5"])
+    with pytest.raises(SystemExit):
+        main(["optimize", "--demo", "--demo-bars", "8000", "--split", "0"])
+
+
+def test_optimize_refuse_un_historique_trop_court():
+    with pytest.raises(SystemExit) as sortie:
+        main(["optimize", "--demo", "--demo-bars", "600", "--split", "0.6"])
+    assert "trop court" in str(sortie.value)
+
+
+def test_optimize_grid_be(capsys):
+    main(["optimize", "--demo", "--demo-bars", "8000", "--grid-tp", "2",
+          "--grid-swing", "2", "--grid-be", "0,1", "--split", "0.6"])
+    lignes = [l for l in capsys.readouterr().out.splitlines() if "│" in l]
+    # deux réglages testés, plus les deux lignes d'en-tête
+    assert len(lignes) >= 4
+
+
+def test_verdict_denonce_le_surapprentissage(capsys):
+    """Un réglage bon en apprentissage et mauvais en validation doit être rejeté."""
+    from smcbot.cli import _verdict
+    from smcbot.metrics import Report
+
+    dedans = Report(expectancy_r=0.25, trades=50)
+    dehors = Report(expectancy_r=-0.18, trades=30)
+    _verdict([(2.0, 3, 1.0, dedans, dehors)])
+
+    sortie = capsys.readouterr().out
+    assert "surapprentissage" in sortie
+    assert "Ne l'utilise pas" in sortie
+
+
+def test_verdict_signale_l_absence_totale_d_avantage(capsys):
+    from smcbot.cli import _verdict
+    from smcbot.metrics import Report
+
+    _verdict([(2.0, 3, 1.0, Report(expectancy_r=-0.1), Report(expectancy_r=-0.2))])
+    sortie = capsys.readouterr().out
+    assert "n'a pas d'avantage" in sortie
+    assert "bruit" in sortie
+
+
+def test_verdict_reste_prudent_quand_ca_tient(capsys):
+    """Même un résultat qui tient ne doit pas être présenté comme une preuve."""
+    from smcbot.cli import _verdict
+    from smcbot.metrics import Report
+
+    _verdict([(2.0, 3, 1.0, Report(expectancy_r=0.30), Report(expectancy_r=0.22))])
+    sortie = capsys.readouterr().out
+    assert "tient en validation" in sortie
+    assert "sans être une preuve" in sortie

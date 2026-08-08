@@ -329,12 +329,32 @@ Descends l'intervalle à 5 secondes : sur M1, une bougie clôture chaque minute.
 ## Recherche de paramètres
 
 ```bash
-python -m smcbot optimize --csv data/eurusd_m15.csv --grid-tp 1.5,2,3 --grid-swing 2,3,4
+python -m smcbot optimize --csv data/xauusd_m1.csv --preset xauusd-scalp \
+    --tz-shift -3 --grid-tp 1.5,2,3 --grid-be 0,1 --split 0.6
 ```
 
-Classement par espérance en R. À manier avec précaution : sur une grille large,
-le meilleur résultat est surtout le mieux surajusté. Teste toujours le gagnant
-sur une période qui n'a pas servi à le choisir.
+La commande coupe l'historique en deux. Les réglages sont **classés** sur la
+première partie ; la seconde, jamais utilisée pour choisir, mesure ce que le
+gagnant vaut réellement.
+
+```
+ tp_R  swing    BE │  trades    esp.R     PF │  trades    esp.R     PF    perf%
+                   │    — apprentissage —    │          — validation —
+```
+
+Sans cette séparation, une grille assez large produit **toujours** un résultat
+flatteur : on ne sélectionne plus une stratégie, on sélectionne du bruit. La
+période de validation est précédée d'une préchauffe (`run_backtest(warmup=...)`)
+qui alimente le moteur SMC sans ouvrir de position — sinon elle démarrerait sans
+structure et sous-traderait, faussant la comparaison.
+
+La commande conclut elle-même, en trois cas :
+
+| Situation | Ce que ça veut dire |
+|---|---|
+| Rien n'est rentable, même en apprentissage | La stratégie n'a pas d'avantage sur cet instrument. Continuer à régler reviendrait à sélectionner du bruit. |
+| Bon en apprentissage, mauvais en validation | Surapprentissage caractérisé. Le réglage a mémorisé la période, il n'a rien appris. |
+| Bon des deux côtés | Encourageant, **pas une preuve**. Une seule période, un seul instrument. Passe à un démo en temps réel. |
 
 ---
 
@@ -442,7 +462,7 @@ bot/
 │   └── cli.py         interface en ligne de commande
 ├── mt5/
 │   └── ExportBars.mq5 export CSV + spécification, sans Python
-└── tests/            135 tests
+└── tests/            145 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -456,7 +476,7 @@ cd bot && python -m pytest
 ```
 
 ```
-135 passed
+145 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),

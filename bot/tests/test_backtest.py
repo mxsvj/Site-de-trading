@@ -401,3 +401,39 @@ def test_fichier_d_arret(tmp_path, demo_candles):
     feed = ReplayFeed(demo_candles)
     trader.run(feed, poll_seconds=0, max_bars=100, stop_file=stop)
     assert trader.index == 0  # arrêt avant toute bougie
+
+
+# ------------------------------------------------------------------ préchauffe
+
+
+def test_warmup_interdit_les_trades_initiaux(demo_candles):
+    """Les bougies de préchauffe alimentent le moteur sans ouvrir de position."""
+    result = run_backtest(demo_candles, BotConfig(), warmup=1500)
+
+    assert result.trades, "aucun trade après la préchauffe"
+    assert all(t.open_index >= 1500 for t in result.trades)
+    assert len(result.equity_curve) == len(demo_candles) - 1500
+
+
+def test_warmup_prepare_le_moteur(demo_candles):
+    """Une validation préchauffée trade plus tôt qu'un démarrage à froid.
+
+    Sans préchauffe, le moteur SMC part sans structure : pas de swing confirmé,
+    pas d'order block, donc aucune entrée pendant un long moment. Comparer une
+    période de validation à une période d'apprentissage exigerait sinon de
+    corriger ce handicap de départ.
+    """
+    froid = run_backtest(demo_candles[1500:], BotConfig())
+    chaud = run_backtest(demo_candles, BotConfig(), warmup=1500)
+
+    assert chaud.trades and froid.trades
+    premier_chaud = chaud.trades[0].open_index - 1500
+    premier_froid = froid.trades[0].open_index
+    assert premier_chaud <= premier_froid
+
+
+def test_warmup_nul_equivaut_a_un_backtest_normal(demo_candles):
+    a = run_backtest(demo_candles, BotConfig())
+    b = run_backtest(demo_candles, BotConfig(), warmup=0)
+    assert a.report.trades == b.report.trades
+    assert a.report.final_balance == pytest.approx(b.report.final_balance)

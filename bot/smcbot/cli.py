@@ -189,6 +189,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_opt.add_argument(
         "--grid-swing", default="2,3,4", help="valeurs de swing_lookback à tester"
     )
+    p_opt.add_argument(
+        "--grid-be", help="valeurs de breakeven_at_r à tester, ex. 0,1,1.5"
+    )
+    p_opt.add_argument(
+        "--split",
+        type=float,
+        default=0.6,
+        help="part de l'historique servant à classer les réglages ; le reste "
+        "sert de validation (défaut 0.6)",
+    )
     p_opt.add_argument("--top", type=int, default=10, help="nombre de lignes affichées")
 
     p_cfg = sub.add_parser("init-config", help="écrire une configuration par défaut")
@@ -467,38 +477,119 @@ def cmd_demo_data(args: argparse.Namespace) -> int:
     return 0
 
 
+def _grille(texte: str, conv):
+    return [conv(v) for v in texte.split(",") if v.strip()]
+
+
 def cmd_optimize(args: argparse.Namespace) -> int:
+    """Recherche sur grille, avec séparation apprentissage / validation.
+
+    Le classement se fait sur la première partie de l'historique ; la seconde,
+    jamais utilisée pour choisir, sert à mesurer ce que le réglage retenu vaut
+    réellement. Sans cette séparation, une grille assez large finit toujours
+    par produire un résultat flatteur et sans valeur.
+    """
     cfg = make_config(args)
     candles = load_candles(args, cfg)
 
-    tps = [float(v) for v in args.grid_tp.split(",") if v.strip()]
-    swings = [int(v) for v in args.grid_swing.split(",") if v.strip()]
+    tps = _grille(args.grid_tp, float)
+    swings = _grille(args.grid_swing, int)
+    bes = _grille(args.grid_be, float) if args.grid_be else [cfg.risk.breakeven_at_r]
 
-    rows = []
-    for tp, swing in itertools.product(tps, swings):
-        trial = make_config(args)
-        trial.risk.tp_r = tp
-        trial.smc.swing_lookback = swing
-        result = run_backtest(candles, trial)
-        rows.append((tp, swing, result.report))
+    split = args.split
+    if not 0.0 < split < 1.0:
+        raise SystemExit("--split doit être strictement compris entre 0 et 1.")
 
-    rows.sort(key=lambda r: r[2].expectancy_r, reverse=True)
+    coupure = int(len(candles) * split)
+    apprentissage = candles[:coupure]
+    # La validation est précédée d'une préchauffe prise dans l'apprentissage :
+    # sans elle, la stratégie démarrerait sans structure et sous-traderait.
+    prechauffe = min(coupure, 2000)
+    validation = candles[coupure - prechauffe :]
 
-    print(f"{'tp_R':>6} {'swing':>6} {'trades':>7} {'win%':>7} {'PF':>7} "
-          f"{'esp.R':>8} {'perf%':>8} {'DD%':>7}")
-    print("-" * 60)
-    for tp, swing, rep in rows[: args.top]:
-        pf = "∞" if rep.profit_factor == float("inf") else f"{rep.profit_factor:.2f}"
-        print(
-            f"{tp:>6.2f} {swing:>6d} {rep.trades:>7d} {rep.winrate:>7.1f} "
-            f"{pf:>7} {rep.expectancy_r:>+8.3f} {rep.return_pct:>+8.2f} "
-            f"{rep.max_drawdown_pct:>7.2f}"
+    if len(apprentissage) < 500 or len(validation) < 500:
+        raise SystemExit(
+            "Historique trop court pour être séparé. Utilise plus de bougies "
+            "ou rapproche --split de 0.5."
         )
+
     print(
-        "\nAttention : plus la grille est large, plus le meilleur résultat risque "
-        "d'être du surapprentissage. Valide toujours sur une période non testée."
+        f"Apprentissage : {len(apprentissage)} bougies "
+        f"({apprentissage[0].time:%Y-%m-%d} → {apprentissage[-1].time:%Y-%m-%d})\n"
+        f"Validation    : {len(validation) - prechauffe} bougies "
+        f"({candles[coupure].time:%Y-%m-%d} → {candles[-1].time:%Y-%m-%d})"
     )
+
+    lignes = []
+    for tp, swing, be in itertools.product(tps, swings, bes):
+        essai = make_config(args)
+        essai.risk.tp_r = tp
+        essai.risk.breakeven_at_r = be
+        essai.smc.swing_lookback = swing
+        dedans = run_backtest(apprentissage, essai).report
+        dehors = run_backtest(validation, essai, warmup=prechauffe).report
+        lignes.append((tp, swing, be, dedans, dehors))
+
+    lignes.sort(key=lambda r: r[3].expectancy_r, reverse=True)
+
+    print(
+        f"\n{'tp_R':>5} {'swing':>6} {'BE':>5} │ {'trades':>7} {'esp.R':>8} "
+        f"{'PF':>6} │ {'trades':>7} {'esp.R':>8} {'PF':>6} {'perf%':>8}"
+    )
+    print(f"{'':>18} │ {'— apprentissage —':^23} │ {'— validation —':^32}")
+    print("-" * 82)
+    for tp, swing, be, dedans, dehors in lignes[: args.top]:
+        print(
+            f"{tp:>5.1f} {swing:>6d} {be:>5.1f} │ "
+            f"{dedans.trades:>7d} {dedans.expectancy_r:>+8.3f} "
+            f"{_pf(dedans):>6} │ "
+            f"{dehors.trades:>7d} {dehors.expectancy_r:>+8.3f} "
+            f"{_pf(dehors):>6} {dehors.return_pct:>+8.2f}"
+        )
+
+    _verdict(lignes)
     return 0
+
+
+def _pf(rapport) -> str:
+    valeur = rapport.profit_factor
+    return "∞" if valeur == float("inf") else f"{valeur:.2f}"
+
+
+def _verdict(lignes: list) -> None:
+    """Dit franchement ce que vaut le meilleur réglage hors échantillon."""
+    _, _, _, dedans, dehors = lignes[0]
+    print()
+
+    if dedans.expectancy_r <= 0:
+        print(
+            "Aucun réglage de la grille n'est rentable, même sur la période qui a "
+            "servi à les classer. Ce n'est pas un problème de réglage : la\n"
+            "stratégie n'a pas d'avantage sur cet instrument. Changer les "
+            "paramètres jusqu'à trouver un chiffre positif reviendrait à\n"
+            "sélectionner du bruit."
+        )
+        return
+
+    if dehors.expectancy_r <= 0:
+        print(
+            f"Le meilleur réglage en apprentissage ({dedans.expectancy_r:+.3f} R) "
+            f"perd en validation ({dehors.expectancy_r:+.3f} R).\n"
+            "C'est la signature du surapprentissage : le réglage a mémorisé la "
+            "période de test, il n'a rien appris de généralisable.\n"
+            "Ne l'utilise pas."
+        )
+        return
+
+    positifs = sum(1 for *_, d in lignes if d.expectancy_r > 0)
+    print(
+        f"Le meilleur réglage tient en validation "
+        f"({dedans.expectancy_r:+.3f} R → {dehors.expectancy_r:+.3f} R), et "
+        f"{positifs}/{len(lignes)} réglages y sont positifs.\n"
+        "C'est encourageant, sans être une preuve : une seule période de "
+        "validation, sur un seul instrument, reste un échantillon étroit.\n"
+        "Étape suivante : un compte démo en temps réel, pendant plusieurs mois."
+    )
 
 
 def cmd_init_config(args: argparse.Namespace) -> int:

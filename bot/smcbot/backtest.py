@@ -85,13 +85,18 @@ class BacktestResult:
 
 
 def run_backtest(
-    candles: Sequence[Candle], cfg: BotConfig | None = None
+    candles: Sequence[Candle], cfg: BotConfig | None = None, warmup: int = 0
 ) -> BacktestResult:
     """Rejoue la série et applique la stratégie SMC.
 
     Chaque bougie est traitée dans cet ordre : gestion des positions ouvertes,
     puis mise à jour du moteur SMC, puis recherche d'une nouvelle entrée. Le
     moteur ne voit jamais une bougie postérieure à celle qu'il traite.
+
+    `warmup` : nombre de bougies initiales qui alimentent le moteur sans donner
+    lieu à des trades. Indispensable pour évaluer une période de validation :
+    sans lui, la stratégie démarrerait aveugle et sous-traderait au début, ce
+    qui fausserait la comparaison avec la période d'apprentissage.
     """
     cfg = cfg or BotConfig()
     strategy = SmcStrategy(cfg)
@@ -99,22 +104,24 @@ def run_backtest(
     signals = 0
 
     for i, candle in enumerate(candles):
+        actif = i >= warmup
         broker.on_candle(candle, i)
-        signal = strategy.on_candle(candle, can_open=broker.can_open)
-        if signal is not None:
+        signal = strategy.on_candle(candle, can_open=actif and broker.can_open)
+        if signal is not None and actif:
             signals += 1
             broker.execute(signal, candle, i)
 
     if candles and broker.positions:
         broker.close_all(candles[-1], len(candles) - 1, "fin de série")
 
-    report = build_report(
-        broker.trades, broker.equity_curve, cfg.risk.initial_balance
-    )
+    # La préchauffe ne compte pas dans les statistiques : son drawdown est nul
+    # par construction et fausserait la comparaison entre périodes.
+    courbe = broker.equity_curve[warmup:]
+    report = build_report(broker.trades, courbe, cfg.risk.initial_balance)
     return BacktestResult(
         report=report,
         trades=broker.trades,
-        equity_curve=broker.equity_curve,
+        equity_curve=courbe,
         candles=len(candles),
         signals=signals,
         rejected=broker.rejected,
