@@ -171,6 +171,7 @@ class AsianSweepStrategy:
                     entry_level=candle.close,
                     stop=stop,
                     tp_r=self.tp_r,
+                    entry_type="market",
                     reason=f"balayage bas asiatique {self.plage.bas:g}",
                 )
 
@@ -189,6 +190,7 @@ class AsianSweepStrategy:
                     entry_level=candle.close,
                     stop=stop,
                     tp_r=self.tp_r,
+                    entry_type="market",
                     reason=f"balayage haut asiatique {self.plage.haut:g}",
                 )
 
@@ -269,6 +271,7 @@ class OpeningRangeStrategy:
                 entry_level=candle.close,
                 stop=self.plage.bas,
                 tp_r=self.tp_r,
+                entry_type="market",
                 reason=f"cassure haute de la plage d'ouverture ({hauteur:g})",
             )
 
@@ -281,6 +284,7 @@ class OpeningRangeStrategy:
                 entry_level=candle.close,
                 stop=self.plage.haut,
                 tp_r=self.tp_r,
+                entry_type="market",
                 reason=f"cassure basse de la plage d'ouverture ({hauteur:g})",
             )
 
@@ -334,6 +338,7 @@ class FadeStrategy:
                 entry_level=candle.close,
                 stop=candle.close + marge,
                 tp_r=self.tp_r,
+                entry_type="market",
                 reason=f"extension haussière {ecart / atr:.1f} ATR",
             )
         if ecart < -seuil:
@@ -344,6 +349,7 @@ class FadeStrategy:
                 entry_level=candle.close,
                 stop=candle.close - marge,
                 tp_r=self.tp_r,
+                entry_type="market",
                 reason=f"extension baissière {abs(ecart) / atr:.1f} ATR",
             )
         return None

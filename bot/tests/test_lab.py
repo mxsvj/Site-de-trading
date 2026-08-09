@@ -362,3 +362,75 @@ def test_aucune_projection_si_la_validation_perd():
     perdant = essai(0.5, -0.2, -1.2, trades=10)
     texte = juger([perdant], Journal(None)).to_text()
     assert "fois plus de données" not in texte
+
+
+# ----------------------------------------------- exécution au marché vs limite
+
+
+def test_ordre_au_marche_est_rempli_a_la_cloture():
+    """Le lookahead corrigé : décider à la clôture, c'est entrer à la clôture."""
+    from smcbot.broker import PaperBroker
+    from smcbot.config import BotConfig, SymbolSpec
+    from smcbot.smc import BULLISH
+    from smcbot.strategy import Signal
+
+    cfg = BotConfig()
+    cfg.symbol = SymbolSpec(point=0.01, value_per_point_per_lot=1.0,
+                            spread_points=0.0, lot_step=0.01)
+    cfg.risk.initial_balance = 100_000
+    cfg.filters.weekdays = []
+    broker = PaperBroker(cfg)
+
+    # Bougie de balayage haussière : ouverture BASSE, clôture haute.
+    bougie = Candle(T0, 2640.0, 2661.0, 2630.0, 2660.0)
+    broker.on_candle(bougie, 0)
+
+    signal = Signal(index=0, time=T0, direction=BULLISH, entry_level=2660.0,
+                    stop=2629.0, tp_r=3.0, reason="balayage",
+                    entry_type="market")
+    pos = broker.execute(signal, bougie, 0)
+
+    assert pos is not None
+    assert pos.entry == pytest.approx(2660.0), (
+        "un ordre au marché doit être rempli à la clôture, pas à l'ouverture"
+    )
+
+
+def test_ordre_limite_profite_encore_de_l_ouverture():
+    """Un ordre posé à l'avance garde ce droit : la correction ne le touche pas."""
+    from smcbot.broker import PaperBroker
+    from smcbot.config import BotConfig, SymbolSpec
+    from smcbot.smc import BULLISH
+    from smcbot.strategy import Signal
+
+    cfg = BotConfig()
+    cfg.symbol = SymbolSpec(point=0.01, value_per_point_per_lot=1.0,
+                            spread_points=0.0, lot_step=0.01)
+    cfg.risk.initial_balance = 100_000
+    cfg.filters.weekdays = []
+    broker = PaperBroker(cfg)
+
+    bougie = Candle(T0, 2640.0, 2661.0, 2630.0, 2660.0)
+    broker.on_candle(bougie, 0)
+
+    # Limite posée à 2650 : la bougie ouvre à 2640, sous la limite → on est
+    # rempli à l'ouverture, ce qui est légitime pour un ordre déjà en carnet.
+    signal = Signal(index=0, time=T0, direction=BULLISH, entry_level=2650.0,
+                    stop=2629.0, tp_r=3.0, reason="order block")
+    pos = broker.execute(signal, bougie, 0)
+
+    assert pos is not None
+    assert pos.entry == pytest.approx(2640.0)
+
+
+def test_toutes_les_strategies_de_scalping_entrent_au_marche():
+    """Une stratégie qui décide à la clôture ne doit jamais poser d'ordre limite."""
+    from smcbot.config import xauusd
+
+    candles = synthetic_series(9000, start=2650.0, point=0.01, timeframe_minutes=1)
+    for nom in ("asian-sweep", "orb", "fade"):
+        cfg = BotConfig(strategy=nom, symbol=xauusd(), timeframe="M1")
+        strategie = make_strategy(cfg)
+        signaux = [s for s in (strategie.on_candle(c) for c in candles) if s]
+        assert signaux, f"{nom} n'a produit aucun signal"
+        assert all(s.entry_type == "market" for s in signaux), nom

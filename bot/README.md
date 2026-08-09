@@ -346,6 +346,19 @@ En ajouter une revient à écrire une classe exposant
 `on_candle(candle, can_open) -> Signal | None`, et une ligne dans
 `smcbot/registry.py`.
 
+### Marché ou limite : une distinction qui vaut 0,9 R
+
+Une stratégie qui **décide à la clôture** d'une bougie doit être remplie à cette
+clôture. La remplir à l'ouverture de la même bougie revient à entrer avant
+d'avoir eu le signal — et le gain est colossal : sur données aléatoires, cette
+seule erreur faisait passer `asian-sweep` de **+0,079 R à +1,000 R** par trade,
+avec un taux de réussite de 50 % sur un objectif à 3 R, ce qui est impossible.
+
+C'est pourquoi `Signal.entry_type` existe. Les stratégies qui posent un ordre à
+l'avance sur un niveau (`smc`) gardent le droit à un meilleur prix à
+l'ouverture ; celles qui décident à la clôture (`asian-sweep`, `orb`, `fade`)
+ne l'ont pas.
+
 ### Le coût statistique de la recherche
 
 **Tester des stratégies jusqu'à en trouver une qui marche garantit d'en trouver
@@ -532,6 +545,8 @@ Ces hypothèses sont volontairement défavorables. Un backtest optimiste ne sert
 |---|---|
 | Stop et take profit dans la même bougie | **le stop**, toujours |
 | Position ouverte en cours de bougie | peut être stoppée sur cette même bougie, mais **jamais** gagner son TP dessus |
+| Entrée au marché (`entry_type="market"`) | remplie à la **clôture** de la bougie de signal, jamais à son ouverture |
+| Entrée sur ordre limite | remplie à l'ouverture si la bougie ouvre au-delà du niveau — l'ordre était déjà en carnet |
 | Spread | bougies en bid ; achat exécuté à l'ask, stop d'une vente déclenché à l'ask. Le coût est porté par le risque réel du trade |
 | Passage à *breakeven* | appliqué en **fin** de bougie, il ne vaut qu'à partir de la suivante |
 | Volume calculé sous le lot minimal | trade **refusé** plutôt que sur-risqué |
@@ -618,7 +633,7 @@ bot/
 ├── scalping.py     stratégies alternatives : asian-sweep, orb, fade
 │   ├── lab.py         banc d'essai et correction du multi-test
 │   ├── registry.py    catalogue des stratégies
-└── tests/            188 tests
+└── tests/            192 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -632,7 +647,7 @@ cd bot && python -m pytest
 ```
 
 ```
-188 passed
+192 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),

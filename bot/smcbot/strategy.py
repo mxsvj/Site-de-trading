@@ -29,6 +29,15 @@ class Signal:
     stop: float
     tp_r: float
     reason: str
+    entry_type: str = "limit"
+    """« limit » : ordre posé à l'avance sur un niveau, rempli quand le prix y
+    vient — l'ouverture peut donner un meilleur prix, c'est légitime.
+
+    « market » : la stratégie décide à la clôture de la bougie et entre au
+    marché. Le seul prix honnête est alors cette clôture. Remplir à l'ouverture
+    reviendrait à acheter avant d'avoir eu le signal.
+    """
+
     order_block: OrderBlock | None = None
     """Zone à l'origine du signal, quand la stratégie en expose une."""
 

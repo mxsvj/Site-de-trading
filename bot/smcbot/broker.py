@@ -199,7 +199,22 @@ class PaperBroker:
     # -------------------------------------------------------------- interne
 
     def _fill_price(self, signal: Signal, candle: Candle) -> float:
-        """Prix d'exécution d'un ordre limite posé sur le bord de la zone."""
+        """Prix d'exécution, selon la nature de l'ordre.
+
+        Un ordre **limite** est posé avant que la bougie ne se forme : si elle
+        ouvre au-delà du niveau, le remplissage se fait à l'ouverture, meilleur
+        prix, et c'est légitime.
+
+        Un ordre **au marché** est décidé à la clôture de la bougie. Le remplir
+        à son ouverture reviendrait à entrer avant d'avoir eu le signal — un
+        lookahead qui flatte l'entrée, rapproche le stop, gonfle le volume et
+        rapproche le take profit. Le seul prix honnête est la clôture.
+        """
+        if signal.entry_type == "market":
+            if signal.direction == BULLISH:
+                return candle.close + self.spread
+            return candle.close
+
         level = signal.entry_level
         if signal.direction == BULLISH:
             # Achat : déclenché quand le bid touche le niveau, exécuté à l'ask.

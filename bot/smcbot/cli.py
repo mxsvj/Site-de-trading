@@ -30,6 +30,7 @@ from .lab import Journal, evaluer, juger
 from .registry import STRATEGIES
 from .paper import PaperTrader, setup_logging
 from .quality import inspect_series, shift_times
+from .risk import granularite_lot, stop_max_praticable
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -491,6 +492,8 @@ def cmd_check(args: argparse.Namespace) -> int:
                 f"contient des bougies de {report.inferred_minutes} min."
             )
 
+    _fenetre_praticable(cfg, report)
+
     filtres = TradeFilters(cfg.filters, cfg.symbol)
     plancher = max(cfg.filters.min_stop_points, filtres.implied_min_stop())
     if plancher and report.median_range_points:
@@ -522,6 +525,66 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     diagnostic = run_diagnostics(args.symbol, args.timeframe, args.mt5_path)
     print(diagnostic.to_text())
     return 0 if diagnostic.ok else 1
+
+
+def _fenetre_praticable(cfg: BotConfig, report) -> None:
+    """Quelles largeurs de stop ce compte peut-il réellement jouer ?
+
+    Deux contraintes se referment l'une sur l'autre : les frais imposent un stop
+    minimal, le lot minimal impose un stop maximal. Entre les deux se trouve la
+    seule fenêtre exploitable — et sur un petit compte elle peut être vide.
+    """
+    filtres = TradeFilters(cfg.filters, cfg.symbol)
+    plafond = stop_max_praticable(cfg.risk.initial_balance, cfg.risk, cfg.symbol)
+    plancher = max(cfg.filters.min_stop_points, filtres.implied_min_stop())
+
+    print(
+        f"\n┌─ Fenêtre praticable ───────────────────────\n"
+        f"│ Capital / risque    : {cfg.risk.initial_balance:,.0f} "
+        f"× {cfg.risk.risk_pct:g} % = "
+        f"{cfg.risk.initial_balance * cfg.risk.risk_pct / 100:,.2f} par trade\n"
+        f"│ Stop maximal        : {plafond:,.0f} points "
+        f"(au-delà, volume sous le lot minimal)\n"
+        f"│ Stop minimal        : {plancher:,.0f} points"
+        + (" (plafond de frais)" if plancher else " (aucune contrainte de frais)")
+    )
+
+    if report.median_range_points:
+        print(
+            f"│ Amplitude médiane   : {report.median_range_points:,.0f} points, "
+            f"soit {plafond / report.median_range_points:.1f} bougie(s) au plafond"
+        )
+    print("└────────────────────────────────────────────")
+
+    if plancher and plancher >= plafond:
+        print(
+            f"\n⚠ Fenêtre vide : les frais exigent au moins {plancher:.0f} points "
+            f"de stop, le lot minimal en interdit plus de {plafond:.0f}.\n"
+            "  Aucun trade ne peut satisfaire les deux. Il faut soit un capital "
+            "plus important, soit un instrument moins cher,\n"
+            "  soit accepter une part de frais plus élevée."
+        )
+        return
+
+    largeur = plafond - plancher
+    if plancher and largeur < plafond * 0.3:
+        print(
+            f"\n⚠ Fenêtre étroite : seuls les stops entre {plancher:.0f} et "
+            f"{plafond:.0f} points sont jouables.\n"
+            "  La plupart des setups tomberont d'un côté ou de l'autre — "
+            "surveille le nombre de trades effectivement pris."
+        )
+
+    ecart = granularite_lot(
+        cfg.risk.initial_balance, max(plancher, plafond / 2), cfg.risk, cfg.symbol
+    )
+    if ecart > 0.1:
+        print(
+            f"\n⚠ Arrondi du volume : jusqu'à {ecart:.0%} d'écart entre le risque "
+            f"visé et le risque réel.\n"
+            f"  Le pas de {cfg.symbol.lot_step:g} lot est grossier face aux volumes "
+            "que ce capital permet."
+        )
 
 
 def cmd_download(args: argparse.Namespace) -> int:

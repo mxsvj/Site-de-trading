@@ -85,6 +85,41 @@ def swap_cost(
     )
 
 
+def stop_max_praticable(balance: float, risk: RiskConfig, symbol: SymbolSpec) -> float:
+    """Stop le plus large que le compte puisse encore dimensionner, en points.
+
+    Le volume vaut risque / (distance × valeur du point). Plus le stop s'élargit,
+    plus le volume diminue — jusqu'à passer sous le lot minimal du courtier, où
+    le trade devient impossible à prendre au risque voulu.
+
+    C'est la contrainte oubliée des petits comptes : elle ne dit pas qu'on perd,
+    elle dit qu'on ne peut pas jouer certains setups du tout.
+    """
+    montant = balance * (risk.risk_pct / 100.0)
+    denominateur = symbol.min_lot * symbol.value_per_point_per_lot
+    if denominateur <= 0:
+        return float("inf")
+    return montant / denominateur
+
+
+def granularite_lot(
+    balance: float, stop_points: float, risk: RiskConfig, symbol: SymbolSpec
+) -> float:
+    """Écart relatif entre le risque visé et le risque réellement pris.
+
+    Le volume est arrondi au pas du courtier. Sur un petit compte le volume est
+    petit, donc l'arrondi pèse lourd : à 0,05 lot avec un pas de 0,01, on perd
+    jusqu'à 20 % du risque prévu.
+    """
+    montant = balance * (risk.risk_pct / 100.0)
+    if stop_points <= 0 or montant <= 0:
+        return 0.0
+    exact = montant / (stop_points * symbol.value_per_point_per_lot)
+    if exact <= 0:
+        return 1.0
+    return min(1.0, symbol.lot_step / exact)
+
+
 def trade_pnl(
     direction: str,
     entry: float,
