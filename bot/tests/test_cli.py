@@ -280,8 +280,12 @@ def test_decomposition_signal_mange_par_les_frais(capsys):
     from smcbot.metrics import Report
 
     _decompose_cout([
-        (2.0, 3, 1.0, 0.0, Report(expectancy_r=0.12, trades=40), Report(trades=35)),
-        (2.0, 3, 1.0, 24.0, Report(expectancy_r=-0.05, trades=42), Report(trades=36)),
+        (2.0, 3, 1.0, 0.0,
+         Report(expectancy_r=0.12, trades=40),
+         Report(expectancy_r=0.12, trades=35)),
+        (2.0, 3, 1.0, 24.0,
+         Report(expectancy_r=-0.05, trades=42),
+         Report(expectancy_r=-0.05, trades=36)),
     ])
     sortie = capsys.readouterr().out
     assert "avantage réel" in sortie
@@ -296,15 +300,19 @@ def test_decomposition_apparie_les_reglages(capsys):
 
     _decompose_cout([
         # Réglage A : coût réel de 0,10 R
-        (2.0, 3, 1.0, 0.0, Report(expectancy_r=0.05, trades=40), Report(trades=35)),
-        (2.0, 3, 1.0, 24.0, Report(expectancy_r=-0.05, trades=40), Report(trades=35)),
+        (2.0, 3, 1.0, 0.0,
+         Report(expectancy_r=0.05, trades=40), Report(expectancy_r=0.05, trades=35)),
+        (2.0, 3, 1.0, 24.0,
+         Report(expectancy_r=-0.05, trades=40), Report(expectancy_r=-0.05, trades=35)),
         # Réglage B, bien meilleur avec frais : apparier au hasard donnerait
         # un coût négatif absurde.
-        (3.0, 4, 0.0, 0.0, Report(expectancy_r=0.08, trades=40), Report(trades=35)),
-        (3.0, 4, 0.0, 24.0, Report(expectancy_r=0.02, trades=40), Report(trades=35)),
+        (3.0, 4, 0.0, 0.0,
+         Report(expectancy_r=0.08, trades=40), Report(expectancy_r=0.08, trades=35)),
+        (3.0, 4, 0.0, 24.0,
+         Report(expectancy_r=0.02, trades=40), Report(expectancy_r=0.02, trades=35)),
     ])
     sortie = capsys.readouterr().out
-    assert "2 réglages appariés" in sortie
+    assert "2 réglage(s) apparié(s)" in sortie
     assert "Coût négatif" not in sortie and "impossible" not in sortie
     # Médiane des coûts 0,10 et 0,06
     assert "+0.100" in sortie or "+0.060" in sortie
@@ -316,8 +324,10 @@ def test_decomposition_signale_un_cout_negatif(capsys):
     from smcbot.metrics import Report
 
     _decompose_cout([
-        (2.0, 3, 1.0, 0.0, Report(expectancy_r=0.09, trades=244), Report(trades=35)),
-        (2.0, 3, 1.0, 24.0, Report(expectancy_r=0.19, trades=91), Report(trades=35)),
+        (2.0, 3, 1.0, 0.0,
+         Report(expectancy_r=0.09, trades=244), Report(expectancy_r=0.09, trades=35)),
+        (2.0, 3, 1.0, 24.0,
+         Report(expectancy_r=0.19, trades=91), Report(expectancy_r=0.19, trades=35)),
     ])
     sortie = capsys.readouterr().out
     assert "impossible" in sortie
@@ -532,3 +542,31 @@ def test_spec_ignore_les_swaps_exprimes_autrement_qu_en_points():
     spec = spec_depuis_mt5(faux, "XAUUSD")
     assert spec["swap_long_points"] == 0.0
     assert spec["swap_short_points"] == 0.0
+
+
+def test_decomposition_ne_conclut_pas_sur_un_avantage_d_apprentissage(capsys):
+    """Un avantage brut qui n'existe qu'en apprentissage n'en est pas un.
+
+    Cas réel : +0.071 R sans frais sur la période d'entraînement, -0.041 R sur
+    la validation. Conclure « le signal a un avantage réel, passe à un
+    timeframe supérieur » enverrait chercher un timeframe pour sauver quelque
+    chose qui n'a jamais existé hors de l'échantillon d'entraînement.
+    """
+    from smcbot.cli import _decompose_cout
+    from smcbot.metrics import Report
+
+    _decompose_cout([
+        (2.0, 3, 0.0, 0.0,
+         Report(expectancy_r=0.071, trades=465),
+         Report(expectancy_r=-0.041, trades=197)),
+        (2.0, 3, 0.0, 24.0,
+         Report(expectancy_r=-0.038, trades=443),
+         Report(expectancy_r=-0.041, trades=194)),
+    ])
+    sortie = capsys.readouterr().out
+
+    assert "avantage réel" not in sortie
+    assert "timeframe supérieur" not in sortie
+    assert "ne vaut rien en lui-même" in sortie
+    assert "n'existe qu'en apprentissage" in sortie
+    assert "+0.071" in sortie and "-0.041" in sortie

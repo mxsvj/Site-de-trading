@@ -938,36 +938,60 @@ def _decompose_cout(lignes: list) -> None:
     même breakeven, seul le spread change. Confronter le meilleur réglage d'un
     groupe au meilleur d'un autre mélange deux effets et produit des écarts
     dénués de sens, jusqu'à des coûts négatifs, ce qui n'existe pas.
+
+    Le verdict est tiré de la **validation**, jamais de l'apprentissage. Une
+    espérance brute mesurée sur la période qui a servi à choisir le réglage est
+    flattée par construction : conclure « le signal a un avantage » sur cette
+    base enverrait chercher un timeframe supérieur pour sauver un avantage qui
+    n'a jamais existé ailleurs que dans l'échantillon d'entraînement.
     """
     paires = []
-    for tp, swing, be, spread, dedans, _ in lignes:
+    for tp, swing, be, spread, dedans, dehors in lignes:
         if spread != 0:
             continue
-        for tp2, swing2, be2, spread2, dedans2, _ in lignes:
+        for tp2, swing2, be2, spread2, dedans2, dehors2 in lignes:
             if (tp2, swing2, be2) == (tp, swing, be) and spread2 not in (None, 0):
-                paires.append((dedans, dedans2))
+                paires.append(((dedans, dedans2), (dehors, dehors2)))
     if not paires:
         return
 
     print("\n── Décomposition ──────────────────────────────────")
     exploitables = [
-        (sans, avec)
-        for sans, avec in paires
-        if sans.trades >= MIN_TRADES and avec.trades >= MIN_TRADES
+        (appr, val)
+        for appr, val in paires
+        if min(r.trades for r in appr + val) >= MIN_TRADES
     ]
     if not exploitables:
         print(f"Non concluante : moins de {MIN_TRADES} trades par réglage.")
         return
 
-    couts = sorted(sans.expectancy_r - avec.expectancy_r for sans, avec in exploitables)
-    cout_median = couts[len(couts) // 2]
-    brut = max(sans.expectancy_r for sans, _ in exploitables)
+    def _mesure(index: int) -> tuple[float, float]:
+        """(espérance brute, coût médian) sur l'une des deux périodes."""
+        couples = [paire[index] for paire in exploitables]
+        couts = sorted(sans.expectancy_r - avec.expectancy_r for sans, avec in couples)
+        return max(sans.expectancy_r for sans, _ in couples), couts[len(couts) // 2]
 
-    print(f"Meilleure espérance brute (spread nul) : {brut:+.3f} R")
+    brut_appr, cout_appr = _mesure(0)
+    brut, cout_median = _mesure(1)
+
     print(
-        f"Coût de transaction, médiane sur {len(exploitables)} réglages "
-        f"appariés : {cout_median:+.3f} R par trade"
+        f"{'':<30}{'apprentissage':>15}{'validation':>15}\n"
+        f"{'Espérance brute (spread nul)':<30}{brut_appr:>+15.3f}{brut:>+15.3f}\n"
+        f"{'Coût de transaction':<30}{cout_appr:>+15.3f}{cout_median:>+15.3f}"
     )
+    print(
+        f"\nVerdict lu sur la validation, sur {len(exploitables)} réglage(s) "
+        f"apparié(s)."
+    )
+
+    if brut_appr > 0.02 >= brut:
+        print(
+            f"  ⚠ L'avantage brut de {brut_appr:+.3f} R n'existe qu'en "
+            f"apprentissage.\n"
+            f"  Hors échantillon il tombe à {brut:+.3f} R : c'est un artefact de "
+            f"la période\n"
+            f"  qui a servi à choisir le réglage, pas une propriété du signal."
+        )
 
     if cout_median < 0:
         print(
