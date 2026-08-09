@@ -462,16 +462,30 @@ def cmd_check(args: argparse.Namespace) -> int:
                 f"contient des bougies de {report.inferred_minutes} min."
             )
 
-    if cfg.filters.min_stop_points and report.median_range_points:
-        bougies = cfg.filters.min_stop_points / report.median_range_points
+    from .filters import TradeFilters
+
+    filtres = TradeFilters(cfg.filters, cfg.symbol)
+    plancher = max(cfg.filters.min_stop_points, filtres.implied_min_stop())
+    if plancher and report.median_range_points:
+        origine = (
+            "plancher explicite"
+            if cfg.filters.min_stop_points >= filtres.implied_min_stop()
+            else f"plafond de frais à {cfg.filters.max_cost_ratio:.0%}"
+        )
+        bougies = plancher / report.median_range_points
         print(
-            f"\nLe plancher de stop ({cfg.filters.min_stop_points:.0f} pts) vaut "
-            f"{bougies:.1f} bougie(s) d'amplitude médiane."
+            f"\nStop minimal effectif : {plancher:.0f} points ({origine}), "
+            f"soit {bougies:.1f} bougie(s) d'amplitude médiane."
         )
         if bougies < 1:
             print(
-                "  → Très serré au regard de la volatilité : la plupart des stops "
-                "seront touchés par le bruit."
+                "  → Sous une bougie médiane : la plupart des stops seront "
+                "touchés par le simple bruit."
+            )
+        elif bougies > 2:
+            print(
+                "  → Plus de deux bougies médianes : beaucoup de setups seront "
+                "écartés. Vérifie le nombre de trades avant de conclure."
             )
 
     return 0 if report.clean else 2

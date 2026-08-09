@@ -303,8 +303,13 @@ def m15_xauusd() -> BotConfig:
             max_spread_points=40.0,
             # 5 % de frais au maximum, soit une ponction d'environ 0,05 R :
             # c'est tout l'intérêt de monter d'unité de temps, autant l'imposer.
+            # Avec 24 points de spread ce plafond impose déjà un stop d'au moins
+            # 480 points, et il s'ajuste seul si le spread change — d'où
+            # l'absence de plancher écrit en dur, qui ne pourrait qu'être faux
+            # sur un autre instrument. Mesuré sur XAUUSD M15 : amplitude médiane
+            # 476 points, donc un stop naturel d'environ 536 avec la marge.
             max_cost_ratio=0.05,
-            min_stop_points=600.0,
+            min_stop_points=0.0,
             max_trades_per_day=4,
         ),
     )

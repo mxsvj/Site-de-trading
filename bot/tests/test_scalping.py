@@ -383,11 +383,16 @@ def test_preset_m15_est_coherent():
     assert cfg.timeframe == "M15" and cfg.htf == "H1"
 
     filtres = TradeFilters(cfg.filters, cfg.symbol)
-    ratio = filtres.cost_ratio(cfg.filters.min_stop_points)
-    assert ratio <= cfg.filters.max_cost_ratio, (
-        f"plancher de stop incohérent : {ratio:.1%} de frais pour un plafond "
-        f"de {cfg.filters.max_cost_ratio:.0%}"
-    )
+    # Le plafond de frais impose déjà un stop minimal ; un plancher explicite
+    # ne doit pas le contredire en étant plus laxiste.
+    impose = filtres.implied_min_stop()
+    assert impose > 0
+    if cfg.filters.min_stop_points:
+        assert cfg.filters.min_stop_points >= impose
+
+    # Et ce seuil doit rester réaliste face à la volatilité mesurée sur M15
+    # (amplitude médiane relevée : 476 points sur deux ans de XAUUSD).
+    assert impose <= 2 * 476, "seuil trop haut : la plupart des setups seraient écartés"
 
 
 def test_preset_m15_reduit_bien_la_ponction():
@@ -397,10 +402,23 @@ def test_preset_m15_reduit_bien_la_ponction():
     scalp = scalping_xauusd()
     m15 = m15_xauusd()
 
-    ponction_scalp = TradeFilters(scalp.filters, scalp.symbol).cost_ratio(
-        scalp.filters.min_stop_points
+    assert m15.filters.max_cost_ratio < scalp.filters.max_cost_ratio / 2
+
+    # Le stop minimal imposé grandit d'autant
+    impose_scalp = TradeFilters(scalp.filters, scalp.symbol).implied_min_stop()
+    impose_m15 = TradeFilters(m15.filters, m15.symbol).implied_min_stop()
+    assert impose_m15 > 2 * impose_scalp
+
+
+def test_seuil_impose_par_le_plafond_de_frais():
+    """Le seuil s'ajuste au spread réel, contrairement à un nombre écrit en dur."""
+    filtres = TradeFilters(FilterConfig(max_cost_ratio=0.05), xauusd())
+    assert filtres.implied_min_stop() == pytest.approx(500.0)  # spread 25 / 0.05
+
+    large = TradeFilters(
+        FilterConfig(max_cost_ratio=0.05),
+        SymbolSpec(point=0.01, value_per_point_per_lot=1.0, spread_points=50.0),
     )
-    ponction_m15 = TradeFilters(m15.filters, m15.symbol).cost_ratio(
-        m15.filters.min_stop_points
-    )
-    assert ponction_m15 < ponction_scalp / 2
+    assert large.implied_min_stop() == pytest.approx(1000.0)
+
+    assert TradeFilters(FilterConfig(), xauusd()).implied_min_stop() == 0.0

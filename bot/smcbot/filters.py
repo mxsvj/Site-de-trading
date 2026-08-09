@@ -84,6 +84,17 @@ class TradeFilters:
             return float("inf")
         return self.cost_points(spread_points) / stop_points
 
+    def implied_min_stop(self, spread_points: float | None = None) -> float:
+        """Distance minimale au stop qu'impose déjà le plafond de frais.
+
+        Ce seuil s'adapte tout seul au spread réel du courtier, là où un
+        `min_stop_points` écrit en dur devient faux dès qu'on change
+        d'instrument ou de conditions de marché.
+        """
+        if self.cfg.max_cost_ratio <= 0:
+            return 0.0
+        return self.cost_points(spread_points) / self.cfg.max_cost_ratio
+
     def check_trade(
         self, stop_points: float, spread_points: float | None = None
     ) -> "Rejection | None":

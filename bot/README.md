@@ -515,7 +515,7 @@ bot/
 │   └── cli.py         interface en ligne de commande
 ├── mt5/
 │   └── ExportBars.mq5 export CSV + spécification, sans Python
-└── tests/            154 tests
+└── tests/            155 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -529,7 +529,7 @@ cd bot && python -m pytest
 ```
 
 ```
-154 passed
+155 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),
