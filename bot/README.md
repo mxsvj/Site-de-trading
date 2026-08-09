@@ -326,6 +326,30 @@ python -m smcbot paper --preset xauusd-scalp --mt5 --interval 5
 
 Descends l'intervalle à 5 secondes : sur M1, une bougie clôture chaque minute.
 
+## Expert Advisor de scalping tick par tick (`mt5/ScalpXAU.mq5`)
+
+Un EA autonome, indépendant du bot Python : toute la décision se prend dans
+`OnTick()`, sur le flux de ticks et non sur des bougies fermées.
+
+Le signal est un **déséquilibre directionnel de courte durée**, mesuré sur une
+fenêtre glissante de quelques centaines de millisecondes par deux quantités :
+
+- le **déplacement net** — où le prix est allé ;
+- le **chemin parcouru** — combien il a bougé pour y aller.
+
+Leur rapport est l'*efficacité*. Proche de 1, le prix avance en ligne droite ;
+proche de 0, il oscille sans aller nulle part — le cas majoritaire, et celui où
+le spread se paie pour rien.
+
+Le point central : **le seuil d'entrée est exprimé en multiples du spread
+courant**, jamais en points absolus. Un seuil en points serait juste à une heure
+de la journée et faux à toutes les autres.
+
+L'EA **refuse de démarrer** si le spread dépasse `MaxCostRatio` du stop (défaut
+30 %), et affiche le taux de réussite que cette configuration exigerait pour
+atteindre l'équilibre. Voir `mt5/README-ScalpXAU.md` pour l'arithmétique
+complète, le protocole de test et les limites.
+
 ## Choisir l'instrument avant la stratégie
 
 ```bash
