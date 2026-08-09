@@ -520,8 +520,22 @@ def cmd_optimize(args: argparse.Namespace) -> int:
         f"({candles[coupure].time:%Y-%m-%d} → {candles[-1].time:%Y-%m-%d})"
     )
 
+    combinaisons = list(itertools.product(tps, swings, bes))
+    total = len(combinaisons)
+    print(
+        f"\n{total} réglage(s) à évaluer, soit {total * 2} backtests. "
+        f"Compte une à trois minutes."
+    )
+
     lignes = []
-    for tp, swing, be in itertools.product(tps, swings, bes):
+    for numero, (tp, swing, be) in enumerate(combinaisons, 1):
+        # Sur une grille large la commande tourne longtemps : sans retour à
+        # l'écran, l'utilisateur ne sait pas si elle avance ou si elle a planté.
+        print(
+            f"  [{numero}/{total}] tp_R={tp:g} swing={swing} BE={be:g} ...",
+            end="",
+            flush=True,
+        )
         essai = make_config(args)
         essai.risk.tp_r = tp
         essai.risk.breakeven_at_r = be
@@ -529,6 +543,10 @@ def cmd_optimize(args: argparse.Namespace) -> int:
         dedans = run_backtest(apprentissage, essai).report
         dehors = run_backtest(validation, essai, warmup=prechauffe).report
         lignes.append((tp, swing, be, dedans, dehors))
+        print(
+            f" {dedans.trades} trades, {dedans.expectancy_r:+.3f} R "
+            f"→ validation {dehors.expectancy_r:+.3f} R"
+        )
 
     lignes.sort(key=lambda r: r[3].expectancy_r, reverse=True)
 
