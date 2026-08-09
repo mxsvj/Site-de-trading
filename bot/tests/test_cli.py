@@ -648,3 +648,23 @@ def test_spread_nul_avertit_du_verrou_journalier(capsys):
     ])
     _avertir_decomposition(args, make_config(args))
     assert capsys.readouterr().out == ""
+
+
+def test_flag_strategy_change_bien_de_strategie(capsys):
+    from smcbot.cli import build_parser, make_config
+
+    args = build_parser().parse_args([
+        "backtest", "--demo", "--strategy", "vol-break",
+    ])
+    assert make_config(args).strategy == "vol-break"
+
+
+def test_backtest_affiche_les_motifs_de_refus(capsys):
+    """Le tableau de bord des filtres doit sortir : c'est l'outil de diagnostic."""
+    code = main([
+        "backtest", "--demo", "--demo-bars", "8000", "--symbol-preset", "xauusd",
+        "--strategy", "vol-break", "--no-sessions",
+        "--strategy-param", "min_atr_points=60",
+    ])
+    assert code == 0
+    assert "Résultats" in capsys.readouterr().out

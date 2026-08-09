@@ -78,6 +78,11 @@ def build_parser() -> argparse.ArgumentParser:
         )
         cf.add_argument("--symbol", help="nom du symbole (ex. EURUSD)")
         cf.add_argument(
+            "--strategy",
+            choices=sorted(STRATEGIES),
+            help="stratégie à employer (défaut : celle de la configuration)",
+        )
+        cf.add_argument(
             "--symbol-preset",
             choices=("eurusd", "xauusd"),
             help="caractéristiques du contrat (point, lot, spread typique)",
@@ -347,6 +352,8 @@ def make_config(args: argparse.Namespace) -> BotConfig:
         cfg.risk.breakeven_at_r = args.breakeven
     if getattr(args, "max_daily_loss", None) is not None:
         cfg.risk.max_daily_loss_pct = args.max_daily_loss
+    if getattr(args, "strategy", None):
+        cfg.strategy = args.strategy
     if getattr(args, "time_exit", None) is not None:
         cfg.risk.max_bars_in_trade = args.time_exit
     for brut in getattr(args, "strategy_param", None) or []:
