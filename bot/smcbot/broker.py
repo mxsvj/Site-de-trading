@@ -181,11 +181,19 @@ class PaperBroker:
         self.positions.append(pos)
         self._day_trades += 1
 
-        # Une position ouverte en cours de bougie peut être stoppée sur cette
-        # même bougie. En revanche on ne lui accorde pas le take profit : rien
-        # ne dit que l'extrême favorable de la bougie s'est produit après
-        # l'entrée. Hypothèse volontairement défavorable.
-        self._check_exits(candle, index, only=pos, sl_only=True)
+        # Un ordre **limite** peut être rempli tôt dans la bougie : le reste de
+        # celle-ci peut donc le stopper. On lui refuse en revanche le take
+        # profit, car rien ne dit que l'extrême favorable s'est produit après
+        # le remplissage. Hypothèse volontairement défavorable.
+        #
+        # Un ordre **au marché** est rempli à la clôture : la bougie est finie,
+        # ses extrêmes appartiennent au passé et ne peuvent rien toucher. Lui
+        # appliquer le stop de cette bougie facturerait au trade un mouvement
+        # antérieur à son existence — et frapperait d'autant plus fort que la
+        # bougie d'entrée est grande, c'est-à-dire exactement les stratégies
+        # qui cherchent les pics de volatilité.
+        if signal.entry_type != "market":
+            self._check_exits(candle, index, only=pos, sl_only=True)
         return pos
 
     def close_all(self, candle: Candle, index: int, reason: str = "fin") -> list[Trade]:

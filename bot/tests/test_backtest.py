@@ -536,3 +536,52 @@ def test_le_stop_prime_sur_l_horloge():
     )
     broker.on_candle(effondrement, 2)
     assert broker.trades[-1].exit_reason == "SL"
+
+
+def test_ordre_au_marche_immunise_contre_sa_propre_bougie():
+    """Une bougie close ne peut pas stopper un ordre rempli à sa clôture.
+
+    Le remplissage au marché a lieu à la fin de la bougie : ses extrêmes
+    appartiennent au passé. Leur appliquer le stop facturerait au trade un
+    mouvement antérieur à son existence. Le biais frappe d'autant plus fort
+    que la bougie d'entrée est grande — donc précisément les stratégies qui
+    visent les pics de volatilité.
+    """
+    cfg = _config_sortie_temps(0)
+    broker = PaperBroker(cfg)
+
+    # Bougie très ample, clôturant au plus haut. Son creux est bien en dessous
+    # du stop, mais il s'est produit avant l'entrée.
+    ample = Candle(
+        time=datetime(2025, 1, 6, 8, 0),
+        open=1990.0, high=2000.0, low=1980.0, close=2000.0, volume=1.0,
+    )
+    signal = Signal(
+        index=0, time=ample.time, direction=BULLISH, entry_level=2000.0,
+        stop=1995.0, tp_r=2.0, entry_type="market", reason="cassure",
+    )
+
+    broker.on_candle(ample, 0)
+    assert broker.execute(signal, ample, 0) is not None
+    assert broker.positions, "l'ordre au marché ne doit pas être stoppé par sa bougie"
+    assert not broker.trades
+
+
+def test_ordre_limite_reste_expose_a_sa_bougie():
+    """Un ordre limite, lui, a pu être rempli tôt : la bougie peut le stopper."""
+    cfg = _config_sortie_temps(0)
+    broker = PaperBroker(cfg)
+
+    ample = Candle(
+        time=datetime(2025, 1, 6, 8, 0),
+        open=1990.0, high=2000.0, low=1980.0, close=2000.0, volume=1.0,
+    )
+    signal = Signal(
+        index=0, time=ample.time, direction=BULLISH, entry_level=1990.0,
+        stop=1985.0, tp_r=2.0, entry_type="limit", reason="niveau",
+    )
+
+    broker.on_candle(ample, 0)
+    broker.execute(signal, ample, 0)
+    assert not broker.positions
+    assert broker.trades[-1].exit_reason == "SL"
