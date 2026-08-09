@@ -668,3 +668,37 @@ def test_backtest_affiche_les_motifs_de_refus(capsys):
     ])
     assert code == 0
     assert "Résultats" in capsys.readouterr().out
+
+
+def test_entete_annonce_l_unite_reellement_lue(tmp_path, capsys):
+    """Un rapport intitulé M15 ne doit pas porter sur des bougies M1.
+
+    Les calculs ne dépendent pas de cfg.timeframe, mais un titre faux rend le
+    rapport entier suspect — et c'est exactement ce qui s'est produit.
+    """
+    from smcbot.data import save_csv, synthetic_series
+
+    csv = tmp_path / "m1.csv"
+    save_csv(
+        synthetic_series(3000, start=2650.0, point=0.01, timeframe_minutes=1), csv
+    )
+
+    # La configuration annonce M15 ; le fichier est en M1.
+    code = main([
+        "backtest", "--csv", str(csv), "--symbol-preset", "xauusd",
+        "--timeframe", "M15", "--no-sessions",
+    ])
+    sortie = capsys.readouterr().out
+    assert code == 0
+    assert "bougies M1" in sortie
+    assert "XAUUSD M1 —" in sortie
+
+
+def test_unite_mesuree_reconnait_les_unites_standard():
+    from smcbot.cli import unite_mesuree
+    from smcbot.data import synthetic_series
+
+    for minutes, attendu in ((1, "M1"), (5, "M5"), (15, "M15")):
+        serie = synthetic_series(300, start=2650.0, point=0.01,
+                                 timeframe_minutes=minutes)
+        assert unite_mesuree(serie) == attendu

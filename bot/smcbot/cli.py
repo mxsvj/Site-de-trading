@@ -495,7 +495,15 @@ def cmd_backtest(args: argparse.Namespace) -> int:
     candles = load_candles(args, cfg)
     result = run_backtest(candles, cfg)
 
-    entete = f"{cfg.symbol.name} {cfg.timeframe}"
+    mesuree = unite_mesuree(candles)
+    if mesuree and mesuree != cfg.timeframe:
+        print(
+            f"⚠ Unité de temps : le fichier contient des bougies {mesuree}, "
+            f"la configuration annonce {cfg.timeframe}.\n"
+            f"  Le rapport ci-dessous porte sur les bougies réellement lues "
+            f"({mesuree})."
+        )
+    entete = f"{cfg.symbol.name} {mesuree or cfg.timeframe}"
     if cfg.htf:
         entete += f" (biais {cfg.htf})"
     print(
@@ -565,6 +573,31 @@ def cmd_paper(args: argparse.Namespace) -> int:
     )
     print(report.to_text())
     return 0
+
+
+def unite_mesuree(candles: Sequence[Candle]) -> str | None:
+    """Unité de temps réellement présente dans les bougies.
+
+    L'en-tête d'un backtest affichait `cfg.timeframe`, c'est-à-dire ce que la
+    configuration *annonce*, sans jamais le confronter au fichier. Un rapport
+    intitulé M15 pouvait donc porter sur des bougies M1. Les calculs restaient
+    justes — rien ne dépend de ce champ — mais un rapport qui se trompe de
+    titre est un rapport auquel on ne peut pas se fier.
+    """
+    if len(candles) < 3:
+        return None
+    ecarts = [
+        (b.time - a.time).total_seconds() / 60.0
+        for a, b in zip(candles[:200], candles[1:201])
+    ]
+    positifs = sorted(e for e in ecarts if e > 0)
+    if not positifs:
+        return None
+    minutes = positifs[len(positifs) // 2]
+    for nom, valeur in TIMEFRAMES.items():
+        if abs(valeur - minutes) < 1e-6:
+            return nom
+    return f"{minutes:g} min"
 
 
 def cmd_check(args: argparse.Namespace) -> int:
