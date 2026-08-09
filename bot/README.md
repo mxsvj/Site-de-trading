@@ -466,10 +466,26 @@ Ces hypothèses sont volontairement défavorables. Un backtest optimiste ne sert
 | Volume calculé sous le lot minimal | trade **refusé** plutôt que sur-risqué |
 | Arrondi du volume | toujours à l'inférieur |
 
+Le **portage** (swap) est modélisé depuis que la stratégie garde des positions
+au-delà de la nuit : facturé à chaque rollover de 21:00 UTC, du lundi au
+vendredi, triple le mercredi. Renseigne `swap_long_points` et
+`swap_short_points` — le script MQL5 les exporte quand ton courtier les exprime
+en points.
+
+Le rapport indique la **durée de détention**, qui décide du style réel de la
+stratégie bien mieux que le nom qu'on lui donne :
+
+```
+├─ Détention ────────────────────────────────
+│ Durée médiane       : 1.5 h  (max 3.1 j)
+│ Gardés la nuit      : 12 %  (week-end : 3 %)
+│ Portage total       : -84.20
+```
+
 Ce qui n'est **pas** modélisé, et qui existe en vrai : slippage, élargissement du
-spread sur news, rejets et requotes, swap/rollover overnight, gaps du week-end,
-décalage d'exécution. Compte tenu de tout ça, un backtest est un plancher de
-plausibilité, pas une prévision.
+spread sur news, rejets et requotes, gaps du week-end, décalage d'exécution.
+Compte tenu de tout ça, un backtest est un plancher de plausibilité, pas une
+prévision.
 
 ## Configuration
 
@@ -528,7 +544,7 @@ bot/
 │   └── cli.py         interface en ligne de commande
 ├── mt5/
 │   └── ExportBars.mq5 export CSV + spécification, sans Python
-└── tests/            157 tests
+└── tests/            160 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -542,7 +558,7 @@ cd bot && python -m pytest
 ```
 
 ```
-157 passed
+160 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),

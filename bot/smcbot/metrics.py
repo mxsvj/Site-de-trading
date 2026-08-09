@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import math
+import statistics
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Sequence
 
 from .broker import EquityPoint, Trade
+from .risk import rollovers
 
 
 @dataclass
@@ -36,6 +39,13 @@ class Report:
     sharpe: float = 0.0
     long_trades: int = 0
     short_trades: int = 0
+    median_hold_hours: float = 0.0
+    max_hold_hours: float = 0.0
+    overnight_pct: float = 0.0
+    """Part des trades conservés au-delà d'un rollover — donc soumis au portage."""
+    weekend_pct: float = 0.0
+    """Part des trades conservés par-dessus un week-end, exposés au gap du dimanche."""
+    total_swap: float = 0.0
     exit_reasons: dict[str, int] = field(default_factory=dict)
 
     def to_text(self) -> str:
@@ -52,6 +62,12 @@ class Report:
             f"│ Perte moyenne       : {self.avg_loss:+.2f}",
             f"│ Meilleur / pire     : {self.best_trade:+.2f} / {self.worst_trade:+.2f}",
             f"│ Pertes consécutives : {self.max_consecutive_losses}",
+            "├─ Détention ────────────────────────────────",
+            f"│ Durée médiane       : {self._duree(self.median_hold_hours)}  "
+            f"(max {self._duree(self.max_hold_hours)})",
+            f"│ Gardés la nuit      : {self.overnight_pct:.0f} %  "
+            f"(week-end : {self.weekend_pct:.0f} %)",
+            f"│ Portage total       : {self.total_swap:+.2f}",
             "├─ Capital ──────────────────────────────────",
             f"│ Départ              : {self.initial_balance:,.2f}",
             f"│ Final               : {self.final_balance:,.2f}",
@@ -67,6 +83,14 @@ class Report:
             )
             lines.append(f"Sorties : {detail}")
         return "\n".join(lines)
+
+    @staticmethod
+    def _duree(heures: float) -> str:
+        if heures < 1:
+            return f"{heures * 60:.0f} min"
+        if heures < 48:
+            return f"{heures:.1f} h"
+        return f"{heures / 24:.1f} j"
 
     @staticmethod
     def _fmt(value: float) -> str:
@@ -129,7 +153,40 @@ def build_report(
             report.exit_reasons.get(trade.exit_reason, 0) + 1
         )
 
+    _add_durations(report, trades)
     return report
+
+
+def _add_durations(report: Report, trades: Sequence[Trade]) -> None:
+    """Durées de détention : c'est ce qui décide du style réel de la stratégie.
+
+    Une stratégie qui garde ses positions plusieurs jours n'est pas du scalping,
+    quels que soient les paramètres affichés — et elle paie un portage et
+    s'expose aux gaps du week-end, que le nom qu'on lui donne n'écarte pas.
+    """
+    if not trades:
+        return
+
+    durees = [
+        (t.close_time - t.open_time).total_seconds() / 3600.0 for t in trades
+    ]
+    report.median_hold_hours = statistics.median(durees)
+    report.max_hold_hours = max(durees)
+    report.total_swap = sum(t.swap for t in trades)
+
+    nuits = sum(1 for t in trades if rollovers(t.open_time, t.close_time) > 0)
+    report.overnight_pct = 100.0 * nuits / len(trades)
+
+    weekends = sum(
+        1
+        for t in trades
+        if any(
+            (t.open_time + timedelta(days=d)).weekday() == 5
+            and t.open_time + timedelta(days=d) <= t.close_time
+            for d in range(0, (t.close_time - t.open_time).days + 1)
+        )
+    )
+    report.weekend_pct = 100.0 * weekends / len(trades)
 
 
 def _sharpe(r_values: Sequence[float]) -> float:

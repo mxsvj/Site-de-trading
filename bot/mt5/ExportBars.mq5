@@ -57,6 +57,9 @@ bool WriteSpec(const string symbol)
    double max_lot   = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
    double lot_step  = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
    long   spread    = SymbolInfoInteger(symbol, SYMBOL_SPREAD);
+   double swap_long = SymbolInfoDouble(symbol, SYMBOL_SWAP_LONG);
+   double swap_shrt = SymbolInfoDouble(symbol, SYMBOL_SWAP_SHORT);
+   long   swap_mode = SymbolInfoInteger(symbol, SYMBOL_SWAP_MODE);
 
    // Valeur monetaire d'un point pour 1 lot, dans la devise du compte.
    // C'est LA valeur qui doit etre juste : tout le dimensionnement en depend.
@@ -82,6 +85,12 @@ bool WriteSpec(const string symbol)
    FileWrite(handle, "  \"max_lot\": " + DoubleToString(max_lot, 2) + ",");
    FileWrite(handle, "  \"lot_step\": " + DoubleToString(lot_step, 2) + ",");
    FileWrite(handle, "  \"spread_points\": " + IntegerToString((int)spread) + ",");
+   // Le mode de calcul du swap varie selon le courtier : seul le mode 1
+   // (SYMBOL_SWAP_MODE_POINTS) se reporte tel quel dans la configuration.
+   FileWrite(handle, "  \"swap_long_points\": " +
+             DoubleToString(swap_mode == 1 ? swap_long : 0.0, 4) + ",");
+   FileWrite(handle, "  \"swap_short_points\": " +
+             DoubleToString(swap_mode == 1 ? swap_shrt : 0.0, 4) + ",");
    FileWrite(handle, "  \"commission_per_lot\": 0.0");
    FileWrite(handle, "}");
    FileClose(handle);
@@ -93,6 +102,12 @@ bool WriteSpec(const string symbol)
    Print("lot min/max/pas = ", DoubleToString(min_lot, 2), " / ",
          DoubleToString(max_lot, 2), " / ", DoubleToString(lot_step, 2));
    Print("spread actuel = ", spread, " points");
+   Print("swap long/court = ", DoubleToString(swap_long, 4), " / ",
+         DoubleToString(swap_shrt, 4), "   (mode ", swap_mode,
+         ", 1 = points ; tout autre mode n'est PAS reporte automatiquement)");
+   if(swap_mode != 1)
+      Print("ATTENTION : swap exprime autrement qu'en points. Convertis-le a la ",
+            "main dans swap_long_points / swap_short_points.");
    Print("Commission : non exposee par MT5, a demander a ton courtier.");
    Print("Fichier ecrit : ", path);
    return(true);

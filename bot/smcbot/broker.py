@@ -17,7 +17,7 @@ from datetime import date, datetime
 from .config import BotConfig
 from .data import Candle
 from .filters import Rejection, TradeFilters
-from .risk import points, position_size, r_multiple, trade_pnl
+from .risk import points, position_size, r_multiple, swap_cost, trade_pnl
 from .smc import BULLISH
 from .strategy import Signal
 
@@ -59,6 +59,7 @@ class Trade:
     open_index: int
     close_index: int
     pnl: float
+    swap: float
     r: float
     exit_reason: str
     reason: str
@@ -247,6 +248,10 @@ class PaperBroker:
         exit_reason: str,
     ) -> Trade:
         pnl = trade_pnl(pos.direction, pos.entry, price, pos.lots, self.cfg.symbol)
+        portage = swap_cost(
+            pos.direction, pos.lots, pos.open_time, candle.time, self.cfg.symbol
+        )
+        pnl += portage
         self.balance += pnl
         self.positions.remove(pos)
 
@@ -262,6 +267,7 @@ class PaperBroker:
             open_index=pos.open_index,
             close_index=index,
             pnl=pnl,
+            swap=portage,
             r=r_multiple(pos.direction, pos.entry, pos.initial_stop, price),
             exit_reason=exit_reason,
             reason=pos.reason,

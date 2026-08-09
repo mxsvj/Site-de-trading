@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from datetime import datetime, timedelta
 
 from .config import RiskConfig, SymbolSpec
 
@@ -40,6 +41,48 @@ def position_size(
     if lots < symbol.min_lot:
         return 0.0
     return round(lots, 8)
+
+
+def rollovers(start: datetime, end: datetime, hour: int = 21) -> int:
+    """Nombre de nuits facturées entre deux instants.
+
+    Le portage est prélevé au passage de l'heure de rollover, du lundi au
+    vendredi, en triple le mercredi — ce qui couvre le week-end. Samedi et
+    dimanche ne sont pas facturés séparément.
+    """
+    if end <= start:
+        return 0
+
+    total = 0
+    moment = start.replace(hour=hour, minute=0, second=0, microsecond=0)
+    if moment <= start:
+        moment += timedelta(days=1)
+    while moment <= end:
+        jour = moment.weekday()
+        if jour == 2:      # mercredi : triple, pour couvrir le week-end
+            total += 3
+        elif jour < 5:     # lundi à vendredi
+            total += 1
+        moment += timedelta(days=1)
+    return total
+
+
+def swap_cost(
+    direction: str,
+    lots: float,
+    start: datetime,
+    end: datetime,
+    symbol: SymbolSpec,
+) -> float:
+    """Frais de portage d'une position, dans la devise du compte."""
+    par_nuit = (
+        symbol.swap_long_points if direction == "bullish" else symbol.swap_short_points
+    )
+    if par_nuit == 0:
+        return 0.0
+    return (
+        rollovers(start, end) * par_nuit * symbol.value_per_point_per_lot * lots
+    )
 
 
 def trade_pnl(

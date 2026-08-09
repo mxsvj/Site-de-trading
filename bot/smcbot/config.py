@@ -29,6 +29,15 @@ class SymbolSpec:
     # Coûts de transaction
     spread_points: float = 10.0  # spread moyen, en points
     commission_per_lot: float = 0.0  # aller-retour, devise du compte
+    swap_long_points: float = 0.0
+    swap_short_points: float = 0.0
+    """Frais de portage par nuit et par lot, en points. Négatif = coût.
+
+    Se lisent dans MT5 (Spécification du symbole, « Swap long / court »). Sur
+    l'or ils sont rarement négligeables, et une stratégie qui garde ses
+    positions plusieurs jours les paie à chaque nuit — triple le mercredi, qui
+    couvre le week-end.
+    """
 
     @property
     def pip(self) -> float:
