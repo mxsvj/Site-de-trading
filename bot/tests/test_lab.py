@@ -552,3 +552,34 @@ def test_journal_ancien_format_conserve_son_total(tmp_path):
 
     journal = Journal(chemin)
     assert journal.total == 34
+
+
+def test_un_parametre_neutre_ne_cree_pas_une_hypothese(tmp_path):
+    """Ajouter une option désactivée ne rejoue pas la recherche.
+
+    `smc tp=2` et `smc tp=2 temps=0` sont le même essai : la sortie sur le
+    temps est désactivée. Compter le second relèverait le seuil sans qu'aucune
+    possibilité nouvelle ait été explorée.
+    """
+    from smcbot.lab import Essai, Journal
+    from smcbot.metrics import Report
+
+    def essai(params, label):
+        return Essai(
+            strategy="smc",
+            label=label,
+            params=params,
+            dedans=Report(trades=443, expectancy_r=-0.038),
+            dehors=Report(trades=194, expectancy_r=-0.041),
+        )
+
+    journal = Journal(tmp_path / "h.json")
+    journal.enregistrer([essai({"tp_r": 2.0}, "smc tp=2")], "avant")
+    assert journal.total == 1
+
+    suite = Journal(tmp_path / "h.json")
+    nouvelles = suite.enregistrer(
+        [essai({"tp_r": 2.0, "max_bars_in_trade": 0}, "smc tp=2 temps=off")], "après"
+    )
+    assert nouvelles == 0
+    assert suite.total == 1

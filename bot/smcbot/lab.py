@@ -239,11 +239,17 @@ def empreinte(essai: "Essai") -> str:
     ou deux réglages dont la différence n'a aucun effet. La correction de
     Bonferroni porte sur le nombre d'hypothèses **distinctes** examinées, pas
     sur le nombre de fois où on a appuyé sur Entrée.
+
+    Les paramètres sont volontairement exclus de la signature : c'est le
+    résultat qui fait l'identité. Ajouter un paramètre neutre — une sortie sur
+    le temps désactivée, un filtre sans effet — produirait sinon une empreinte
+    différente pour un essai rigoureusement identique, et relèverait le seuil
+    sans qu'aucune possibilité nouvelle ait été explorée. C'est la même clé que
+    `doublons()` applique à l'intérieur d'une session.
     """
     return "|".join(
         (
             essai.strategy,
-            json.dumps(essai.params, sort_keys=True, ensure_ascii=False),
             str(essai.dedans.trades),
             f"{essai.dedans.expectancy_r:.9f}",
             str(essai.dehors.trades),
