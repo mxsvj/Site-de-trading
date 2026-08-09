@@ -356,6 +356,25 @@ La commande conclut elle-même, en trois cas :
 | Bon en apprentissage, mauvais en validation | Surapprentissage caractérisé. Le réglage a mémorisé la période, il n'a rien appris. |
 | Bon des deux côtés | Encourageant, **pas une preuve**. Une seule période, un seul instrument. Passe à un démo en temps réel. |
 
+### Décomposer la perte : signal ou frais ?
+
+Une stratégie légèrement perdante pose une question à deux réponses opposées :
+le signal ne vaut-il rien, ou vaut-il quelque chose que les frais dévorent ?
+Les deux donnent les mêmes chiffres, et appellent des décisions contraires.
+
+`--grid-spread` tranche en rejouant à spread nul. Ce n'est pas un scénario
+tradable — c'est un instrument de mesure, qui isole la valeur brute du signal :
+
+```bash
+python -m smcbot optimize --csv data/xauusd_m1.csv --preset xauusd-scalp \
+    --tz-shift -3 --grid-spread 0,24 --grid-tp 2 --grid-swing 3
+```
+
+| Espérance à spread nul | Conclusion |
+|---|---|
+| ≤ 0 | Le signal ne vaut rien par lui-même. Le spread n'a fait qu'aggraver une absence d'avantage : changer d'instrument ou de timeframe ne sauvera rien, il faut changer de schéma. |
+| > 0 | Le signal a un avantage réel, mais inférieur aux frais. Il faut des stops plus larges — donc un timeframe supérieur — pour que le spread pèse une part plus faible du risque. |
+
 ---
 
 ## La stratégie
@@ -462,7 +481,7 @@ bot/
 │   └── cli.py         interface en ligne de commande
 ├── mt5/
 │   └── ExportBars.mq5 export CSV + spécification, sans Python
-└── tests/            145 tests
+└── tests/            149 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -476,7 +495,7 @@ cd bot && python -m pytest
 ```
 
 ```
-145 passed
+149 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),

@@ -193,6 +193,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--grid-be", help="valeurs de breakeven_at_r à tester, ex. 0,1,1.5"
     )
     p_opt.add_argument(
+        "--grid-spread",
+        help="valeurs de spread à tester, ex. 0,12,24 — outil de mesure et non "
+        "de réglage : inclure 0 sépare la valeur du signal du coût des frais",
+    )
+    p_opt.add_argument(
         "--split",
         type=float,
         default=0.6,
@@ -520,53 +525,107 @@ def cmd_optimize(args: argparse.Namespace) -> int:
         f"({candles[coupure].time:%Y-%m-%d} → {candles[-1].time:%Y-%m-%d})"
     )
 
-    combinaisons = list(itertools.product(tps, swings, bes))
+    # Le spread est le seul paramètre qu'on ne « règle » pas : le faire varier
+    # sert à décomposer la perte entre valeur du signal et coût de transaction.
+    spreads = _grille(args.grid_spread, float) if args.grid_spread else [None]
+
+    combinaisons = list(itertools.product(tps, swings, bes, spreads))
     total = len(combinaisons)
     print(
         f"\n{total} réglage(s) à évaluer, soit {total * 2} backtests. "
         f"Compte une à trois minutes."
     )
 
+    montre_spread = len(spreads) > 1
     lignes = []
-    for numero, (tp, swing, be) in enumerate(combinaisons, 1):
-        # Sur une grille large la commande tourne longtemps : sans retour à
-        # l'écran, l'utilisateur ne sait pas si elle avance ou si elle a planté.
-        print(
-            f"  [{numero}/{total}] tp_R={tp:g} swing={swing} BE={be:g} ...",
-            end="",
-            flush=True,
-        )
+    for numero, (tp, swing, be, spread) in enumerate(combinaisons, 1):
         essai = make_config(args)
         essai.risk.tp_r = tp
         essai.risk.breakeven_at_r = be
         essai.smc.swing_lookback = swing
+        if spread is not None:
+            essai.symbol.spread_points = spread
+
+        etiquette = f"tp_R={tp:g} swing={swing} BE={be:g}"
+        if montre_spread:
+            etiquette += f" spread={spread:g}"
+        # Sur une grille large la commande tourne longtemps : sans retour à
+        # l'écran, l'utilisateur ne sait pas si elle avance ou si elle a planté.
+        print(f"  [{numero}/{total}] {etiquette} ...", end="", flush=True)
+
         dedans = run_backtest(apprentissage, essai).report
         dehors = run_backtest(validation, essai, warmup=prechauffe).report
-        lignes.append((tp, swing, be, dedans, dehors))
+        lignes.append((tp, swing, be, spread, dedans, dehors))
         print(
             f" {dedans.trades} trades, {dedans.expectancy_r:+.3f} R "
             f"→ validation {dehors.expectancy_r:+.3f} R"
         )
 
-    lignes.sort(key=lambda r: r[3].expectancy_r, reverse=True)
+    lignes.sort(key=lambda r: r[4].expectancy_r, reverse=True)
 
+    tete_spread = f"{'spread':>7} " if montre_spread else ""
+    largeur = 18 + (8 if montre_spread else 0)
     print(
-        f"\n{'tp_R':>5} {'swing':>6} {'BE':>5} │ {'trades':>7} {'esp.R':>8} "
-        f"{'PF':>6} │ {'trades':>7} {'esp.R':>8} {'PF':>6} {'perf%':>8}"
+        f"\n{'tp_R':>5} {'swing':>6} {'BE':>5} {tete_spread}│ "
+        f"{'trades':>7} {'esp.R':>8} {'PF':>6} │ "
+        f"{'trades':>7} {'esp.R':>8} {'PF':>6} {'perf%':>8}"
     )
-    print(f"{'':>18} │ {'— apprentissage —':^23} │ {'— validation —':^32}")
-    print("-" * 82)
-    for tp, swing, be, dedans, dehors in lignes[: args.top]:
+    print(f"{'':>{largeur}} │ {'— apprentissage —':^23} │ {'— validation —':^32}")
+    print("-" * (82 + (8 if montre_spread else 0)))
+    for tp, swing, be, spread, dedans, dehors in lignes[: args.top]:
+        colonne = f"{spread:>7g} " if montre_spread else ""
         print(
-            f"{tp:>5.1f} {swing:>6d} {be:>5.1f} │ "
+            f"{tp:>5.1f} {swing:>6d} {be:>5.1f} {colonne}│ "
             f"{dedans.trades:>7d} {dedans.expectancy_r:>+8.3f} "
             f"{_pf(dedans):>6} │ "
             f"{dehors.trades:>7d} {dehors.expectancy_r:>+8.3f} "
             f"{_pf(dehors):>6} {dehors.return_pct:>+8.2f}"
         )
 
+    if montre_spread:
+        _decompose_cout(lignes)
     _verdict(lignes)
     return 0
+
+
+def _decompose_cout(lignes: list) -> None:
+    """Sépare la valeur brute du signal du coût de transaction.
+
+    Rejouer à spread nul n'est pas un scénario tradable : c'est un instrument
+    de mesure. Si l'espérance reste négative sans frais, le signal lui-même ne
+    vaut rien. Si elle devient positive, le schéma fonctionne mais ne survit pas
+    aux coûts — et la réponse est un timeframe plus grand, pas un autre réglage.
+    """
+    sans_frais = [ligne for ligne in lignes if ligne[3] == 0]
+    if not sans_frais:
+        return
+
+    meilleur = max(sans_frais, key=lambda r: r[4].expectancy_r)
+    brut = meilleur[4].expectancy_r
+    print("\n── Décomposition ──────────────────────────────────")
+    print(f"Meilleure espérance brute (spread nul) : {brut:+.3f} R")
+
+    if brut <= 0.02:
+        print(
+            "Le signal ne vaut rien en lui-même : même sans payer un centime de\n"
+            "frais, il ne gagne pas. Le spread n'est pas le coupable, il n'a\n"
+            "fait qu'aggraver une absence d'avantage. Changer d'instrument ou\n"
+            "de timeframe ne sauvera pas ce schéma — il faut changer de schéma."
+        )
+    else:
+        avec_frais = max(
+            (r for r in lignes if r[3] not in (None, 0)),
+            key=lambda r: r[4].expectancy_r,
+            default=None,
+        )
+        cout = brut - avec_frais[4].expectancy_r if avec_frais else brut
+        print(
+            f"Coût de transaction : {cout:.3f} R par trade.\n"
+            f"Le signal a un avantage réel ({brut:+.3f} R) mais les frais le\n"
+            f"dépassent. Ce n'est pas un problème de réglage : il faut des stops\n"
+            f"plus larges, donc un timeframe supérieur, pour que le spread pèse\n"
+            f"une part plus faible du risque."
+        )
 
 
 def _pf(rapport) -> str:
@@ -576,7 +635,7 @@ def _pf(rapport) -> str:
 
 def _verdict(lignes: list) -> None:
     """Dit franchement ce que vaut le meilleur réglage hors échantillon."""
-    _, _, _, dedans, dehors = lignes[0]
+    *_, dedans, dehors = lignes[0]
     print()
 
     if dedans.expectancy_r <= 0:

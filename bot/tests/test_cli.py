@@ -245,3 +245,51 @@ def test_verdict_reste_prudent_quand_ca_tient(capsys):
     sortie = capsys.readouterr().out
     assert "tient en validation" in sortie
     assert "sans être une preuve" in sortie
+
+
+def test_grid_spread_decompose_le_cout(capsys):
+    """Rejouer à spread nul sépare la valeur du signal du coût de transaction."""
+    code = main(["optimize", "--demo", "--demo-bars", "8000", "--grid-tp", "2",
+                 "--grid-swing", "2", "--grid-spread", "0,24", "--split", "0.6"])
+    sortie = capsys.readouterr().out
+
+    assert code == 0
+    assert "spread" in sortie                    # la colonne apparaît
+    assert "Décomposition" in sortie
+    assert "spread nul" in sortie
+
+
+def test_decomposition_signal_sans_valeur(capsys):
+    from smcbot.cli import _decompose_cout
+    from smcbot.metrics import Report
+
+    _decompose_cout([
+        (2.0, 3, 1.0, 0.0, Report(expectancy_r=-0.08), Report(expectancy_r=-0.09)),
+        (2.0, 3, 1.0, 24.0, Report(expectancy_r=-0.15), Report(expectancy_r=-0.16)),
+    ])
+    sortie = capsys.readouterr().out
+    assert "ne vaut rien en lui-même" in sortie
+    assert "changer de schéma" in sortie
+
+
+def test_decomposition_signal_mange_par_les_frais(capsys):
+    """Un avantage réel mais insuffisant appelle une conclusion opposée."""
+    from smcbot.cli import _decompose_cout
+    from smcbot.metrics import Report
+
+    _decompose_cout([
+        (2.0, 3, 1.0, 0.0, Report(expectancy_r=0.12), Report(expectancy_r=0.10)),
+        (2.0, 3, 1.0, 24.0, Report(expectancy_r=-0.05), Report(expectancy_r=-0.04)),
+    ])
+    sortie = capsys.readouterr().out
+    assert "avantage réel" in sortie
+    assert "timeframe supérieur" in sortie
+    assert "0.170" in sortie  # 0.12 - (-0.05)
+
+
+def test_decomposition_ignoree_sans_spread_nul(capsys):
+    from smcbot.cli import _decompose_cout
+    from smcbot.metrics import Report
+
+    _decompose_cout([(2.0, 3, 1.0, 24.0, Report(), Report())])
+    assert capsys.readouterr().out == ""
