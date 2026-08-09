@@ -378,6 +378,11 @@ Chercher en dix sessions ne coûte pas moins cher qu'en une seule : c'est
 pourquoi le compteur persiste. `--reset-journal` ne se justifie qu'en changeant
 de jeu de données.
 
+`lab` signale aussi les **hypothèses identiques** — deux réglages qui donnent
+exactement le même résultat au trade près. Ce n'est pas une coïncidence : c'est
+que le paramètre censé les distinguer n'a aucun effet sur cette stratégie. Une
+seule hypothèse, pas plusieurs, et un compteur à corriger d'autant.
+
 ## Recherche de paramètres
 
 ```bash
@@ -599,7 +604,7 @@ bot/
 ├── scalping.py     stratégies alternatives : asian-sweep, orb, fade
 │   ├── lab.py         banc d'essai et correction du multi-test
 │   ├── registry.py    catalogue des stratégies
-└── tests/            180 tests
+└── tests/            183 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -613,7 +618,7 @@ cd bot && python -m pytest
 ```
 
 ```
-180 passed
+183 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),

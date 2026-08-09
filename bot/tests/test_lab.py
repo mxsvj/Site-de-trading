@@ -233,3 +233,45 @@ def test_evaluer_separe_les_periodes():
     )
     assert len(essais) == 2
     assert all(e.strategy in ("fade", "orb") for e in essais)
+
+
+def test_tp_r_est_applique_a_toutes_les_strategies():
+    """Un tp_r qui n'atteint pas la stratégie fait tester trois fois la même."""
+    candles = synthetic_series(9000, start=2650.0, point=0.01, timeframe_minutes=1)
+    cfg = BotConfig(symbol=xauusd(), timeframe="M1")
+    cfg.filters.sessions = []
+    cfg.filters.weekdays = []
+
+    essais = evaluer(
+        [("smc", {"tp_r": tp}, f"smc tp={tp}") for tp in (1.5, 3.0)],
+        candles, cfg, split=0.6, prechauffe=500,
+    )
+    resultats = {(e.dedans.trades, round(e.dedans.expectancy_r, 6)) for e in essais}
+    assert len(resultats) > 1, "le take profit n'a eu aucun effet sur la stratégie"
+
+
+def test_doublons_sont_signales():
+    from smcbot.lab import doublons
+
+    a = essai(0.1, 0.1, 1.0)
+    a.label = "smc tp=1.5"
+    b = essai(0.1, 0.1, 1.0)
+    b.label = "smc tp=3"
+    c = essai(0.2, 0.2, 1.0)
+    c.label = "fade tp=2"
+    c.strategy = "fade"
+
+    groupes = doublons([a, b, c])
+    assert len(groupes) == 1
+    assert {e.label for e in groupes[0]} == {"smc tp=1.5", "smc tp=3"}
+
+
+def test_verdict_signale_les_hypotheses_dupliquees():
+    a = essai(0.1, 0.1, 1.0)
+    a.label = "smc tp=1.5"
+    b = essai(0.1, 0.1, 1.0)
+    b.label = "smc tp=3"
+
+    texte = juger([a, b], Journal(None)).to_text()
+    assert "Résultats identiques" in texte
+    assert "aucun effet" in texte

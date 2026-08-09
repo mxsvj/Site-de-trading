@@ -138,6 +138,11 @@ def evaluer(
         cfg = _copie(base)
         cfg.strategy = strategie
         cfg.strategy_params = dict(params)
+        # `tp_r` est commun à toutes les stratégies : il doit atterrir dans la
+        # configuration de risque, sans quoi celles qui ne lisent pas
+        # `strategy_params` l'ignorent en silence et la grille ne teste rien.
+        if "tp_r" in params:
+            cfg.risk.tp_r = float(params["tp_r"])
 
         essai = Essai(
             strategy=strategie,
@@ -159,6 +164,27 @@ def _copie(cfg: BotConfig) -> BotConfig:
     return deepcopy(cfg)
 
 
+def doublons(essais: Sequence[Essai]) -> list[list[Essai]]:
+    """Regroupe les candidates dont les résultats sont rigoureusement identiques.
+
+    Deux réglages qui produisent le même résultat au trade près ne sont pas deux
+    hypothèses : c'est la même, testée deux fois. Le paramètre censé les
+    distinguer n'a aucun effet — et le compteur de Bonferroni s'en trouve
+    faussé à la hausse.
+    """
+    groupes: dict[tuple, list[Essai]] = {}
+    for essai in essais:
+        cle = (
+            essai.strategy,
+            essai.dedans.trades,
+            round(essai.dedans.expectancy_r, 9),
+            essai.dehors.trades,
+            round(essai.dehors.expectancy_r, 9),
+        )
+        groupes.setdefault(cle, []).append(essai)
+    return [g for g in groupes.values() if len(g) > 1]
+
+
 @dataclass
 class Verdict:
     hypotheses_session: int
@@ -167,6 +193,7 @@ class Verdict:
     meilleur: Essai | None
     significatif: bool
     exploitables: int
+    identiques: list[list[Essai]] = field(default_factory=list)
 
     def to_text(self) -> str:
         lignes = [
@@ -175,6 +202,14 @@ class Verdict:
             f"Hypothèses testées au total      : {self.hypotheses_total}",
             f"Seuil de t exigé (Bonferroni)    : {self.seuil_t:.2f}",
         ]
+
+        for groupe in self.identiques:
+            noms = ", ".join(e.label for e in groupe)
+            lignes.append(
+                f"\n⚠ Résultats identiques : {noms}\n"
+                "  Le paramètre qui les distingue n'a aucun effet sur cette "
+                "stratégie. Ce n'est qu'une seule hypothèse, pas plusieurs."
+            )
 
         if self.meilleur is None:
             lignes.append(
@@ -233,6 +268,7 @@ def juger(essais: Sequence[Essai], journal: Journal, detail: str = "") -> Verdic
         and meilleur.t_validation > seuil
     )
     return Verdict(
+        identiques=doublons(essais),
         hypotheses_session=len(essais),
         hypotheses_total=journal.total,
         seuil_t=seuil,
