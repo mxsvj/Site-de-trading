@@ -286,7 +286,45 @@ def test_decomposition_signal_mange_par_les_frais(capsys):
     sortie = capsys.readouterr().out
     assert "avantage réel" in sortie
     assert "timeframe supérieur" in sortie
-    assert "0.170" in sortie  # 0.12 - (-0.05)
+    assert "+0.170" in sortie  # 0.12 - (-0.05)
+
+
+def test_decomposition_apparie_les_reglages(capsys):
+    """Le coût ne se mesure qu'à tp, swing et breakeven identiques."""
+    from smcbot.cli import _decompose_cout
+    from smcbot.metrics import Report
+
+    _decompose_cout([
+        # Réglage A : coût réel de 0,10 R
+        (2.0, 3, 1.0, 0.0, Report(expectancy_r=0.05, trades=40), Report(trades=35)),
+        (2.0, 3, 1.0, 24.0, Report(expectancy_r=-0.05, trades=40), Report(trades=35)),
+        # Réglage B, bien meilleur avec frais : apparier au hasard donnerait
+        # un coût négatif absurde.
+        (3.0, 4, 0.0, 0.0, Report(expectancy_r=0.08, trades=40), Report(trades=35)),
+        (3.0, 4, 0.0, 24.0, Report(expectancy_r=0.02, trades=40), Report(trades=35)),
+    ])
+    sortie = capsys.readouterr().out
+    assert "2 réglages appariés" in sortie
+    assert "Coût négatif" not in sortie and "impossible" not in sortie
+    # Médiane des coûts 0,10 et 0,06
+    assert "+0.100" in sortie or "+0.060" in sortie
+
+
+def test_decomposition_signale_un_cout_negatif(capsys):
+    """Un coût négatif révèle des populations de trades différentes."""
+    from smcbot.cli import _decompose_cout
+    from smcbot.metrics import Report
+
+    _decompose_cout([
+        (2.0, 3, 1.0, 0.0, Report(expectancy_r=0.09, trades=244), Report(trades=35)),
+        (2.0, 3, 1.0, 24.0, Report(expectancy_r=0.19, trades=91), Report(trades=35)),
+    ])
+    sortie = capsys.readouterr().out
+    assert "impossible" in sortie
+    assert "pas sur les mêmes trades" in sortie
+    # Et surtout aucune conclusion ne doit être tirée
+    assert "avantage réel" not in sortie
+    assert "survit à ses coûts" not in sortie
 
 
 def test_decomposition_ignoree_sans_spread_nul(capsys):
@@ -333,6 +371,7 @@ def test_decomposition_muette_sur_petit_echantillon(capsys):
 
     _decompose_cout([
         (3.0, 3, 1.0, 0.0, Report(expectancy_r=1.25, trades=8), Report(trades=5)),
+        (3.0, 3, 1.0, 24.0, Report(expectancy_r=1.00, trades=9), Report(trades=5)),
     ])
     sortie = capsys.readouterr().out
     assert "Non concluante" in sortie

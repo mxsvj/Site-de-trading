@@ -24,6 +24,7 @@ from .data import (
     synthetic_series,
 )
 from .doctor import run_diagnostics
+from .filters import TradeFilters
 from .paper import PaperTrader, setup_logging
 from .quality import inspect_series, shift_times
 
@@ -462,8 +463,6 @@ def cmd_check(args: argparse.Namespace) -> int:
                 f"contient des bougies de {report.inferred_minutes} min."
             )
 
-    from .filters import TradeFilters
-
     filtres = TradeFilters(cfg.filters, cfg.symbol)
     plancher = max(cfg.filters.min_stop_points, filtres.implied_min_stop())
     if plancher and report.median_range_points:
@@ -583,6 +582,18 @@ def cmd_optimize(args: argparse.Namespace) -> int:
     )
 
     montre_spread = len(spreads) > 1
+    # Faire varier le spread change aussi les filtres qui en dépendent : à
+    # spread nul, le plafond de frais n'impose plus aucun stop minimal et la
+    # population de trades explose. Pour que les lignes restent comparables, le
+    # seuil est figé une fois pour toutes sur le spread réel.
+    reference = TradeFilters(cfg.filters, cfg.symbol)
+    plancher_fige = max(cfg.filters.min_stop_points, reference.implied_min_stop())
+    if montre_spread and plancher_fige:
+        print(
+            f"Filtres figés sur le spread réel : stop minimal {plancher_fige:.0f} "
+            f"points pour toutes les lignes."
+        )
+
     lignes = []
     for numero, (tp, swing, be, spread) in enumerate(combinaisons, 1):
         essai = make_config(args)
@@ -591,6 +602,11 @@ def cmd_optimize(args: argparse.Namespace) -> int:
         essai.smc.swing_lookback = swing
         if spread is not None:
             essai.symbol.spread_points = spread
+            # Seul le coût d'exécution varie ; l'admissibilité des setups reste
+            # celle du spread réel, sans quoi on comparerait deux stratégies
+            # différentes au lieu de mesurer un coût.
+            essai.filters.max_cost_ratio = 0.0
+            essai.filters.min_stop_points = plancher_fige
 
         etiquette = f"tp_R={tp:g} swing={swing} BE={be:g}"
         if montre_spread:
@@ -639,23 +655,52 @@ def _decompose_cout(lignes: list) -> None:
 
     Rejouer à spread nul n'est pas un scénario tradable : c'est un instrument
     de mesure. Si l'espérance reste négative sans frais, le signal lui-même ne
-    vaut rien. Si elle devient positive, le schéma fonctionne mais ne survit pas
-    aux coûts — et la réponse est un timeframe plus grand, pas un autre réglage.
+    vaut rien ; si elle devient positive, le schéma fonctionne mais ne survit
+    pas à ses coûts.
+
+    La comparaison ne vaut qu'à **réglage identique** — même tp, même swing,
+    même breakeven, seul le spread change. Confronter le meilleur réglage d'un
+    groupe au meilleur d'un autre mélange deux effets et produit des écarts
+    dénués de sens, jusqu'à des coûts négatifs, ce qui n'existe pas.
     """
-    sans_frais = [ligne for ligne in lignes if ligne[3] == 0]
-    if not sans_frais:
+    paires = []
+    for tp, swing, be, spread, dedans, _ in lignes:
+        if spread != 0:
+            continue
+        for tp2, swing2, be2, spread2, dedans2, _ in lignes:
+            if (tp2, swing2, be2) == (tp, swing, be) and spread2 not in (None, 0):
+                paires.append((dedans, dedans2))
+    if not paires:
         return
 
-    meilleur = max(sans_frais, key=lambda r: r[4].expectancy_r)
-    brut = meilleur[4].expectancy_r
     print("\n── Décomposition ──────────────────────────────────")
-    if meilleur[4].trades < MIN_TRADES:
+    exploitables = [
+        (sans, avec)
+        for sans, avec in paires
+        if sans.trades >= MIN_TRADES and avec.trades >= MIN_TRADES
+    ]
+    if not exploitables:
+        print(f"Non concluante : moins de {MIN_TRADES} trades par réglage.")
+        return
+
+    couts = sorted(sans.expectancy_r - avec.expectancy_r for sans, avec in exploitables)
+    cout_median = couts[len(couts) // 2]
+    brut = max(sans.expectancy_r for sans, _ in exploitables)
+
+    print(f"Meilleure espérance brute (spread nul) : {brut:+.3f} R")
+    print(
+        f"Coût de transaction, médiane sur {len(exploitables)} réglages "
+        f"appariés : {cout_median:+.3f} R par trade"
+    )
+
+    if cout_median < 0:
         print(
-            f"Non concluante : {meilleur[4].trades} trades seulement, "
-            f"minimum {MIN_TRADES}."
+            "  ⚠ Un coût négatif est impossible : les deux séries ne portent pas "
+            "sur les mêmes trades.\n"
+            "  Résultat inexploitable — vérifie que les filtres ne dépendent pas "
+            "du spread."
         )
         return
-    print(f"Meilleure espérance brute (spread nul) : {brut:+.3f} R")
 
     if brut <= 0.02:
         print(
@@ -664,19 +709,17 @@ def _decompose_cout(lignes: list) -> None:
             "fait qu'aggraver une absence d'avantage. Changer d'instrument ou\n"
             "de timeframe ne sauvera pas ce schéma — il faut changer de schéma."
         )
-    else:
-        avec_frais = max(
-            (r for r in lignes if r[3] not in (None, 0)),
-            key=lambda r: r[4].expectancy_r,
-            default=None,
-        )
-        cout = brut - avec_frais[4].expectancy_r if avec_frais else brut
+    elif cout_median >= brut:
         print(
-            f"Coût de transaction : {cout:.3f} R par trade.\n"
             f"Le signal a un avantage réel ({brut:+.3f} R) mais les frais le\n"
             f"dépassent. Ce n'est pas un problème de réglage : il faut des stops\n"
             f"plus larges, donc un timeframe supérieur, pour que le spread pèse\n"
             f"une part plus faible du risque."
+        )
+    else:
+        print(
+            f"L'avantage brut ({brut:+.3f} R) dépasse les frais "
+            f"({cout_median:.3f} R) : la stratégie survit à ses coûts."
         )
 
 

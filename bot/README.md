@@ -369,7 +369,20 @@ le signal ne vaut-il rien, ou vaut-il quelque chose que les frais dévorent ?
 Les deux donnent les mêmes chiffres, et appellent des décisions contraires.
 
 `--grid-spread` tranche en rejouant à spread nul. Ce n'est pas un scénario
-tradable — c'est un instrument de mesure, qui isole la valeur brute du signal :
+tradable — c'est un instrument de mesure, qui isole la valeur brute du signal.
+
+Deux précautions, sans lesquelles la mesure ne veut rien dire :
+
+- **Les filtres sont figés sur le spread réel.** Sinon `max_cost_ratio`, qui
+  impose un stop minimal égal à `spread / plafond`, n'impose plus rien à spread
+  nul : la population de trades change et on compare deux stratégies au lieu de
+  mesurer un coût.
+- **Le coût est mesuré à réglage identique**, même tp, même swing, même
+  breakeven. Confronter le meilleur réglage d'un groupe au meilleur d'un autre
+  mélange deux effets.
+
+Un coût de transaction négatif est impossible ; s'il apparaît, la commande le
+signale et refuse de conclure.
 
 ```bash
 python -m smcbot optimize --csv data/xauusd_m1.csv --preset xauusd-scalp \
@@ -515,7 +528,7 @@ bot/
 │   └── cli.py         interface en ligne de commande
 ├── mt5/
 │   └── ExportBars.mq5 export CSV + spécification, sans Python
-└── tests/            155 tests
+└── tests/            157 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -529,7 +542,7 @@ cd bot && python -m pytest
 ```
 
 ```
-155 passed
+157 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),
