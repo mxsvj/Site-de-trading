@@ -244,6 +244,23 @@ def build_parser() -> argparse.ArgumentParser:
         "(ex. 0.6). Sans cette option, rien n'est validé hors échantillon.",
     )
 
+    p_prof = sub.add_parser(
+        "spread-profile",
+        help="mesurer le spread réel heure par heure (aucune hypothèse "
+        "consommée : c'est une mesure de coût)",
+    )
+    p_prof.add_argument("--symbol", default="XAUUSD")
+    p_prof.add_argument(
+        "--days", type=int, default=5, help="jours de ticks à examiner"
+    )
+    p_prof.add_argument(
+        "--tz-shift",
+        type=float,
+        default=0.0,
+        help="décalage à appliquer aux heures (ex. -3 pour un serveur UTC+3)",
+    )
+    p_prof.add_argument("--mt5-path", help="chemin de terminal64.exe à utiliser")
+
     p_dl = sub.add_parser("download", help="exporter un historique MT5 en CSV")
     p_dl.add_argument("--symbol", required=True)
     p_dl.add_argument("--timeframe", default="M15")
@@ -1157,6 +1174,105 @@ def _confronter_balayage(args: argparse.Namespace, candles) -> int:
     return 0
 
 
+def cmd_spread_profile(args: argparse.Namespace) -> int:
+    """Mesure le spread réel heure par heure, à partir des ticks.
+
+    Tout le reste du projet suppose un spread constant, pris à l'instant où on
+    l'a relevé. C'est faux : sur l'or il double ou triple hors des séances de
+    Londres et New York. Un avantage mesuré à une heure creuse peut donc être
+    entièrement mangé par un coût qu'on n'a jamais regardé.
+
+    Les bougies OHLC ne contiennent que le bid : impossible d'en déduire le
+    spread. Seuls les ticks portent l'écart bid/ask, d'où le passage par MT5.
+    """
+    import statistics
+    from datetime import datetime, timedelta, timezone
+
+    try:
+        import MetaTrader5 as mt5  # type: ignore[import-not-found]
+    except ImportError as exc:
+        raise SystemExit(
+            "Le paquet MetaTrader5 est requis pour `spread-profile` "
+            "(Windows uniquement)."
+        ) from exc
+
+    init_mt5(mt5, args.mt5_path)
+    try:
+        if not mt5.symbol_select(args.symbol, True):
+            raise SystemExit(f"Symbole {args.symbol} introuvable.")
+        spec = mt5.symbol_info(args.symbol)
+        if spec is None or spec.point <= 0:
+            raise SystemExit(f"Spécification indisponible pour {args.symbol}.")
+
+        fin = datetime.now(timezone.utc)
+        debut = fin - timedelta(days=args.days)
+        print(
+            f"Lecture des ticks {args.symbol} sur {args.days} jours — "
+            f"cela peut prendre une minute."
+        )
+        ticks = mt5.copy_ticks_range(
+            args.symbol, debut, fin, mt5.COPY_TICKS_INFO
+        )
+    finally:
+        mt5.shutdown()
+
+    if ticks is None or len(ticks) == 0:
+        raise SystemExit(
+            "Aucun tick récupéré. Ouvre un graphique du symbole et laisse MT5 "
+            "charger l'historique, puis relance."
+        )
+
+    decalage = timedelta(hours=float(args.tz_shift or 0.0))
+    par_heure: dict[int, list[float]] = {h: [] for h in range(24)}
+    for t in ticks:
+        bid, ask = float(t["bid"]), float(t["ask"])
+        if bid <= 0 or ask <= 0 or ask < bid:
+            continue
+        moment = datetime.fromtimestamp(int(t["time"]), tz=timezone.utc) + decalage
+        par_heure[moment.hour].append((ask - bid) / spec.point)
+
+    total = sum(len(v) for v in par_heure.values())
+    if total == 0:
+        raise SystemExit("Aucun tick exploitable (bid/ask absents).")
+
+    print(f"\n{total:,} ticks retenus.\n")
+    print(f"{'heure':<8}{'ticks':>10}{'médian':>10}{'90e c.':>10}  profil")
+    print("-" * 58)
+
+    medians = {}
+    for heure in range(24):
+        echantillon = sorted(par_heure[heure])
+        if len(echantillon) < 100:
+            continue
+        median = echantillon[len(echantillon) // 2]
+        p90 = echantillon[int(len(echantillon) * 0.9)]
+        medians[heure] = median
+        barre = "#" * min(40, int(median / 2))
+        print(
+            f"{heure:02d}h{'':<5}{len(echantillon):>10,}{median:>10.0f}"
+            f"{p90:>10.0f}  {barre}"
+        )
+
+    if not medians:
+        raise SystemExit("Pas assez de ticks par heure pour conclure.")
+
+    meilleure = min(medians, key=medians.get)
+    pire = max(medians, key=medians.get)
+    reference = statistics.median(list(medians.values()))
+    print(
+        f"\nMoins cher : {meilleure:02d}h à {medians[meilleure]:.0f} points.\n"
+        f"Plus cher  : {pire:02d}h à {medians[pire]:.0f} points, soit "
+        f"{medians[pire] / max(medians[meilleure], 1):.1f} fois plus.\n"
+        f"Médiane sur la journée : {reference:.0f} points."
+    )
+    print(
+        "\nÀ confronter aux cellules d'edge-scan : un avantage mesuré à une "
+        "heure creuse\ndoit être jugé sur LE spread de cette heure-là, pas "
+        "sur la moyenne du marché."
+    )
+    return 0
+
+
 def cmd_download(args: argparse.Namespace) -> int:
     candles = download_mt5(args.symbol, args.timeframe, args.bars, args.mt5_path)
 
@@ -1590,6 +1706,7 @@ COMMANDS = {
     "download": cmd_download,
     "scan": cmd_scan,
     "edge-scan": cmd_edge_scan,
+    "spread-profile": cmd_spread_profile,
     "demo-data": cmd_demo_data,
     "optimize": cmd_optimize,
     "init-config": cmd_init_config,

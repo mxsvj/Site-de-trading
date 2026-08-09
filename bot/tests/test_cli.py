@@ -744,3 +744,14 @@ def test_recouvrement_nul_arrete_tout(tmp_path):
     with pytest.raises(SystemExit) as sortie:
         verifier_reference(cfg, principale)
     assert "Recouvrement insuffisant" in str(sortie.value)
+
+
+def test_spread_profile_exige_metatrader(monkeypatch):
+    """Les bougies OHLC ne portent que le bid : seuls les ticks ont l'écart."""
+    import sys
+
+    monkeypatch.setitem(sys.modules, "MetaTrader5", None)
+    monkeypatch.delitem(sys.modules, "MetaTrader5")
+    with pytest.raises(SystemExit) as sortie:
+        main(["spread-profile", "--symbol", "XAUUSD"])
+    assert "MetaTrader5" in str(sortie.value)
