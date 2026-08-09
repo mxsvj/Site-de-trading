@@ -26,6 +26,8 @@ from .data import (
     synthetic_series,
 )
 from .doctor import run_diagnostics
+from .edge import MIN_ECHANTILLON as MIN_ECH
+from .edge import balayer
 from .filters import TradeFilters
 from .lab import MIN_TRADES as LAB_MIN
 from .lab import Journal, evaluer, juger
@@ -219,6 +221,22 @@ def build_parser() -> argparse.ArgumentParser:
     p_scan.add_argument("--timeframe", default="M5")
     p_scan.add_argument("--bars", type=int, default=5000)
     p_scan.add_argument("--mt5-path", help="chemin de terminal64.exe à utiliser")
+
+    p_edge = sub.add_parser(
+        "edge-scan",
+        help="chercher une condition sous laquelle le rendement futur n'est "
+        "pas nul — mesure du marché, pas d'une stratégie",
+    )
+    add_common(p_edge)
+    p_edge.add_argument(
+        "--horizon",
+        type=int,
+        default=15,
+        help="bougies sur lesquelles le rendement futur est mesuré",
+    )
+    p_edge.add_argument(
+        "--top", type=int, default=15, help="cellules à afficher"
+    )
 
     p_dl = sub.add_parser("download", help="exporter un historique MT5 en CSV")
     p_dl.add_argument("--symbol", required=True)
@@ -914,6 +932,87 @@ def _ecrire_spec(symbole: str, chemin: str, mt5_path: str | None) -> None:
     print("  Commission : non exposée par MT5, à demander à ton courtier.")
 
 
+def cmd_edge_scan(args: argparse.Namespace) -> int:
+    """Cherche une condition prédictive, quelle qu'elle soit.
+
+    Ne teste aucune stratégie : ni stop, ni objectif, ni spread n'interviennent.
+    On mesure seulement le rendement de l'or après chaque condition
+    observable. Si rien ne ressort, aucune stratégie fondée sur ces conditions
+    ne peut fonctionner — et ce n'est plus une conjecture mais une mesure.
+    """
+    cfg = make_config(args)
+    candles = load_candles(args, cfg)
+
+    try:
+        balayage = balayer(candles, horizon=args.horizon)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    print(
+        f"{len(candles)} bougies, horizon {args.horizon} bougies.\n"
+        f"{balayage.observations} observations disjointes — une bougie sur "
+        f"{args.horizon}, pour que les fenêtres ne se recouvrent pas."
+    )
+    examinees = balayage.examinees
+    if not examinees:
+        raise SystemExit(
+            f"Aucune cellule n'atteint {MIN_ECH} observations. "
+            "Réduis l'horizon ou allonge l'historique."
+        )
+
+    seuil = balayage.seuil
+    print(
+        f"{len(examinees)} cellules examinées → seuil de t exigé "
+        f"{seuil:.2f} (Bonferroni).\n"
+    )
+
+    print(
+        f"{'critère':<20}{'valeur':<14}{'n':>7}{'rendement':>12}{'t':>8}"
+    )
+    print("-" * 61)
+    for cellule in examinees[: args.top]:
+        marque = "*" if abs(cellule.t) > seuil else " "
+        print(
+            f"{marque}{cellule.critere:<19}{cellule.valeur:<14}{cellule.n:>7}"
+            f"{cellule.moyenne:>+11.3f}A{cellule.t:>8.2f}"
+        )
+
+    print(
+        "\nLe rendement est exprimé en multiples de l'ATR courant : +0.100A "
+        "signifie\nun dixième d'amplitude de bougie gagné en moyenne sur "
+        f"{args.horizon} bougies."
+    )
+
+    survivants = [c for c in examinees if abs(c.t) > seuil]
+    print()
+    if not survivants:
+        meilleur = examinees[0]
+        print(
+            f"Aucune cellule ne franchit le seuil. La plus forte est "
+            f"{meilleur.critere} = {meilleur.valeur} avec t = {meilleur.t:.2f}, "
+            f"contre {seuil:.2f} exigé.\n"
+            "Sur ces conditions, le rendement futur de l'or est indiscernable "
+            "de zéro.\n"
+            "Aucune stratégie construite dessus ne peut fonctionner — ce n'est "
+            "pas une opinion, c'est cette mesure."
+        )
+        return 0
+
+    print(f"{len(survivants)} cellule(s) franchissent le seuil :")
+    for c in survivants:
+        print(
+            f"  {c.critere} = {c.valeur} : {c.moyenne:+.3f} ATR sur "
+            f"{c.n} observations, t = {c.t:.2f}"
+        )
+    print(
+        "\nÀ vérifier avant d'en faire quoi que ce soit : ces cellules sont "
+        "issues d'un\nbalayage, donc choisies pour être les meilleures. Le "
+        "test qui compte est de\nrejouer la même mesure sur une période que "
+        "ce balayage n'a pas vue."
+    )
+    return 0
+
+
 def cmd_download(args: argparse.Namespace) -> int:
     candles = download_mt5(args.symbol, args.timeframe, args.bars, args.mt5_path)
 
@@ -1346,6 +1445,7 @@ COMMANDS = {
     "lab": cmd_lab,
     "download": cmd_download,
     "scan": cmd_scan,
+    "edge-scan": cmd_edge_scan,
     "demo-data": cmd_demo_data,
     "optimize": cmd_optimize,
     "init-config": cmd_init_config,
