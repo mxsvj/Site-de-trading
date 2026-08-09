@@ -116,6 +116,12 @@ int      g_trades = 0, g_wins = 0;
 double   g_gross_profit = 0.0, g_gross_loss = 0.0;
 double   g_sum_hold = 0.0;
 
+// Repartition des sorties. C'est le diagnostic decisif de cet EA : une
+// majorite de sorties sur le temps signifie que l'impulsion detectee ne
+// continue pas, et que chaque trade paie le spread pour rien.
+int      g_exit_sl = 0, g_exit_tp = 0, g_exit_time = 0, g_exit_rev = 0, g_exit_autre = 0;
+string   g_pending_close = "";   // motif de la cloture demandee par l'EA
+
 // Heures d'annonces, pre-decoupees a l'init (jamais reparsees dans OnTick)
 int      g_news_minutes[];
 
@@ -387,6 +393,22 @@ void PrintSessionStats()
    PrintFormat("Trade moyen : %.2f %s | Duree moyenne : %.1f s",
                net / g_trades, AccountInfoString(ACCOUNT_CURRENCY),
                g_sum_hold / g_trades);
+
+   //--- Repartition des sorties, et le seul seuil qui compte vraiment.
+   double part_temps = 100.0 * g_exit_time / g_trades;
+   PrintFormat("Sorties : stop %d (%.0f%%) | objectif %d (%.0f%%) | temps %d (%.0f%%) "
+               "| inversion %d (%.0f%%) | autre %d",
+               g_exit_sl,   100.0 * g_exit_sl   / g_trades,
+               g_exit_tp,   100.0 * g_exit_tp   / g_trades,
+               g_exit_time, part_temps,
+               g_exit_rev,  100.0 * g_exit_rev  / g_trades,
+               g_exit_autre);
+   if(part_temps > 70.0)
+      PrintFormat("DIAGNOSTIC : %.0f%% des trades expirent sur le temps. "
+                  "L'impulsion detectee ne continue pas —", part_temps);
+   if(part_temps > 70.0)
+      Print("  chaque trade paie le spread pour rien. Ce n'est pas un reglage "
+            "de sortie a ajuster : c'est le signal d'entree qui ne vaut rien.");
    if(g_halted)
       PrintFormat("EA a l'arret : %s", g_halt_reason);
   }
@@ -850,6 +872,7 @@ void ManageOpenPosition(const MqlTick &tick, const double spread_pts)
 
 void ClosePosition(const string raison)
   {
+   g_pending_close = raison;
    for(int essai = 1; essai <= InpMaxRetries; essai++)
      {
       if(trade.PositionClose(g_ticket, InpDeviationPoints))
@@ -905,6 +928,7 @@ void DetectClosedPosition()
    double prix_sortie = 0.0;
    double prix_entree = 0.0;
    datetime fermeture = TimeCurrent();
+   long motif_serveur = -1;
    bool trouve = false;
 
    int total = HistoryDealsTotal();
@@ -926,12 +950,29 @@ void DetectClosedPosition()
                      + HistoryDealGetDouble(deal, DEAL_COMMISSION);
          prix_sortie = HistoryDealGetDouble(deal, DEAL_PRICE);
          fermeture   = (datetime)HistoryDealGetInteger(deal, DEAL_TIME);
+         motif_serveur = HistoryDealGetInteger(deal, DEAL_REASON);
          trouve = true;
         }
      }
 
    if(!trouve)
       return;
+
+   //--- Motif de sortie. Le serveur fait foi pour SL et TP : ce sont ses
+   //--- ordres qui ont declenche, pas l'EA. Pour les clotures demandees par
+   //--- l'EA, on reprend le motif enregistre au moment de la demande.
+   string motif = "autre";
+   if(motif_serveur == DEAL_REASON_SL)
+     { motif = "stop loss";  g_exit_sl++; }
+   else if(motif_serveur == DEAL_REASON_TP)
+     { motif = "objectif";   g_exit_tp++; }
+   else if(StringFind(g_pending_close, "temps") >= 0)
+     { motif = "temps ecoule"; g_exit_time++; }
+   else if(StringFind(g_pending_close, "inversee") >= 0)
+     { motif = "impulsion inversee"; g_exit_rev++; }
+   else
+      g_exit_autre++;
+   g_pending_close = "";
 
    int    duree  = (int)(fermeture - g_open_time);
    double points = 0.0;
@@ -960,6 +1001,8 @@ void DetectClosedPosition()
                   ticket, (g_open_dir > 0 ? "ACHAT" : "VENTE"), g_open_reason,
                   g_open_spread, duree, points, resultat,
                   AccountInfoString(ACCOUNT_CURRENCY));
+   if(InpVerboseLog)
+      Print("   sortie : ", motif);
 
    //--- Un point d'etape regulier evite d'avoir a lire tout le journal.
    if(g_trades % 20 == 0)
