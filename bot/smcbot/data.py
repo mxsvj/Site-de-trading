@@ -336,6 +336,48 @@ def download_mt5(
         mt5.shutdown()
 
 
+def spec_depuis_mt5(mt5, symbol: str) -> dict:
+    """Extrait la spécification d'un symbole, comme mt5/ExportBars.mq5.
+
+    Reproduit délibérément la même logique et les mêmes noms de champs que le
+    script MQL5, pour que les deux chemins d'export donnent des fichiers
+    interchangeables.
+
+    Deux valeurs demandent de l'attention :
+
+    - `value_per_point_per_lot` conditionne tout le dimensionnement. MT5 expose
+      la valeur d'un *tick*, pas d'un point ; sur la plupart des symboles les
+      deux coïncident, mais pas tous, d'où la conversion par `point / tick_size`.
+    - les swaps ne sont reportés que si le courtier les exprime en points
+      (`swap_mode == 1`). Dans les autres modes on écrit 0 plutôt qu'un chiffre
+      dans la mauvaise unité, qui se propagerait silencieusement.
+    """
+    spec = mt5.symbol_info(symbol)
+    if spec is None:  # pragma: no cover - dépend de la plateforme
+        raise RuntimeError(f"Spécification indisponible pour {symbol}.")
+
+    point = float(spec.point)
+    tick_size = float(getattr(spec, "trade_tick_size", 0.0) or 0.0)
+    tick_value = float(getattr(spec, "trade_tick_value", 0.0) or 0.0)
+    valeur_point = tick_value * (point / tick_size) if tick_size > 0 else tick_value
+
+    en_points = int(getattr(spec, "swap_mode", 0)) == 1
+    return {
+        "name": spec.name,
+        "digits": int(spec.digits),
+        "point": point,
+        "contract_size": float(spec.trade_contract_size),
+        "value_per_point_per_lot": valeur_point,
+        "min_lot": float(spec.volume_min),
+        "max_lot": float(spec.volume_max),
+        "lot_step": float(spec.volume_step),
+        "spread_points": float(spec.spread),
+        "swap_long_points": float(spec.swap_long) if en_points else 0.0,
+        "swap_short_points": float(spec.swap_short) if en_points else 0.0,
+        "commission_per_lot": 0.0,
+    }
+
+
 def market_open(when: datetime) -> bool:
     """Le marché forex/or est-il ouvert à cet instant (en UTC) ?
 

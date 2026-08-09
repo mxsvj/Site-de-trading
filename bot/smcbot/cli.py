@@ -22,6 +22,7 @@ from .data import (
     load_csv,
     resample,
     save_csv,
+    spec_depuis_mt5,
     synthetic_series,
 )
 from .doctor import run_diagnostics
@@ -201,6 +202,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_dl.add_argument("--timeframe", default="M15")
     p_dl.add_argument("--bars", type=int, default=5000)
     p_dl.add_argument("--out", required=True)
+    p_dl.add_argument(
+        "--spec-out",
+        help="écrire aussi la spécification du contrat dans ce fichier JSON, "
+        "à passer ensuite à --symbol-spec",
+    )
     p_dl.add_argument("--mt5-path", help="chemin de terminal64.exe à utiliser")
 
     p_demo = sub.add_parser("demo-data", help="générer un CSV synthétique")
@@ -629,6 +635,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
 
     init_mt5(mt5, args.mt5_path)
     lignes = []
+    non_mesures: list[tuple[str, str]] = []
     try:
         for nom in [s.strip() for s in args.symbols.split(",") if s.strip()]:
             if not mt5.symbol_select(nom, True):
@@ -649,9 +656,27 @@ def cmd_scan(args: argparse.Namespace) -> int:
             mediane = statistics.median(amplitudes)
             if mediane <= 0:
                 continue
-            ratio = spec.spread / mediane
-            lignes.append((nom, spec.spread, mediane, ratio))
-            print(f"  {nom:<10} spread {spec.spread:>5} pts, amplitude médiane "
+
+            spread = float(spec.spread)
+            # `symbol_info().spread` est une photo de l'instant : hors séance, ou
+            # avant qu'un premier tick n'arrive, le champ peut valoir 0. Le
+            # classer « favorable » ferait passer une absence de mesure pour un
+            # coût nul — l'erreur la plus flatteuse possible. On recoupe avec le
+            # tick courant, et à défaut on refuse de classer l'instrument.
+            tick = mt5.symbol_info_tick(nom)
+            if tick is not None and tick.ask > 0 and tick.bid > 0:
+                depuis_tick = (float(tick.ask) - float(tick.bid)) / spec.point
+                if spread <= 0:
+                    spread = depuis_tick
+            if spread <= 0:
+                non_mesures.append(
+                    (nom, "spread nul — instrument fermé ou sans cotation")
+                )
+                print(f"  {nom:<10} spread non mesurable pour l'instant")
+                continue
+
+            lignes.append((nom, spread, mediane, spread / mediane))
+            print(f"  {nom:<10} spread {spread:>5.0f} pts, amplitude médiane "
                   f"{mediane:>7.0f} pts")
     finally:
         mt5.shutdown()
@@ -677,14 +702,61 @@ def cmd_scan(args: argparse.Namespace) -> int:
             f"{nom:<12}{spread:>8.0f}{mediane:>11.0f}{cout:>21.1%}  {verdict}"
         )
 
+    if non_mesures:
+        print("\nNon classés — le spread n'a pas pu être mesuré :")
+        for nom, motif in non_mesures:
+            print(f"  {nom:<12}{motif}")
+        print(
+            "  Relance pendant les heures de cotation de ces instruments. Un\n"
+            "  spread inconnu n'est pas un spread nul."
+        )
+
     print(
         f"\nLecture : le spread est fixe, l'amplitude d'une bougie donne la taille\n"
         f"naturelle d'un stop. Leur rapport est la part du risque perdue avant même\n"
         f"que la stratégie n'ait raison ou tort. Sous {SCALP_BON:.0%} le scalping\n"
         f"garde de la marge ; au-delà de {SCALP_LIMITE:.0%} il faut un avantage\n"
-        f"brut que presque aucun schéma simple n'atteint."
+        f"brut que presque aucun schéma simple n'atteint.\n"
+        f"\nCe classement porte sur le spread de l'instant. Il varie fortement selon\n"
+        f"l'heure : relance pendant la séance que tu comptes trader."
     )
     return 0
+
+
+def _ecrire_spec(symbole: str, chemin: str, mt5_path: str | None) -> None:
+    """Écrit la spécification du contrat, au format attendu par --symbol-spec."""
+    try:
+        import MetaTrader5 as mt5  # type: ignore[import-not-found]
+    except ImportError as exc:
+        raise SystemExit(
+            "Le paquet MetaTrader5 est requis pour --spec-out (Windows uniquement)."
+        ) from exc
+
+    init_mt5(mt5, mt5_path)
+    try:
+        mt5.symbol_select(symbole, True)
+        spec = spec_depuis_mt5(mt5, symbole)
+    finally:
+        mt5.shutdown()
+
+    cible = Path(chemin)
+    if cible.parent and not cible.parent.exists():
+        cible.parent.mkdir(parents=True, exist_ok=True)
+    cible.write_text(json.dumps(spec, indent=2), encoding="utf-8")
+
+    print(f"\nSpécification écrite dans {cible.resolve()}")
+    print(
+        f"  valeur du point pour 1 lot : "
+        f"{spec['value_per_point_per_lot']:.4f} (devise du compte)"
+    )
+    print(f"  spread relevé             : {spec['spread_points']:.0f} points")
+    if spec["swap_long_points"] == 0.0 and spec["swap_short_points"] == 0.0:
+        print(
+            "  Swaps à 0 : soit ton courtier ne les exprime pas en points, soit\n"
+            "  ils sont réellement nuls. À vérifier dans la fiche du symbole si\n"
+            "  tu comptes garder des positions la nuit."
+        )
+    print("  Commission : non exposée par MT5, à demander à ton courtier.")
 
 
 def cmd_download(args: argparse.Namespace) -> int:
@@ -708,6 +780,8 @@ def cmd_download(args: argparse.Namespace) -> int:
         "Les horodatages sont à l'heure du serveur. Lance `check` pour trouver "
         "le décalage à appliquer."
     )
+    if getattr(args, "spec_out", None):
+        _ecrire_spec(args.symbol, args.spec_out, args.mt5_path)
     return 0
 
 

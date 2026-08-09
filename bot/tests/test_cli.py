@@ -392,3 +392,143 @@ def test_seuils_de_scalpabilite_sont_ordonnes():
     from smcbot.cli import SCALP_BON, SCALP_LIMITE
 
     assert 0 < SCALP_BON < SCALP_LIMITE < 1
+
+
+# ------------------------------------------------- scan sur un MT5 simulé
+
+
+class _FauxSpec:
+    def __init__(self, nom, spread, point=0.01):
+        self.name = nom
+        self.spread = spread
+        self.point = point
+        self.digits = 2
+        self.trade_contract_size = 100.0
+        self.trade_tick_size = point
+        self.trade_tick_value = 1.0
+        self.volume_min = 0.01
+        self.volume_max = 50.0
+        self.volume_step = 0.01
+        self.swap_long = -4.5
+        self.swap_short = 1.2
+        self.swap_mode = 1
+
+
+class _FauxTick:
+    def __init__(self, bid, ask):
+        self.bid = bid
+        self.ask = ask
+
+
+class _FauxMt5:
+    """Terminal MT5 simulé, réduit à ce que `scan` consomme."""
+
+    TIMEFRAME_M5 = 5
+
+    def __init__(self, specs, ticks=None, amplitude=100.0):
+        self.specs = specs
+        self.ticks = ticks or {}
+        self.amplitude = amplitude
+
+    def initialize(self, **_):
+        return True
+
+    def shutdown(self):
+        return None
+
+    def symbol_select(self, nom, _=True):
+        return nom in self.specs
+
+    def symbol_info(self, nom):
+        return self.specs.get(nom)
+
+    def symbol_info_tick(self, nom):
+        return self.ticks.get(nom)
+
+    def copy_rates_from_pos(self, nom, _tf, _depuis, combien):
+        spec = self.specs[nom]
+        hauteur = self.amplitude * spec.point
+        return [
+            {"high": 2000.0 + hauteur, "low": 2000.0, "open": 2000.0, "close": 2000.5}
+            for _ in range(combien)
+        ]
+
+
+def _installer_mt5(monkeypatch, faux):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "MetaTrader5", faux)
+
+
+def test_scan_refuse_de_classer_un_spread_nul(monkeypatch, capsys):
+    """Un spread à 0 est une mesure absente, pas un coût nul.
+
+    Hors séance, `symbol_info().spread` peut valoir 0. Le classer « favorable »
+    ferait passer l'instrument le moins mesurable pour le meilleur.
+    """
+    faux = _FauxMt5({"GER40": _FauxSpec("GER40", 0), "XAUUSD": _FauxSpec("XAUUSD", 24)})
+    _installer_mt5(monkeypatch, faux)
+
+    main(["scan", "--symbols", "GER40,XAUUSD", "--timeframe", "M5", "--bars", "200"])
+    sortie = capsys.readouterr().out
+
+    assert "Non classés" in sortie
+    assert "favorable" not in sortie.split("Non classés")[1]
+    ligne_ger40 = [l for l in sortie.splitlines() if l.startswith("GER40")]
+    assert ligne_ger40 == [], "GER40 ne doit pas figurer dans le classement"
+    assert any(l.startswith("XAUUSD") for l in sortie.splitlines())
+
+
+def test_scan_retombe_sur_le_tick_quand_le_champ_spread_est_vide(monkeypatch, capsys):
+    """Si le tick courant porte un écart bid/ask, il fait foi."""
+    faux = _FauxMt5(
+        {"US30": _FauxSpec("US30", 0, point=0.1)},
+        ticks={"US30": _FauxTick(bid=40000.0, ask=40001.5)},  # 15 points
+        amplitude=300.0,
+    )
+    _installer_mt5(monkeypatch, faux)
+
+    main(["scan", "--symbols", "US30", "--timeframe", "M5", "--bars", "200"])
+    sortie = capsys.readouterr().out
+
+    assert "Non classés" not in sortie
+    assert "spread    15 pts" in sortie
+
+
+def test_scan_avertit_que_le_spread_depend_de_l_heure(monkeypatch, capsys):
+    faux = _FauxMt5({"XAUUSD": _FauxSpec("XAUUSD", 24)})
+    _installer_mt5(monkeypatch, faux)
+
+    main(["scan", "--symbols", "XAUUSD", "--timeframe", "M5", "--bars", "200"])
+    assert "spread de l'instant" in capsys.readouterr().out
+
+
+def test_spec_depuis_mt5_reproduit_le_format_du_script_mql5(monkeypatch, tmp_path):
+    """`--spec-out` doit produire un fichier que `--symbol-spec` relit."""
+    from smcbot.data import spec_depuis_mt5
+
+    faux = _FauxMt5({"NAS100": _FauxSpec("NAS100", 10, point=0.1)})
+    spec = spec_depuis_mt5(faux, "NAS100")
+
+    chemin = tmp_path / "nas100_spec.json"
+    chemin.write_text(json.dumps(spec), encoding="utf-8")
+    relu = load_symbol_spec(str(chemin))
+
+    assert relu.name == "NAS100"
+    assert relu.point == 0.1
+    assert relu.spread_points == 10
+    # tick_value 1.0 pour un tick d'une taille égale au point.
+    assert relu.value_per_point_per_lot == pytest.approx(1.0)
+
+
+def test_spec_ignore_les_swaps_exprimes_autrement_qu_en_points():
+    """Un swap en devise reporté tel quel serait une erreur d'unité silencieuse."""
+    from smcbot.data import spec_depuis_mt5
+
+    spec_devise = _FauxSpec("XAUUSD", 24)
+    spec_devise.swap_mode = 0  # points désactivés : montant en devise
+    faux = _FauxMt5({"XAUUSD": spec_devise})
+
+    spec = spec_depuis_mt5(faux, "XAUUSD")
+    assert spec["swap_long_points"] == 0.0
+    assert spec["swap_short_points"] == 0.0
