@@ -196,7 +196,10 @@ def _sharpe(r_values: Sequence[float]) -> float:
     mean = sum(r_values) / len(r_values)
     variance = sum((r - mean) ** 2 for r in r_values) / (len(r_values) - 1)
     std = math.sqrt(variance)
-    if std == 0:
+    # Une dispersion numériquement nulle — tous les trades au même R — donne un
+    # t infini, qui n'informe sur rien. On le neutralise plutôt que d'afficher
+    # un nombre astronomique dont la seule lecture possible est « bug ».
+    if std <= max(1e-12, abs(mean) * 1e-9):
         return 0.0
     return mean / std * math.sqrt(len(r_values))
 

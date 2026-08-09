@@ -326,6 +326,58 @@ python -m smcbot paper --preset xauusd-scalp --mt5 --interval 5
 
 Descends l'intervalle à 5 secondes : sur M1, une bougie clôture chaque minute.
 
+## Banc d'essai : comparer des stratégies sans se mentir
+
+```bash
+python -m smcbot lab --csv data/xauusd_m1.csv --symbol-spec spec.json \
+    --tz-shift -3 --strategies smc,asian-sweep,orb,fade --grid-tp 1.5,2,3
+```
+
+Quatre stratégies sont disponibles, toutes interchangeables :
+
+| Nom | Principe |
+|---|---|
+| `smc` | structure, order block, FVG — le schéma d'origine |
+| `asian-sweep` | balayage de la plage asiatique à l'ouverture de Londres |
+| `orb` | cassure de la plage d'ouverture de séance |
+| `fade` | retour à la moyenne après extension de N ATR |
+
+En ajouter une revient à écrire une classe exposant
+`on_candle(candle, can_open) -> Signal | None`, et une ligne dans
+`smcbot/registry.py`.
+
+### Le coût statistique de la recherche
+
+**Tester des stratégies jusqu'à en trouver une qui marche garantit d'en trouver
+une.** Sur 100 hypothèses sans le moindre avantage, environ 5 franchissent le
+seuil habituel de significativité par pur hasard. Le gagnant d'une longue
+recherche est donc du bruit par défaut.
+
+`lab` compte les hypothèses testées — **sessions précédentes comprises**, dans
+`runtime/hypotheses.json` — et relève le seuil en conséquence (Bonferroni) :
+
+| Hypothèses testées | Statistique t exigée |
+|---|---|
+| 1 | 1,96 |
+| 10 | 2,81 |
+| 100 | 3,48 |
+| 1000 | 4,06 |
+
+```
+── Verdict statistique ────────────────────────────
+Hypothèses testées cette session : 6
+Hypothèses testées au total      : 48
+Seuil de t exigé (Bonferroni)    : 3.20
+
+t = 1.12 < 3.20 : il manque 2.08 pour être distinguable du hasard.
+Le tester davantage ne le rendra pas plus significatif : ça relèvera
+encore la barre.
+```
+
+Chercher en dix sessions ne coûte pas moins cher qu'en une seule : c'est
+pourquoi le compteur persiste. `--reset-journal` ne se justifie qu'en changeant
+de jeu de données.
+
 ## Recherche de paramètres
 
 ```bash
@@ -544,7 +596,10 @@ bot/
 │   └── cli.py         interface en ligne de commande
 ├── mt5/
 │   └── ExportBars.mq5 export CSV + spécification, sans Python
-└── tests/            160 tests
+├── scalping.py     stratégies alternatives : asian-sweep, orb, fade
+│   ├── lab.py         banc d'essai et correction du multi-test
+│   ├── registry.py    catalogue des stratégies
+└── tests/            180 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -558,7 +613,7 @@ cd bot && python -m pytest
 ```
 
 ```
-160 passed
+180 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),

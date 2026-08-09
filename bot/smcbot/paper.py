@@ -20,7 +20,7 @@ from .broker import PaperBroker, Trade
 from .config import BotConfig
 from .data import Candle
 from .metrics import Report, build_report
-from .strategy import SmcStrategy
+from .registry import make_strategy
 
 logger = logging.getLogger("smcbot.paper")
 
@@ -60,7 +60,7 @@ class PaperTrader:
         state_path: str | Path | None = None,
     ):
         self.cfg = cfg or BotConfig()
-        self.strategy = SmcStrategy(self.cfg)
+        self.strategy = make_strategy(self.cfg)
         self.broker = PaperBroker(self.cfg)
         self.state_path = Path(state_path) if state_path else None
         self.index = 0
@@ -75,14 +75,13 @@ class PaperTrader:
     def warmup(self, candles: Sequence[Candle]) -> None:
         """Alimente le moteur SMC en historique sans prendre de position."""
         for candle in candles:
-            self.strategy.engine.push(candle)
+            # `can_open=False` : la stratégie voit la bougie et construit son
+            # état, mais aucun signal n'est retenu. Fonctionne quelle que soit
+            # la stratégie, sans supposer qu'elle expose un moteur SMC.
+            self.strategy.on_candle(candle, can_open=False)
             self.index += 1
             self.last_time = candle.time
-        logger.info(
-            "Préchauffe : %d bougies, biais initial = %s",
-            len(candles),
-            self.strategy.engine.bias or "indéfini",
-        )
+        logger.info("Préchauffe : %d bougies (%s)", len(candles), self.cfg.strategy)
 
     def on_candle(self, candle: Candle) -> list[Trade]:
         """Traite une bougie clôturée : sorties, signal, entrée."""

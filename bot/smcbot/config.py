@@ -167,6 +167,12 @@ class BotConfig:
     htf_smc: SmcConfig = field(default_factory=SmcConfig)
     """Paramètres SMC propres à l'unité de temps supérieure."""
 
+    strategy: str = "smc"
+    """Nom de la stratégie à exécuter (voir smcbot.registry.STRATEGIES)."""
+
+    strategy_params: dict = field(default_factory=dict)
+    """Paramètres propres à la stratégie choisie, en clair dans la config."""
+
     def to_json(self, path: str | Path) -> None:
         Path(path).write_text(
             json.dumps(asdict(self), indent=2, ensure_ascii=False), encoding="utf-8"
@@ -183,6 +189,8 @@ class BotConfig:
             timeframe=raw.get("timeframe", "M15"),
             htf=raw.get("htf", ""),
             htf_smc=SmcConfig(**raw.get("htf_smc", {})),
+            strategy=raw.get("strategy", "smc"),
+            strategy_params=dict(raw.get("strategy_params", {})),
         )
 
 

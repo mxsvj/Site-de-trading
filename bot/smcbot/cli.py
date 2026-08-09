@@ -25,6 +25,9 @@ from .data import (
 )
 from .doctor import run_diagnostics
 from .filters import TradeFilters
+from .lab import MIN_TRADES as LAB_MIN
+from .lab import Journal, evaluer, juger
+from .registry import STRATEGIES
 from .paper import PaperTrader, setup_logging
 from .quality import inspect_series, shift_times
 
@@ -213,6 +216,31 @@ def build_parser() -> argparse.ArgumentParser:
         "sert de validation (défaut 0.6)",
     )
     p_opt.add_argument("--top", type=int, default=10, help="nombre de lignes affichées")
+
+    p_lab = sub.add_parser(
+        "lab", help="comparer plusieurs stratégies, correction du multi-test incluse"
+    )
+    add_common(p_lab)
+    p_lab.add_argument(
+        "--strategies",
+        default=",".join(sorted(STRATEGIES)),
+        help="stratégies à comparer, séparées par des virgules",
+    )
+    p_lab.add_argument(
+        "--grid-tp", default="1.5,2,3", help="valeurs de tp_r à tester"
+    )
+    p_lab.add_argument("--split", type=float, default=0.6)
+    p_lab.add_argument(
+        "--journal",
+        default="runtime/hypotheses.json",
+        help="fichier où sont comptées les hypothèses testées, "
+        "sessions précédentes incluses",
+    )
+    p_lab.add_argument(
+        "--reset-journal",
+        action="store_true",
+        help="repartir de zéro (à n'utiliser qu'en changeant de jeu de données)",
+    )
 
     p_cfg = sub.add_parser("init-config", help="écrire une configuration par défaut")
     p_cfg.add_argument("--out", default="config.json")
@@ -795,6 +823,69 @@ def _verdict(lignes: list) -> None:
     )
 
 
+def cmd_lab(args: argparse.Namespace) -> int:
+    cfg = make_config(args)
+    candles = load_candles(args, cfg)
+    if len(candles) < 2000:
+        raise SystemExit("Historique trop court pour un banc d'essai.")
+
+    strategies = [s.strip() for s in args.strategies.split(",") if s.strip()]
+    inconnues = [s for s in strategies if s not in STRATEGIES]
+    if inconnues:
+        raise SystemExit(
+            f"Stratégie(s) inconnue(s) : {', '.join(inconnues)}. "
+            f"Disponibles : {', '.join(sorted(STRATEGIES))}"
+        )
+
+    tps = _grille(args.grid_tp, float)
+    candidates = [
+        (nom, {"tp_r": tp}, f"{nom} tp={tp:g}")
+        for nom in strategies
+        for tp in tps
+    ]
+
+    chemin = Path(args.journal) if args.journal else None
+    if chemin and args.reset_journal and chemin.exists():
+        chemin.unlink()
+    journal = Journal(chemin)
+
+    print(
+        f"{len(candidates)} candidates à évaluer sur {len(candles)} bougies.\n"
+        f"Hypothèses déjà testées lors des sessions précédentes : {journal.total}"
+    )
+
+    def avancement(numero: int, total: int, essai) -> None:
+        print(
+            f"  [{numero}/{total}] {essai.label:<24} "
+            f"{essai.dedans.trades:>4} trades, {essai.dedans.expectancy_r:+.3f} R "
+            f"→ validation {essai.dehors.expectancy_r:+.3f} R"
+        )
+
+    essais = evaluer(candidates, candles, cfg, split=args.split,
+                     progression=avancement)
+
+    print(
+        f"\n{'stratégie':<24} │ {'trades':>7} {'esp.R':>8} │ "
+        f"{'trades':>7} {'esp.R':>8} {'t':>6} {'perf%':>8}"
+    )
+    print(f"{'':<24} │ {'— apprentissage —':^17} │ {'— validation —':^32}")
+    print("-" * 82)
+    for essai in sorted(essais, key=lambda e: e.dedans.expectancy_r, reverse=True):
+        marque = " " if essai.exploitable else "!"
+        print(
+            f"{marque}{essai.label:<23} │ "
+            f"{essai.dedans.trades:>7} {essai.dedans.expectancy_r:>+8.3f} │ "
+            f"{essai.dehors.trades:>7} {essai.dehors.expectancy_r:>+8.3f} "
+            f"{essai.t_validation:>6.2f} {essai.dehors.return_pct:>+8.2f}"
+        )
+    if any(not e.exploitable for e in essais):
+        print(f"\n! = moins de {LAB_MIN} trades d'un côté : ligne non exploitable.")
+
+    print()
+    print(juger(essais, journal, detail=args.strategies).to_text())
+    return 0
+
+
 def cmd_init_config(args: argparse.Namespace) -> int:
     PRESETS[args.preset]().to_json(args.out)
     print(f"Configuration « {args.preset} » écrite dans {args.out}")
@@ -806,6 +897,7 @@ COMMANDS = {
     "check": cmd_check,
     "paper": cmd_paper,
     "doctor": cmd_doctor,
+    "lab": cmd_lab,
     "download": cmd_download,
     "demo-data": cmd_demo_data,
     "optimize": cmd_optimize,

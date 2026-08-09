@@ -11,7 +11,7 @@ from .broker import EquityPoint, PaperBroker, Trade
 from .config import BotConfig
 from .data import Candle
 from .metrics import Report, build_report
-from .strategy import SmcStrategy
+from .registry import make_strategy
 
 
 @dataclass
@@ -99,7 +99,7 @@ def run_backtest(
     qui fausserait la comparaison avec la période d'apprentissage.
     """
     cfg = cfg or BotConfig()
-    strategy = SmcStrategy(cfg)
+    strategy = make_strategy(cfg)
     broker = PaperBroker(cfg)
     signals = 0
 

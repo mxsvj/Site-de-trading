@@ -29,7 +29,8 @@ class Signal:
     stop: float
     tp_r: float
     reason: str
-    order_block: OrderBlock
+    order_block: OrderBlock | None = None
+    """Zone à l'origine du signal, quand la stratégie en expose une."""
 
     @property
     def risk_distance(self) -> float:
@@ -45,6 +46,8 @@ class SmcStrategy:
     schéma indispensable en scalping, où la structure de la petite unité de
     temps, prise seule, n'est guère que du bruit.
     """
+
+    name = "smc"
 
     def __init__(self, cfg: BotConfig | None = None):
         self.cfg = cfg or BotConfig()
