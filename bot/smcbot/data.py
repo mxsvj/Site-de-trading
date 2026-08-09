@@ -156,6 +156,12 @@ MT5_ERREURS = {
         "Indique son chemin avec --mt5-path "
         r'"C:\Program Files\MetaTrader 5\terminal64.exe".',
     ),
+    -2: (
+        "paramètres refusés par le terminal",
+        "Souvent le nombre de bougies demandé. Augmente la limite dans MT5 "
+        "(Outils → Options → Graphiques → « Max. de barres dans le graphique ») "
+        "ou demande moins de bougies.",
+    ),
     -10005: (
         "le terminal ne répond pas",
         "Ferme complètement MT5, rouvre-le, attends qu'il soit connecté, "
@@ -232,6 +238,44 @@ def init_mt5(mt5, path: str | None = None) -> None:
     raise RuntimeError(detail)
 
 
+# Une seule requête au-delà de quelques dizaines de milliers de bougies est
+# refusée par le terminal (« Invalid params »). On découpe donc la demande.
+TAILLE_TRANCHE = 20_000
+
+
+def _copier_par_tranches(mt5, symbol: str, tf, bars: int) -> list:
+    """Récupère l'historique par tranches, en remontant le temps.
+
+    `copy_rates_from_pos` plafonne à ce que le terminal accepte de servir d'un
+    coup — plafond qui dépend du réglage « Max. de barres dans le graphique ».
+    Demander 200 000 bougies d'un bloc échoue là où vingt demandes de 10 000
+    réussissent.
+    """
+    from datetime import timedelta
+
+    collecte: list = []
+    ancre = datetime.now(timezone.utc)
+
+    while len(collecte) < bars:
+        voulu = min(TAILLE_TRANCHE, bars - len(collecte))
+        tranche = mt5.copy_rates_from(symbol, tf, ancre, voulu)
+        if tranche is None or len(tranche) == 0:
+            break
+
+        collecte = list(tranche) + collecte
+        plus_ancienne = datetime.fromtimestamp(int(tranche[0]["time"]), tz=timezone.utc)
+        if len(collecte) < bars:
+            print(f"  {len(collecte)} bougies récupérées (jusqu'au {plus_ancienne:%Y-%m-%d})...")
+        ancre = plus_ancienne - timedelta(seconds=1)
+
+        if len(tranche) < voulu:
+            break  # le courtier n'a pas plus d'historique
+
+    # Les tranches peuvent se chevaucher d'une bougie : on déduplique.
+    par_temps = {int(r["time"]): r for r in collecte}
+    return [par_temps[t] for t in sorted(par_temps)]
+
+
 def _erreur_mt5(mt5) -> tuple[int, str]:
     """Normalise le retour de last_error() en (code, message)."""
     brut = mt5.last_error()
@@ -270,8 +314,8 @@ def download_mt5(
                 f"Les noms varient (XAUUSD, XAUUSD.a, GOLD...). Symboles "
                 f"approchants : {proches}"
             )
-        rates = mt5.copy_rates_from_pos(symbol, tf, 0, bars)
-        if rates is None or len(rates) == 0:
+        rates = _copier_par_tranches(mt5, symbol, tf, bars)
+        if not rates:
             raise RuntimeError(
                 f"Aucune donnée pour {symbol} en {timeframe} : {mt5.last_error()}\n"
                 f"Ouvre un graphique {symbol} sur cette unité de temps et fais "

@@ -275,3 +275,52 @@ def test_verdict_signale_les_hypotheses_dupliquees():
     texte = juger([a, b], Journal(None)).to_text()
     assert "Résultats identiques" in texte
     assert "aucun effet" in texte
+
+
+def test_telechargement_par_tranches(monkeypatch):
+    """Une grosse demande est découpée, et les tranches sont recollées sans doublon."""
+    import types
+    from datetime import timezone as tz
+    from smcbot.data import _copier_par_tranches
+
+    base = int(datetime(2024, 6, 1, tzinfo=tz.utc).timestamp())
+
+    class FauxTerminal:
+        """Sert au plus 20 000 bougies par appel, et n'en possède que 45 000."""
+
+        DISPONIBLES = 45_000
+
+        def __init__(self):
+            self.appels = 0
+
+        def copy_rates_from(self, symbol, tf, ancre, count):
+            self.appels += 1
+            fin = int(ancre.timestamp())
+            debut_possible = base - self.DISPONIBLES * 60
+            rates = []
+            for i in range(count):
+                t = fin - i * 60
+                if t < debut_possible:
+                    break
+                rates.append({"time": t, "open": 1.0, "high": 1.0,
+                              "low": 1.0, "close": 1.0, "tick_volume": 1})
+            return list(reversed(rates))
+
+    faux = FauxTerminal()
+    monkeypatch.setattr(
+        "smcbot.data.datetime",
+        types.SimpleNamespace(
+            now=lambda tzinfo=None: datetime.fromtimestamp(base, tz=tz.utc),
+            fromtimestamp=datetime.fromtimestamp,
+        ),
+    )
+
+    rates = _copier_par_tranches(faux, "XAUUSD", 1, 100_000)
+
+    assert faux.appels > 1, "une demande de 100 000 doit être découpée"
+    horodatages = [int(r["time"]) for r in rates]
+    assert horodatages == sorted(horodatages), "les bougies doivent être ordonnées"
+    assert len(set(horodatages)) == len(horodatages), "aucun doublon entre tranches"
+    # Le terminal n'en a que 45 000 : la boucle doit s'arrêter là, pas tourner
+    # jusqu'aux 100 000 demandées.
+    assert FauxTerminal.DISPONIBLES <= len(rates) < FauxTerminal.DISPONIBLES + 10
