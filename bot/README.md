@@ -432,6 +432,32 @@ C'est une projection à effet constant, pas une promesse — mais elle dit quell
 est la seule action utile : allonger l'historique. Multiplier les réglages ne
 ferait que relever la barre.
 
+### Muette ou bâillonnée : deux façons de n'avoir aucun trade
+
+Une candidate peut manquer de trades pour deux raisons opposées, que le seul
+nombre de trades ne distingue pas :
+
+```
+Candidates étouffées par les refus, et non par manque de signal :
+  orb tp=2                 4 trades pris sur 312 setups — 305 refusés pour
+                           « volume sous le lot minimal (risque trop faible) »
+```
+
+Le premier cas — le schéma ne se présente presque jamais — est un résultat sur
+la stratégie. Le second — il se présente 312 fois et le compte refuse 305
+entrées — n'en est pas un : **la stratégie n'a jamais été évaluée**.
+
+Le cas le plus courant vient du pas de lot. Sur un compte à 1 000 € risquant
+0,5 % (5 €) sur l'or, où 0,01 lot vaut 0,0087 € du point, tout stop au-delà de
+**577 points** donne un volume théorique sous le lot minimal, et le trade est
+refusé plutôt que surdimensionné. L'amplitude médiane d'une bougie M5 étant de
+359 points, un stop de deux bougies dépasse déjà ce plafond.
+
+Conséquence à garder en tête : **un backtest à 1 000 € ne teste pas la même
+population qu'à 10 000 €.** Il écarte silencieusement les setups à stop large.
+Ce n'est pas un biais — c'est la réalité du compte — mais un résultat obtenu
+sur l'un ne se transpose pas à l'autre.
+
 `lab` signale aussi les **hypothèses identiques** — deux réglages qui donnent
 exactement le même résultat au trade près. Ce n'est pas une coïncidence : c'est
 que le paramètre censé les distinguer n'a aucun effet sur cette stratégie. Une

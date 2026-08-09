@@ -45,12 +45,37 @@ class Essai:
     params: dict = field(default_factory=dict)
     dedans: Report = field(default_factory=Report)
     dehors: Report = field(default_factory=Report)
+    refus: dict[str, int] = field(default_factory=dict)
+    """Setups détectés puis écartés — filtres de coût, volume, horaires."""
 
     @property
     def exploitable(self) -> bool:
         return (
             self.dedans.trades >= MIN_TRADES and self.dehors.trades >= MIN_TRADES
         )
+
+    @property
+    def refuses(self) -> int:
+        return sum(self.refus.values())
+
+    @property
+    def motif_dominant(self) -> tuple[str, int] | None:
+        """Motif de refus le plus fréquent, s'il y en a."""
+        if not self.refus:
+            return None
+        return max(self.refus.items(), key=lambda kv: kv[1])
+
+    @property
+    def etouffe(self) -> bool:
+        """La stratégie a-t-elle été bâillonnée plutôt que muette ?
+
+        Un candidat qui déclenche 300 fois et se voit refuser 296 entrées n'a
+        pas « peu de signaux » : il en a beaucoup, et le compte les rejette.
+        Confondre les deux ferait conclure sur une stratégie qui n'a jamais été
+        évaluée.
+        """
+        total = self.dedans.trades + self.refuses
+        return total > 0 and self.refuses > total / 2
 
     @property
     def t_validation(self) -> float:
@@ -144,12 +169,15 @@ def evaluer(
         if "tp_r" in params:
             cfg.risk.tp_r = float(params["tp_r"])
 
+        dedans = run_backtest(apprentissage, cfg)
+        dehors = run_backtest(validation, cfg, warmup=decalage)
         essai = Essai(
             strategy=strategie,
             label=label,
             params=dict(params),
-            dedans=run_backtest(apprentissage, cfg).report,
-            dehors=run_backtest(validation, cfg, warmup=decalage).report,
+            dedans=dedans.report,
+            dehors=dehors.report,
+            refus=dict(dedans.skipped),
         )
         essais.append(essai)
         if progression is not None:

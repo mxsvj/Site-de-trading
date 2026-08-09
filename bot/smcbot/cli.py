@@ -1118,6 +1118,26 @@ def cmd_lab(args: argparse.Namespace) -> int:
     if any(not e.exploitable for e in essais):
         print(f"\n! = moins de {LAB_MIN} trades d'un côté : ligne non exploitable.")
 
+    # Une candidate peut manquer de trades pour deux raisons opposées : son
+    # schéma ne se présente presque jamais, ou il se présente souvent et le
+    # compte refuse les entrées. Le tableau seul ne les distingue pas, et
+    # conclure « peu de signaux » sur une stratégie jamais évaluée serait faux.
+    etouffees = [e for e in essais if not e.exploitable and e.etouffe]
+    if etouffees:
+        print("\nCandidates étouffées par les refus, et non par manque de signal :")
+        for essai in etouffees:
+            motif, combien = essai.motif_dominant  # type: ignore[misc]
+            total = essai.dedans.trades + essai.refuses
+            print(
+                f"  {essai.label:<24} {essai.dedans.trades} trades pris sur "
+                f"{total} setups — {combien} refusés pour « {motif} »"
+            )
+        print(
+            "  Leur résultat ne dit rien de la stratégie : il dit que ce compte\n"
+            "  ne peut pas la jouer. À retester sur un capital ou un stop\n"
+            "  compatibles avant d'en tirer la moindre conclusion."
+        )
+
     print()
     print(juger(essais, journal, detail=args.strategies).to_text())
     return 0

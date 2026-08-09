@@ -434,3 +434,43 @@ def test_toutes_les_strategies_de_scalping_entrent_au_marche():
         signaux = [s for s in (strategie.on_candle(c) for c in candles) if s]
         assert signaux, f"{nom} n'a produit aucun signal"
         assert all(s.entry_type == "market" for s in signaux), nom
+
+
+def test_essai_distingue_le_silence_du_baillon():
+    """Peu de trades par manque de signal, ou par refus : ce n'est pas pareil.
+
+    Un candidat qui déclenche 300 fois et se voit refuser 296 entrées n'a pas
+    été évalué. Le confondre avec un schéma qui ne se présente jamais ferait
+    conclure sur une stratégie jamais testée.
+    """
+    from smcbot.lab import Essai
+    from smcbot.metrics import Report
+
+    muette = Essai(strategy="orb", label="orb", dedans=Report(trades=4), refus={})
+    assert not muette.etouffe
+    assert muette.motif_dominant is None
+
+    baillonnee = Essai(
+        strategy="orb",
+        label="orb",
+        dedans=Report(trades=4),
+        refus={"volume sous le lot minimal (risque trop faible)": 296, "session": 3},
+    )
+    assert baillonnee.etouffe
+    assert baillonnee.refuses == 299
+    motif, combien = baillonnee.motif_dominant
+    assert combien == 296
+    assert "lot minimal" in motif
+
+
+def test_essai_avec_beaucoup_de_trades_n_est_pas_etouffe():
+    from smcbot.lab import Essai
+    from smcbot.metrics import Report
+
+    essai = Essai(
+        strategy="smc",
+        label="smc",
+        dedans=Report(trades=879),
+        refus={"frais trop lourds": 40},
+    )
+    assert not essai.etouffe
