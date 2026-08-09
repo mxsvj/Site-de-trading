@@ -97,10 +97,20 @@ class Journal:
 
     def __init__(self, chemin: str | Path | None = None):
         self.chemin = Path(chemin) if chemin else None
-        self.total = 0
+        self.herite = 0
+        """Hypothèses d'avant le suivi par empreinte, non déduplicables."""
+
+        self.empreintes: set[str] = set()
         self.sessions: list[dict] = []
+        self.rejouees = 0
+        """Hypothèses de la dernière session déjà vues à l'identique."""
+
         if self.chemin and self.chemin.exists():
             self._charger()
+
+    @property
+    def total(self) -> int:
+        return self.herite + len(self.empreintes)
 
     def _charger(self) -> None:
         assert self.chemin is not None
@@ -108,29 +118,53 @@ class Journal:
             brut = json.loads(self.chemin.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return
-        self.total = int(brut.get("total", 0))
         self.sessions = list(brut.get("sessions", []))
+        self.empreintes = set(brut.get("empreintes", []))
+        if "empreintes" in brut:
+            self.herite = int(brut.get("herite", 0))
+        else:
+            # Journal écrit avant le suivi par empreinte : son total ne peut
+            # pas être dédupliqué rétroactivement, faute de savoir ce qu'il
+            # comptait. On le conserve tel quel plutôt que de l'effacer — le
+            # sous-estimer serait plus grave que le surestimer.
+            self.herite = int(brut.get("total", 0))
 
-    def enregistrer(self, nombre: int, detail: str) -> None:
-        self.total += nombre
+    def enregistrer(self, essais: Sequence["Essai"], detail: str) -> int:
+        """Ajoute les hypothèses réellement nouvelles. Renvoie leur nombre."""
+        nouvelles = 0
+        for essai in essais:
+            signature = empreinte(essai)
+            if signature in self.empreintes:
+                continue
+            self.empreintes.add(signature)
+            nouvelles += 1
+        self.rejouees = len(essais) - nouvelles
+
         self.sessions.append(
             {
                 "quand": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                "hypotheses": nombre,
+                "hypotheses": nouvelles,
+                "rejouees": self.rejouees,
                 "detail": detail,
             }
         )
         if self.chemin is None:
-            return
+            return nouvelles
         self.chemin.parent.mkdir(parents=True, exist_ok=True)
         self.chemin.write_text(
             json.dumps(
-                {"total": self.total, "sessions": self.sessions[-200:]},
+                {
+                    "total": self.total,
+                    "herite": self.herite,
+                    "empreintes": sorted(self.empreintes),
+                    "sessions": self.sessions[-200:],
+                },
                 indent=2,
                 ensure_ascii=False,
             ),
             encoding="utf-8",
         )
+        return nouvelles
 
 
 def seuil_bonferroni(hypotheses: int, alpha: float = ALPHA) -> float:
@@ -192,6 +226,27 @@ def _copie(cfg: BotConfig) -> BotConfig:
     return deepcopy(cfg)
 
 
+def empreinte(essai: "Essai") -> str:
+    """Signature d'une hypothèse, fondée sur son résultat.
+
+    Deux exécutions qui produisent exactement les mêmes trades et la même
+    espérance sont la même hypothèse — que ce soit la même commande relancée,
+    ou deux réglages dont la différence n'a aucun effet. La correction de
+    Bonferroni porte sur le nombre d'hypothèses **distinctes** examinées, pas
+    sur le nombre de fois où on a appuyé sur Entrée.
+    """
+    return "|".join(
+        (
+            essai.strategy,
+            json.dumps(essai.params, sort_keys=True, ensure_ascii=False),
+            str(essai.dedans.trades),
+            f"{essai.dedans.expectancy_r:.9f}",
+            str(essai.dehors.trades),
+            f"{essai.dehors.expectancy_r:.9f}",
+        )
+    )
+
+
 def doublons(essais: Sequence[Essai]) -> list[list[Essai]]:
     """Regroupe les candidates dont les résultats sont rigoureusement identiques.
 
@@ -243,6 +298,9 @@ class Verdict:
     significatif: bool
     exploitables: int
     identiques: list[list[Essai]] = field(default_factory=list)
+    hypotheses_rejouees: int = 0
+    """Candidates de cette session déjà testées à l'identique auparavant."""
+
     plus_proche: Essai | None = None
     """Meilleure candidate malgré un échantillon insuffisant — pour dire ce qui
     manque, jamais pour conclure."""
@@ -254,6 +312,14 @@ class Verdict:
             f"Hypothèses testées au total      : {self.hypotheses_total}",
             f"Seuil de t exigé (Bonferroni)    : {self.seuil_t:.2f}",
         ]
+
+        if self.hypotheses_rejouees:
+            lignes.append(
+                f"\n{self.hypotheses_rejouees} candidate(s) déjà testée(s) à "
+                "l'identique : non recomptée(s).\n"
+                "  Relancer la même commande n'examine pas de nouvelle "
+                "hypothèse, donc ne relève pas le seuil."
+            )
 
         for groupe in self.identiques:
             noms = ", ".join(e.label for e in groupe)
@@ -331,7 +397,7 @@ class Verdict:
 
 def juger(essais: Sequence[Essai], journal: Journal, detail: str = "") -> Verdict:
     """Classe les candidates et tranche, correction du multi-test incluse."""
-    journal.enregistrer(len(essais), detail)
+    nouvelles = journal.enregistrer(essais, detail)
     exploitables = [e for e in essais if e.exploitable]
     seuil = seuil_bonferroni(journal.total)
 
@@ -354,8 +420,9 @@ def juger(essais: Sequence[Essai], journal: Journal, detail: str = "") -> Verdic
     return Verdict(
         plus_proche=prometteuse,
         identiques=doublons(essais),
-        hypotheses_session=len(essais),
+        hypotheses_session=nouvelles,
         hypotheses_total=journal.total,
+        hypotheses_rejouees=journal.rejouees,
         seuil_t=seuil,
         meilleur=meilleur,
         significatif=significatif,

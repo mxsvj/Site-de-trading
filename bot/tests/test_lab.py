@@ -149,23 +149,39 @@ def test_seuil_monte_avec_le_nombre_d_hypotheses():
     assert seuil_bonferroni(0) == seuil_bonferroni(1)
 
 
+def _lot(n: int, decalage: int = 0) -> list[Essai]:
+    """n hypothèses distinctes, identifiables par leur résultat."""
+    from smcbot.metrics import Report
+
+    return [
+        Essai(
+            strategy="smc",
+            label=f"smc #{i + decalage}",
+            params={"tp_r": float(i + decalage)},
+            dedans=Report(trades=100 + i + decalage, expectancy_r=0.1),
+            dehors=Report(trades=50 + i + decalage, expectancy_r=0.1),
+        )
+        for i in range(n)
+    ]
+
+
 def test_journal_cumule_entre_sessions(tmp_path):
     """Tester en dix fois ne coûte pas moins cher qu'en une."""
     chemin = tmp_path / "hypotheses.json"
 
     premier = Journal(chemin)
-    premier.enregistrer(12, "session 1")
+    premier.enregistrer(_lot(12), "session 1")
     assert premier.total == 12
 
     second = Journal(chemin)
     assert second.total == 12, "le compteur doit survivre à la session"
-    second.enregistrer(8, "session 2")
+    second.enregistrer(_lot(8, decalage=100), "session 2")
     assert Journal(chemin).total == 20
 
 
 def test_journal_sans_fichier_reste_en_memoire():
     journal = Journal(None)
-    journal.enregistrer(5, "essai")
+    journal.enregistrer(_lot(5), "essai")
     assert journal.total == 5
 
 
@@ -187,12 +203,11 @@ def essai(dedans_r: float, dehors_r: float, t: float, trades: int = 60) -> Essai
 def test_verdict_exige_plus_quand_on_a_plus_cherche(capsys):
     """Le même t peut être significatif seul et ne plus l'être après 100 essais."""
     journal = Journal(None)
-    journal.total = 0
     verdict = juger([essai(0.2, 0.2, 2.5)], journal)
     assert verdict.significatif
 
     beaucoup = Journal(None)
-    beaucoup.total = 200
+    beaucoup.herite = 200
     verdict = juger([essai(0.2, 0.2, 2.5)], beaucoup)
     assert not verdict.significatif
     assert "relever la barre" in verdict.to_text()
@@ -474,3 +489,66 @@ def test_essai_avec_beaucoup_de_trades_n_est_pas_etouffe():
         refus={"frais trop lourds": 40},
     )
     assert not essai.etouffe
+
+
+def test_relancer_la_meme_commande_ne_consomme_pas_d_hypothese(tmp_path):
+    """Bonferroni corrige le nombre d'hypothèses examinées, pas d'exécutions.
+
+    Relancer une commande identique n'explore aucune possibilité nouvelle. La
+    compter relèverait le seuil sans qu'aucune recherche supplémentaire ait eu
+    lieu — pénaliser l'utilisateur pour avoir appuyé deux fois sur Entrée.
+    """
+    from smcbot.lab import Essai, Journal
+    from smcbot.metrics import Report
+
+    def lot():
+        return [
+            Essai(
+                strategy="smc",
+                label="smc tp=2",
+                params={"tp_r": 2.0},
+                dedans=Report(trades=443, expectancy_r=-0.038),
+                dehors=Report(trades=194, expectancy_r=-0.041),
+            )
+        ]
+
+    chemin = tmp_path / "h.json"
+    assert Journal(chemin).enregistrer(lot(), "smc") == 1
+    assert Journal(chemin).total == 1
+
+    journal = Journal(chemin)
+    assert journal.enregistrer(lot(), "smc") == 0
+    assert journal.rejouees == 1
+    assert journal.total == 1, "le seuil ne doit pas monter pour une relance"
+
+
+def test_deux_reglages_au_resultat_identique_comptent_pour_un(tmp_path):
+    """Un filtre sans effet ne crée pas une hypothèse de plus."""
+    from smcbot.lab import Essai, Journal
+    from smcbot.metrics import Report
+
+    def essai(label):
+        return Essai(
+            strategy="asian-sweep",
+            label=label,
+            params={"tp_r": 2.0},
+            dedans=Report(trades=118, expectancy_r=-0.237),
+            dehors=Report(trades=46, expectancy_r=-0.283),
+        )
+
+    journal = Journal(tmp_path / "h.json")
+    assert journal.enregistrer([essai("sans filtre"), essai("avec filtre")], "x") == 1
+    assert journal.total == 1
+
+
+def test_journal_ancien_format_conserve_son_total(tmp_path):
+    """Un compteur écrit avant le suivi par empreinte n'est pas effacé."""
+    import json
+
+    from smcbot.lab import Journal
+
+    chemin = tmp_path / "h.json"
+    chemin.write_text(json.dumps({"total": 34, "sessions": []}), encoding="utf-8")
+
+    journal = Journal(chemin)
+    assert journal.total == 34
