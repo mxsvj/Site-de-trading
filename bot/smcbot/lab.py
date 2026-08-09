@@ -185,6 +185,27 @@ def doublons(essais: Sequence[Essai]) -> list[list[Essai]]:
     return [g for g in groupes.values() if len(g) > 1]
 
 
+def trades_necessaires(essai: "Essai", seuil: float) -> int | None:
+    """Combien de trades il faudrait pour trancher, à effet constant.
+
+    La statistique t croît comme la racine du nombre de trades : quadrupler
+    l'échantillon double le t. Si l'avantage observé est réel et se maintient,
+    ce chiffre dit exactement quelle quantité de données manque — plutôt que de
+    laisser « échantillon insuffisant » sans suite.
+
+    C'est une projection, pas une promesse : rien ne garantit que l'espérance
+    tienne sur des données qu'on n'a pas encore vues.
+    """
+    n = essai.dehors.trades
+    t = essai.t_validation
+    if n <= 0 or t <= 0:
+        return None
+    effet = t / (n ** 0.5)          # espérance rapportée à sa dispersion
+    if effet <= 0:
+        return None
+    return int((seuil / effet) ** 2) + 1
+
+
 @dataclass
 class Verdict:
     hypotheses_session: int
@@ -194,6 +215,9 @@ class Verdict:
     significatif: bool
     exploitables: int
     identiques: list[list[Essai]] = field(default_factory=list)
+    plus_proche: Essai | None = None
+    """Meilleure candidate malgré un échantillon insuffisant — pour dire ce qui
+    manque, jamais pour conclure."""
 
     def to_text(self) -> str:
         lignes = [
@@ -216,6 +240,21 @@ class Verdict:
                 f"\nAucune candidate n'atteint {MIN_TRADES} trades de chaque côté. "
                 "Rien à conclure."
             )
+            if self.plus_proche is not None:
+                p = self.plus_proche
+                besoin = trades_necessaires(p, self.seuil_t)
+                lignes.append(
+                    f"\nLa plus fournie est {p.label} : "
+                    f"{p.dedans.trades} / {p.dehors.trades} trades, "
+                    f"{p.dedans.expectancy_r:+.3f} R → {p.dehors.expectancy_r:+.3f} R"
+                    + (
+                        f"\nIl en faudrait environ {besoin} en validation pour "
+                        f"pouvoir trancher, soit {besoin / max(1, p.dehors.trades):.0f} "
+                        "fois plus de données."
+                        if besoin
+                        else ""
+                    )
+                )
             return "\n".join(lignes)
 
         m = self.meilleur
@@ -240,14 +279,25 @@ class Verdict:
             )
         else:
             manque = self.seuil_t - m.t_validation
-            lignes.append(
+            texte = (
                 f"\nt = {m.t_validation:.2f} < {self.seuil_t:.2f} : il manque "
                 f"{manque:.2f} pour être distinguable du hasard,\n"
                 f"compte tenu des {self.hypotheses_total} hypothèses déjà testées. "
                 "Le résultat est peut-être réel, mais rien ici ne permet\n"
-                "de l'affirmer. Le tester davantage ne le rendra pas plus "
-                "significatif : ça relèvera encore la barre."
+                "de l'affirmer."
             )
+            besoin = trades_necessaires(m, self.seuil_t)
+            if besoin:
+                facteur = besoin / max(1, m.dehors.trades)
+                texte += (
+                    f"\n\nÀ effet constant, il faudrait environ {besoin} trades "
+                    f"en validation contre {m.dehors.trades} aujourd'hui,\n"
+                    f"soit à peu près {facteur:.0f} fois plus de données. "
+                    "Le t croît comme la racine du nombre de trades.\n"
+                    "Allonger l'historique est donc la seule voie utile : "
+                    "multiplier les réglages ne ferait que relever la barre."
+                )
+            lignes.append(texte)
         return "\n".join(lignes)
 
 
@@ -267,7 +317,14 @@ def juger(essais: Sequence[Essai], journal: Journal, detail: str = "") -> Verdic
         and meilleur.dehors.expectancy_r > 0
         and meilleur.t_validation > seuil
     )
+    prometteuse = None
+    if not exploitables and essais:
+        positives = [e for e in essais if e.dehors.expectancy_r > 0]
+        if positives:
+            prometteuse = max(positives, key=lambda e: e.dehors.trades)
+
     return Verdict(
+        plus_proche=prometteuse,
         identiques=doublons(essais),
         hypotheses_session=len(essais),
         hypotheses_total=journal.total,

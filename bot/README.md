@@ -378,6 +378,20 @@ Chercher en dix sessions ne coûte pas moins cher qu'en une seule : c'est
 pourquoi le compteur persiste. `--reset-journal` ne se justifie qu'en changeant
 de jeu de données.
 
+Quand l'échantillon ne suffit pas, `lab` ne s'arrête pas à « rien à conclure » :
+il calcule **combien de trades manquent**. La statistique t croît comme la
+racine du nombre de trades, donc quadrupler les données double le t.
+
+```
+La plus fournie est asian-sweep tp=3 : 25 / 17 trades, +0.920 R → +0.882 R
+Il en faudrait environ 46 en validation pour pouvoir trancher,
+soit 3 fois plus de données.
+```
+
+C'est une projection à effet constant, pas une promesse — mais elle dit quelle
+est la seule action utile : allonger l'historique. Multiplier les réglages ne
+ferait que relever la barre.
+
 `lab` signale aussi les **hypothèses identiques** — deux réglages qui donnent
 exactement le même résultat au trade près. Ce n'est pas une coïncidence : c'est
 que le paramètre censé les distinguer n'a aucun effet sur cette stratégie. Une
@@ -604,7 +618,7 @@ bot/
 ├── scalping.py     stratégies alternatives : asian-sweep, orb, fade
 │   ├── lab.py         banc d'essai et correction du multi-test
 │   ├── registry.py    catalogue des stratégies
-└── tests/            183 tests
+└── tests/            188 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -618,7 +632,7 @@ cd bot && python -m pytest
 ```
 
 ```
-183 passed
+188 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),

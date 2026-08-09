@@ -195,7 +195,7 @@ def test_verdict_exige_plus_quand_on_a_plus_cherche(capsys):
     beaucoup.total = 200
     verdict = juger([essai(0.2, 0.2, 2.5)], beaucoup)
     assert not verdict.significatif
-    assert "relèvera encore la barre" in verdict.to_text()
+    assert "relever la barre" in verdict.to_text()
 
 
 def test_verdict_rejette_une_validation_perdante():
@@ -324,3 +324,41 @@ def test_telechargement_par_tranches(monkeypatch):
     # Le terminal n'en a que 45 000 : la boucle doit s'arrêter là, pas tourner
     # jusqu'aux 100 000 demandées.
     assert FauxTerminal.DISPONIBLES <= len(rates) < FauxTerminal.DISPONIBLES + 10
+
+
+def test_trades_necessaires_suit_la_racine():
+    """Quadrupler l'échantillon double le t : la projection doit le refléter."""
+    from smcbot.lab import trades_necessaires
+
+    observe = essai(0.5, 0.5, 1.5, trades=17)
+    besoin = trades_necessaires(observe, seuil=3.0)
+    # t = 1.5 sur 17 trades ; pour t = 3.0 il faut 4 fois plus de trades
+    assert besoin == pytest.approx(17 * 4, rel=0.15)
+
+    assert trades_necessaires(essai(0.1, -0.1, -0.5), 3.0) is None
+    assert trades_necessaires(essai(0.1, 0.1, 1.0, trades=0), 3.0) is None
+
+
+def test_verdict_dit_combien_de_donnees_manquent():
+    """« Échantillon insuffisant » sans suite ne dit pas quoi faire."""
+    petit = essai(0.9, 0.6, 1.57, trades=17)
+    petit.label = "asian-sweep tp=2"
+    texte = juger([petit], Journal(None)).to_text()
+
+    assert "Rien à conclure" in texte
+    assert "asian-sweep tp=2" in texte
+    assert "fois plus de données" in texte
+
+
+def test_verdict_projette_aussi_sur_un_echantillon_valide():
+    """Échantillon suffisant mais t insuffisant : dire ce qu'il manque."""
+    proche = essai(0.3, 0.25, 1.4, trades=40)
+    texte = juger([proche], Journal(None)).to_text()
+    assert "il faudrait environ" in texte
+    assert "racine du nombre de trades" in texte
+
+
+def test_aucune_projection_si_la_validation_perd():
+    perdant = essai(0.5, -0.2, -1.2, trades=10)
+    texte = juger([perdant], Journal(None)).to_text()
+    assert "fois plus de données" not in texte
