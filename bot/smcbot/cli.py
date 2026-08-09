@@ -583,6 +583,52 @@ def cmd_paper(args: argparse.Namespace) -> int:
     return 0
 
 
+def verifier_reference(cfg: BotConfig, candles: Sequence[Candle]) -> None:
+    """Mesure le recouvrement entre la série principale et sa référence.
+
+    Une stratégie qui croise deux séries ne produit rien quand elles ne se
+    rencontrent pas — et le silence se lit comme une absence de setups plutôt
+    que comme une erreur de configuration. Mieux vaut donc chiffrer le
+    recouvrement une fois, avant de lancer quoi que ce soit, que de le
+    deviner en cours de route.
+    """
+    chemin = str(cfg.strategy_params.get("reference_csv", "")).strip()
+    if not chemin or not candles:
+        return
+
+    reference = load_csv(chemin)
+    decalage = float(cfg.strategy_params.get("reference_tz_shift", 0.0))
+    if decalage:
+        reference = shift_times(reference, decalage)
+    if not reference:
+        raise SystemExit(f"Série de référence vide : {chemin}")
+
+    from .scalping import _cle_temps
+
+    connus = {_cle_temps(c.time) for c in reference}
+    communs = sum(1 for c in candles if _cle_temps(c.time) in connus)
+    part = communs / len(candles)
+
+    print(
+        f"Référence : {len(reference)} bougies "
+        f"({reference[0].time:%Y-%m-%d} → {reference[-1].time:%Y-%m-%d}), "
+        f"recouvrement {communs}/{len(candles)} ({part:.0%})."
+    )
+    if part < 0.10:
+        raise SystemExit(
+            "Recouvrement insuffisant entre les deux séries : la stratégie "
+            "n'aurait presque aucune bougie exploitable.\n"
+            "Vérifie qu'elles ont la même unité de temps et le même décalage "
+            "horaire (--tz-shift s'applique aux deux)."
+        )
+    if part < 0.80:
+        print(
+            "  Une partie notable des bougies n'a pas de référence et ne "
+            "produira aucun signal.\n"
+            "  C'est normal si la référence commence plus tard ; suspect sinon."
+        )
+
+
 def unite_mesuree(candles: Sequence[Candle]) -> str | None:
     """Unité de temps réellement présente dans les bougies.
 
@@ -1199,6 +1245,7 @@ def cmd_lab(args: argparse.Namespace) -> int:
     candles = load_candles(args, cfg)
     if len(candles) < 2000:
         raise SystemExit("Historique trop court pour un banc d'essai.")
+    verifier_reference(cfg, candles)
 
     strategies = [s.strip() for s in args.strategies.split(",") if s.strip()]
     inconnues = [s for s in strategies if s not in STRATEGIES]

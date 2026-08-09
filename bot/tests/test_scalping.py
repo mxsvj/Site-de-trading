@@ -581,26 +581,46 @@ def _cfg_leadlag(chemin, **params):
     return cfg
 
 
-def test_leadlag_previent_quand_les_series_sont_desalignees(tmp_path, capsys):
-    """Deux séries décalées ne se croisent jamais — et le disent.
-
-    Sans avertissement, un décalage horaire oublié produirait zéro signal, et
-    le silence passerait pour une absence de setups plutôt que pour une
-    erreur de configuration.
-    """
+def test_leadlag_previent_quand_aucun_rapprochement_n_aboutit(tmp_path, capsys):
+    """Un désalignement total doit être dit, pas subi en silence."""
     from smcbot.scalping import LeadLagStrategy
 
-    strat = LeadLagStrategy(_cfg_leadlag(_serie_reference(tmp_path, 0)))
-    # Bougies d'or décalées d'une heure : aucune correspondance possible.
-    base = datetime(2025, 6, 2, 12, 0)
-    for i in range(600):
+    strat = LeadLagStrategy(_cfg_leadlag(_serie_reference(tmp_path, 0, n=100)))
+    # Bougies d'or décalées d'un an : aucune correspondance possible.
+    base = datetime(2026, 6, 2, 0, 0)
+    for i in range(strat.JAMAIS_ALIGNE + 10):
         strat.on_candle(
             Candle(base + timedelta(minutes=i), 2000.0, 2001.0, 1999.0, 2000.0, 1.0)
         )
 
     sortie = capsys.readouterr().out
-    assert "ne sont pas alignées" in sortie
-    assert strat.manques > 500
+    assert "aucun des" in sortie
+    assert strat.manques == strat.consultations
+
+
+def test_leadlag_ne_crie_pas_sur_un_simple_trou_de_tete(tmp_path, capsys):
+    """La référence commence souvent plus tard : ce n'est pas un désalignement.
+
+    Le premier garde-fou se déclenchait au bout de 500 bougies et ne
+    revérifiait jamais. Six jours d'or sans EUR/USD en tête de série
+    suffisaient donc à faire crier au désalignement alors que tout le reste
+    se rapprochait correctement.
+    """
+    from smcbot.scalping import LeadLagStrategy
+
+    # Référence démarrant 600 bougies après l'or, puis parfaitement alignée.
+    chemin = _serie_reference(tmp_path, decalage_minutes=600, n=2000)
+    strat = LeadLagStrategy(_cfg_leadlag(chemin))
+
+    base = datetime(2025, 6, 2, 0, 0)
+    for i in range(1500):
+        strat.on_candle(
+            Candle(base + timedelta(minutes=i), 2000.0, 2001.0, 1999.0, 2000.0, 1.0)
+        )
+
+    assert strat.manques == 600, "le trou de tête doit être compté"
+    assert strat.manques < strat.consultations, "le reste se rapproche bien"
+    assert capsys.readouterr().out == "", "aucun cri sur un trou de tête légitime"
 
 
 def test_leadlag_se_tait_quand_les_series_sont_alignees(tmp_path, capsys):

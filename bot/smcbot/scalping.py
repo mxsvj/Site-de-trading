@@ -529,16 +529,22 @@ class LeadLagStrategy:
             return 0.0
         return (valeurs[-1] - moyenne) / ecart
 
+    # Deux séries peuvent légitimement ne pas se recouvrir au début : la
+    # référence commence souvent plus tard que la série principale. Ce filet
+    # ne se déclenche donc que sur un désalignement **total** et durable, seul
+    # cas qu'un trou de tête ne peut pas expliquer. Le contrôle informatif du
+    # recouvrement, lui, est fait en amont par la ligne de commande.
+    JAMAIS_ALIGNE = 20_000
+
     def _prevenir_si_desaligne(self) -> None:
-        """Deux séries mal alignées ne produiraient aucun signal, en silence."""
-        if self._alerte_donnee or self.consultations < 500:
+        """Signale le seul cas où aucun rapprochement n'a jamais abouti."""
+        if self._alerte_donnee or self.consultations < self.JAMAIS_ALIGNE:
             return
-        if self.manques > self.consultations / 2:
+        if self.manques == self.consultations:
             self._alerte_donnee = True
             print(
-                f"⚠ lead-lag : {self.manques} horodatages sur "
-                f"{self.consultations} n'ont aucune correspondance dans la "
-                f"série de référence.\n"
+                f"⚠ lead-lag : aucun des {self.consultations} horodatages "
+                f"n'a trouvé de correspondance.\n"
                 f"  Les deux séries ne sont pas alignées — décalage horaire "
                 f"différent, ou unités de temps différentes.\n"
                 f"  Tout résultat obtenu ainsi serait vide de sens."

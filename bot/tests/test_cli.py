@@ -702,3 +702,45 @@ def test_unite_mesuree_reconnait_les_unites_standard():
         serie = synthetic_series(300, start=2650.0, point=0.01,
                                  timeframe_minutes=minutes)
         assert unite_mesuree(serie) == attendu
+
+
+def test_recouvrement_des_series_est_chiffre(tmp_path, capsys):
+    """Le recouvrement doit être mesuré en amont, pas deviné en cours de route."""
+    from smcbot.cli import verifier_reference
+    from smcbot.config import BotConfig, xauusd
+    from smcbot.data import save_csv, synthetic_series
+
+    principale = synthetic_series(1000, start=2650.0, point=0.01, timeframe_minutes=1)
+    chemin = tmp_path / "ref.csv"
+    save_csv(principale[300:], chemin)  # référence démarrant plus tard
+
+    cfg = BotConfig(symbol=xauusd())
+    cfg.strategy_params = {"reference_csv": str(chemin)}
+    verifier_reference(cfg, principale)
+
+    sortie = capsys.readouterr().out
+    assert "recouvrement 700/1000 (70%)" in sortie
+    assert "ne produira aucun signal" in sortie
+
+
+def test_recouvrement_nul_arrete_tout(tmp_path):
+    """Sans recouvrement, lancer le test produirait un résultat vide de sens."""
+    from smcbot.cli import verifier_reference
+    from smcbot.config import BotConfig, xauusd
+    from smcbot.data import save_csv, synthetic_series
+
+    principale = synthetic_series(500, start=2650.0, point=0.01, timeframe_minutes=1)
+    decalee = synthetic_series(
+        500, start=2650.0, point=0.01, timeframe_minutes=1
+    )
+    for c in decalee:
+        object.__setattr__(c, "time", c.time.replace(year=c.time.year + 3))
+
+    chemin = tmp_path / "ref.csv"
+    save_csv(decalee, chemin)
+
+    cfg = BotConfig(symbol=xauusd())
+    cfg.strategy_params = {"reference_csv": str(chemin)}
+    with pytest.raises(SystemExit) as sortie:
+        verifier_reference(cfg, principale)
+    assert "Recouvrement insuffisant" in str(sortie.value)
