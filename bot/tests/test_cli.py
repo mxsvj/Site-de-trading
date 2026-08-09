@@ -376,3 +376,19 @@ def test_decomposition_muette_sur_petit_echantillon(capsys):
     sortie = capsys.readouterr().out
     assert "Non concluante" in sortie
     assert "avantage réel" not in sortie
+
+
+def test_scan_exige_metatrader(monkeypatch):
+    """Hors Windows, `scan` doit le dire au lieu de planter."""
+    import sys
+    monkeypatch.setitem(sys.modules, "MetaTrader5", None)
+    monkeypatch.delitem(sys.modules, "MetaTrader5")
+    with pytest.raises(SystemExit) as sortie:
+        main(["scan", "--symbols", "XAUUSD"])
+    assert "MetaTrader5" in str(sortie.value)
+
+
+def test_seuils_de_scalpabilite_sont_ordonnes():
+    from smcbot.cli import SCALP_BON, SCALP_LIMITE
+
+    assert 0 < SCALP_BON < SCALP_LIMITE < 1

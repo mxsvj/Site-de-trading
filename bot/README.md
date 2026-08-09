@@ -326,6 +326,33 @@ python -m smcbot paper --preset xauusd-scalp --mt5 --interval 5
 
 Descends l'intervalle à 5 secondes : sur M1, une bougie clôture chaque minute.
 
+## Choisir l'instrument avant la stratégie
+
+```bash
+python -m smcbot scan --symbols XAUUSD,EURUSD,GBPUSD,USDJPY,NAS100,GER40,US30 \
+    --timeframe M5
+```
+
+En scalping, le premier facteur de résultat n'est pas le schéma d'entrée : c'est
+le rapport entre le spread, qui est fixe, et l'amplitude d'une bougie, qui fixe
+la taille naturelle d'un stop. Ce rapport est la part du risque perdue **avant
+même que la stratégie ait raison ou tort**.
+
+```
+instrument    spread  amplitude  frais/stop 2 bougies  aptitude
+----------------------------------------------------------------------
+EURUSD             8        180                  2.2%  favorable
+XAUUSD            24        166                  7.2%  jouable, sans marge
+```
+
+Sous 5 % le scalping garde de la marge ; au-delà de 10 % il faut un avantage
+brut que presque aucun schéma simple n'atteint. Sur l'or à 24 points de spread,
+7,2 % du risque part en frais à chaque trade — c'est l'équivalent d'un handicap
+permanent de 0,07 R que la stratégie doit d'abord rembourser.
+
+`scan` ne teste aucune stratégie : il ne consomme donc **aucune hypothèse** et
+ne relève pas le seuil de Bonferroni. Il demande MetaTrader 5 ouvert (Windows).
+
 ## Banc d'essai : comparer des stratégies sans se mentir
 
 ```bash

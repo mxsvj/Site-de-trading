@@ -14,6 +14,7 @@ from .backtest import run_backtest
 from .config import PRESETS, BotConfig, SymbolSpec, eurusd, xauusd
 from .data import (
     TIMEFRAMES,
+    init_mt5,
     Candle,
     Mt5Feed,
     ReplayFeed,
@@ -180,6 +181,20 @@ def build_parser() -> argparse.ArgumentParser:
     p_doc.add_argument("--symbol", default="XAUUSD")
     p_doc.add_argument("--timeframe", default="M1")
     p_doc.add_argument("--mt5-path", help="chemin de terminal64.exe à utiliser")
+
+    p_scan = sub.add_parser(
+        "scan",
+        help="classer des instruments par aptitude au scalping (aucune "
+        "hypothèse consommée : ce n'est pas un test de stratégie)",
+    )
+    p_scan.add_argument(
+        "--symbols",
+        default="XAUUSD,EURUSD,GBPUSD,USDJPY,NAS100,GER40,US30,BTCUSD",
+        help="symboles à comparer, séparés par des virgules",
+    )
+    p_scan.add_argument("--timeframe", default="M5")
+    p_scan.add_argument("--bars", type=int, default=5000)
+    p_scan.add_argument("--mt5-path", help="chemin de terminal64.exe à utiliser")
 
     p_dl = sub.add_parser("download", help="exporter un historique MT5 en CSV")
     p_dl.add_argument("--symbol", required=True)
@@ -587,6 +602,91 @@ def _fenetre_praticable(cfg: BotConfig, report) -> None:
         )
 
 
+# Coût de transaction rapporté à l'amplitude d'une bougie, pour un stop de deux
+# bougies. En deçà de 5 %, le scalping garde de la marge ; au-delà de 10 %, les
+# frais mangent l'essentiel de ce qu'une stratégie peut espérer gagner.
+SCALP_BON = 0.05
+SCALP_LIMITE = 0.10
+
+
+def cmd_scan(args: argparse.Namespace) -> int:
+    """Classe des instruments par rapport frais / amplitude.
+
+    C'est le seul chiffre qui décide si le scalping est jouable sur un
+    instrument : le spread est fixe, l'amplitude d'une bougie fixe la taille
+    naturelle d'un stop, et leur rapport donne la part du risque perdue d'avance.
+
+    Aucune stratégie n'est testée ici — donc aucune hypothèse n'est consommée.
+    """
+    import statistics
+
+    try:
+        import MetaTrader5 as mt5  # type: ignore[import-not-found]
+    except ImportError as exc:
+        raise SystemExit(
+            "Le paquet MetaTrader5 est requis pour `scan` (Windows uniquement)."
+        ) from exc
+
+    init_mt5(mt5, args.mt5_path)
+    lignes = []
+    try:
+        for nom in [s.strip() for s in args.symbols.split(",") if s.strip()]:
+            if not mt5.symbol_select(nom, True):
+                print(f"  {nom:<10} introuvable chez ce courtier")
+                continue
+            spec = mt5.symbol_info(nom)
+            tf = getattr(mt5, f"TIMEFRAME_{args.timeframe}", None)
+            if spec is None or tf is None:
+                continue
+            rates = mt5.copy_rates_from_pos(nom, tf, 0, args.bars)
+            if rates is None or len(rates) < 100:
+                print(f"  {nom:<10} historique insuffisant")
+                continue
+
+            amplitudes = [
+                (float(r["high"]) - float(r["low"])) / spec.point for r in rates
+            ]
+            mediane = statistics.median(amplitudes)
+            if mediane <= 0:
+                continue
+            ratio = spec.spread / mediane
+            lignes.append((nom, spec.spread, mediane, ratio))
+            print(f"  {nom:<10} spread {spec.spread:>5} pts, amplitude médiane "
+                  f"{mediane:>7.0f} pts")
+    finally:
+        mt5.shutdown()
+
+    if not lignes:
+        raise SystemExit("Aucun instrument exploitable.")
+
+    lignes.sort(key=lambda l: l[3])
+    print(
+        f"\n{'instrument':<12}{'spread':>8}{'amplitude':>11}{'frais/stop 2 bougies':>22}"
+        f"  aptitude"
+    )
+    print("-" * 70)
+    for nom, spread, mediane, ratio in lignes:
+        cout = ratio / 2  # un stop d'environ deux bougies
+        if cout < SCALP_BON:
+            verdict = "favorable"
+        elif cout < SCALP_LIMITE:
+            verdict = "jouable, sans marge"
+        else:
+            verdict = "à écarter"
+        print(
+            f"{nom:<12}{spread:>8.0f}{mediane:>11.0f}{cout:>21.1%}  {verdict}"
+        )
+
+    print(
+        f"\nLecture : le spread est fixe, l'amplitude d'une bougie donne la taille\n"
+        f"naturelle d'un stop. Leur rapport est la part du risque perdue avant même\n"
+        f"que la stratégie n'ait raison ou tort. Sous {SCALP_BON:.0%} le scalping\n"
+        f"garde de la marge ; au-delà de {SCALP_LIMITE:.0%} il faut un avantage\n"
+        f"brut que presque aucun schéma simple n'atteint."
+    )
+    return 0
+
+
 def cmd_download(args: argparse.Namespace) -> int:
     candles = download_mt5(args.symbol, args.timeframe, args.bars, args.mt5_path)
 
@@ -962,6 +1062,7 @@ COMMANDS = {
     "doctor": cmd_doctor,
     "lab": cmd_lab,
     "download": cmd_download,
+    "scan": cmd_scan,
     "demo-data": cmd_demo_data,
     "optimize": cmd_optimize,
     "init-config": cmd_init_config,
