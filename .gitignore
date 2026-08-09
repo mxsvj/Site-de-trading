@@ -2,10 +2,13 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# Historiques de marché : volumineux, et retéléchargeables avec `download`.
-bot/data/*.csv
+# Les historiques de marché SONT suivis volontairement : ils sont le seul
+# moyen pour l'assistant, qui tourne sur une autre machine, d'exécuter les
+# analyses lui-même au lieu de les dicter. Compter quelques mégaoctets contre
+# des dizaines d'allers-retours de copier-coller n'est pas un arbitrage
+# difficile.
 
-# État du paper trading en cours.
+# État du paper trading : propre à la machine qui l'exécute.
 bot/runtime/paper_state.json
 bot/runtime/paper.log
 bot/runtime/STOP
