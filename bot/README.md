@@ -348,7 +348,13 @@ période de validation est précédée d'une préchauffe (`run_backtest(warmup=.
 qui alimente le moteur SMC sans ouvrir de position — sinon elle démarrerait sans
 structure et sous-traderait, faussant la comparaison.
 
-La commande conclut elle-même, en trois cas :
+**En dessous de 30 trades de chaque côté, la commande refuse de conclure.**
+Une espérance tirée d'une dizaine de trades est dominée par le hasard : la
+commenter reviendrait à raconter du bruit. C'est le garde-fou le plus important
+de l'outil, parce que c'est l'erreur la plus facile à commettre sans s'en rendre
+compte — un écart spectaculaire sur huit trades est parfaitement banal.
+
+Au-dessus de ce seuil, la commande conclut elle-même, en trois cas :
 
 | Situation | Ce que ça veut dire |
 |---|---|
@@ -387,7 +393,16 @@ Mesuré sur XAUUSD : 24 points de spread contre 245 points de risque coûtaient
 ### Changer d'horizon sans réexporter
 
 `--resample` agrège tes bougies vers une unité de temps supérieure. Des M1
-suffisent donc à tester M5, M15 ou H1 :
+suffisent donc à tester M5, M15 ou H1 — **à condition d'avoir assez
+d'historique** : 50 000 bougies M1 ne couvrent que sept semaines, soit environ
+3 300 bougies M15, et une poignée de trades. Pour évaluer sérieusement une
+unité de temps, télécharge-la directement depuis MT5 :
+
+| Téléchargement | Couverture |
+|---|---|
+| 50 000 bougies M1 | ~7 semaines |
+| 50 000 bougies M15 | ~18 mois |
+| 50 000 bougies H1 | ~6 ans |
 
 ```bash
 python -m smcbot optimize --csv data/xauusd_m1.csv --symbol-spec spec.json \
@@ -500,7 +515,7 @@ bot/
 │   └── cli.py         interface en ligne de commande
 ├── mt5/
 │   └── ExportBars.mq5 export CSV + spécification, sans Python
-└── tests/            151 tests
+└── tests/            154 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -514,7 +529,7 @@ cd bot && python -m pytest
 ```
 
 ```
-151 passed
+154 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),

@@ -230,7 +230,8 @@ def test_verdict_signale_l_absence_totale_d_avantage(capsys):
     from smcbot.cli import _verdict
     from smcbot.metrics import Report
 
-    _verdict([(2.0, 3, 1.0, Report(expectancy_r=-0.1), Report(expectancy_r=-0.2))])
+    _verdict([(2.0, 3, 1.0, Report(expectancy_r=-0.1, trades=40),
+               Report(expectancy_r=-0.2, trades=35))])
     sortie = capsys.readouterr().out
     assert "n'a pas d'avantage" in sortie
     assert "bruit" in sortie
@@ -241,7 +242,8 @@ def test_verdict_reste_prudent_quand_ca_tient(capsys):
     from smcbot.cli import _verdict
     from smcbot.metrics import Report
 
-    _verdict([(2.0, 3, 1.0, Report(expectancy_r=0.30), Report(expectancy_r=0.22))])
+    _verdict([(2.0, 3, 1.0, Report(expectancy_r=0.30, trades=45),
+               Report(expectancy_r=0.22, trades=38))])
     sortie = capsys.readouterr().out
     assert "tient en validation" in sortie
     assert "sans être une preuve" in sortie
@@ -264,8 +266,8 @@ def test_decomposition_signal_sans_valeur(capsys):
     from smcbot.metrics import Report
 
     _decompose_cout([
-        (2.0, 3, 1.0, 0.0, Report(expectancy_r=-0.08), Report(expectancy_r=-0.09)),
-        (2.0, 3, 1.0, 24.0, Report(expectancy_r=-0.15), Report(expectancy_r=-0.16)),
+        (2.0, 3, 1.0, 0.0, Report(expectancy_r=-0.08, trades=40), Report(trades=35)),
+        (2.0, 3, 1.0, 24.0, Report(expectancy_r=-0.15, trades=42), Report(trades=36)),
     ])
     sortie = capsys.readouterr().out
     assert "ne vaut rien en lui-même" in sortie
@@ -278,8 +280,8 @@ def test_decomposition_signal_mange_par_les_frais(capsys):
     from smcbot.metrics import Report
 
     _decompose_cout([
-        (2.0, 3, 1.0, 0.0, Report(expectancy_r=0.12), Report(expectancy_r=0.10)),
-        (2.0, 3, 1.0, 24.0, Report(expectancy_r=-0.05), Report(expectancy_r=-0.04)),
+        (2.0, 3, 1.0, 0.0, Report(expectancy_r=0.12, trades=40), Report(trades=35)),
+        (2.0, 3, 1.0, 24.0, Report(expectancy_r=-0.05, trades=42), Report(trades=36)),
     ])
     sortie = capsys.readouterr().out
     assert "avantage réel" in sortie
@@ -291,5 +293,47 @@ def test_decomposition_ignoree_sans_spread_nul(capsys):
     from smcbot.cli import _decompose_cout
     from smcbot.metrics import Report
 
-    _decompose_cout([(2.0, 3, 1.0, 24.0, Report(), Report())])
+    _decompose_cout([(2.0, 3, 1.0, 24.0, Report(trades=40), Report(trades=35))])
     assert capsys.readouterr().out == ""
+
+
+def test_verdict_refuse_de_conclure_sur_trop_peu_de_trades(capsys):
+    """Un écart spectaculaire sur dix trades reste du bruit : ne rien affirmer."""
+    from smcbot.cli import _verdict
+    from smcbot.metrics import Report
+
+    dedans = Report(expectancy_r=1.250, trades=8)
+    dehors = Report(expectancy_r=-0.600, trades=5)
+    _verdict([(3.0, 3, 1.0, 0.0, dedans, dehors)])
+
+    sortie = capsys.readouterr().out
+    assert "Échantillon insuffisant" in sortie
+    assert "8 trades" in sortie and "5 en validation" in sortie
+    # Surtout : aucun verdict ne doit être prononcé
+    assert "surapprentissage" not in sortie
+    assert "Ne l'utilise pas" not in sortie
+    assert "tient en validation" not in sortie
+    # Et la sortie doit orienter vers la cause
+    assert "Historique trop court" in sortie
+
+
+def test_verdict_conclut_des_que_l_echantillon_suffit(capsys):
+    from smcbot.cli import MIN_TRADES, _verdict
+    from smcbot.metrics import Report
+
+    dedans = Report(expectancy_r=0.25, trades=MIN_TRADES)
+    dehors = Report(expectancy_r=-0.18, trades=MIN_TRADES)
+    _verdict([(2.0, 3, 1.0, 24.0, dedans, dehors)])
+    assert "surapprentissage" in capsys.readouterr().out
+
+
+def test_decomposition_muette_sur_petit_echantillon(capsys):
+    from smcbot.cli import _decompose_cout
+    from smcbot.metrics import Report
+
+    _decompose_cout([
+        (3.0, 3, 1.0, 0.0, Report(expectancy_r=1.25, trades=8), Report(trades=5)),
+    ])
+    sortie = capsys.readouterr().out
+    assert "Non concluante" in sortie
+    assert "avantage réel" not in sortie

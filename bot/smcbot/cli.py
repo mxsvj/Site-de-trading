@@ -635,6 +635,12 @@ def _decompose_cout(lignes: list) -> None:
     meilleur = max(sans_frais, key=lambda r: r[4].expectancy_r)
     brut = meilleur[4].expectancy_r
     print("\n── Décomposition ──────────────────────────────────")
+    if meilleur[4].trades < MIN_TRADES:
+        print(
+            f"Non concluante : {meilleur[4].trades} trades seulement, "
+            f"minimum {MIN_TRADES}."
+        )
+        return
     print(f"Meilleure espérance brute (spread nul) : {brut:+.3f} R")
 
     if brut <= 0.02:
@@ -660,6 +666,33 @@ def _decompose_cout(lignes: list) -> None:
         )
 
 
+# En deçà, aucune statistique n'est exploitable : l'erreur d'échantillonnage
+# dépasse largement les écarts qu'on prétendrait mesurer. Une espérance tirée
+# de dix trades peut valoir n'importe quoi.
+MIN_TRADES = 30
+
+
+def _echantillon_suffisant(dedans, dehors) -> bool:
+    return dedans.trades >= MIN_TRADES and dehors.trades >= MIN_TRADES
+
+
+def _refus_echantillon(dedans, dehors) -> None:
+    print(
+        f"Échantillon insuffisant : {dedans.trades} trades en apprentissage et "
+        f"{dehors.trades} en validation, pour un minimum de {MIN_TRADES}.\n"
+        "Aucune conclusion n'est tirée — sur si peu de trades, l'espérance et le "
+        "profit factor sont dominés par le hasard, et\n"
+        "les commenter reviendrait à raconter du bruit.\n\n"
+        "Deux causes possibles, à traiter dans cet ordre :\n"
+        "  1. Historique trop court pour cette unité de temps. Télécharge "
+        "directement l'unité visée depuis MT5 plutôt que d'agréger :\n"
+        "     50 000 bougies M15 couvrent environ 18 mois, contre 7 semaines "
+        "pour 50 000 bougies M1.\n"
+        "  2. Filtres trop stricts. Lance `check` sur les mêmes données pour "
+        "comparer min_stop_points à l'amplitude médiane réelle."
+    )
+
+
 def _pf(rapport) -> str:
     valeur = rapport.profit_factor
     return "∞" if valeur == float("inf") else f"{valeur:.2f}"
@@ -669,6 +702,10 @@ def _verdict(lignes: list) -> None:
     """Dit franchement ce que vaut le meilleur réglage hors échantillon."""
     *_, dedans, dehors = lignes[0]
     print()
+
+    if not _echantillon_suffisant(dedans, dehors):
+        _refus_echantillon(dedans, dehors)
+        return
 
     if dedans.expectancy_r <= 0:
         print(
