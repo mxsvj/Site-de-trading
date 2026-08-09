@@ -222,3 +222,46 @@ def balayer(
 
     cellules.sort(key=lambda c: abs(c.t), reverse=True)
     return Balayage(cellules=cellules, horizon=horizon, observations=observations)
+
+
+@dataclass
+class Confrontation:
+    """Une cellule, mesurée sur deux périodes distinctes."""
+
+    critere: str
+    valeur: str
+    dedans: Cellule
+    dehors: Cellule
+
+    @property
+    def meme_sens(self) -> bool:
+        return self.dedans.moyenne * self.dehors.moyenne > 0
+
+
+def confronter(
+    candles: Sequence[Candle], horizon: int = 15, split: float = 0.6
+) -> tuple[list[Confrontation], float]:
+    """Rejoue le balayage sur une période que la première n'a pas vue.
+
+    Un balayage retient mécaniquement ses meilleures cellules : sur soixante
+    conditions, les plus fortes le sont en partie par chance. La seule
+    question qui tranche est de savoir si la même condition produit le même
+    effet sur des données qui n'ont pas servi à la sélectionner.
+
+    Une inversion de signe hors échantillon est le verdict le plus net qui
+    soit : ce n'était pas un effet, c'était du bruit.
+    """
+    coupure = int(len(candles) * split)
+    dedans = balayer(candles[:coupure], horizon=horizon)
+    dehors = balayer(candles[coupure:], horizon=horizon)
+
+    par_cle = {(c.critere, c.valeur): c for c in dehors.cellules}
+    couples = []
+    for cellule in dedans.examinees:
+        jumelle = par_cle.get((cellule.critere, cellule.valeur))
+        if jumelle is not None and jumelle.exploitable:
+            couples.append(
+                Confrontation(cellule.critere, cellule.valeur, cellule, jumelle)
+            )
+    couples.sort(key=lambda c: abs(c.dedans.t), reverse=True)
+    return couples, dedans.seuil

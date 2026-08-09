@@ -27,7 +27,7 @@ from .data import (
 )
 from .doctor import run_diagnostics
 from .edge import MIN_ECHANTILLON as MIN_ECH
-from .edge import balayer
+from .edge import balayer, confronter
 from .filters import TradeFilters
 from .lab import MIN_TRADES as LAB_MIN
 from .lab import Journal, evaluer, juger
@@ -236,6 +236,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_edge.add_argument(
         "--top", type=int, default=15, help="cellules à afficher"
+    )
+    p_edge.add_argument(
+        "--split",
+        type=float,
+        help="confronter le balayage à une période qu'il n'a pas vue "
+        "(ex. 0.6). Sans cette option, rien n'est validé hors échantillon.",
     )
 
     p_dl = sub.add_parser("download", help="exporter un historique MT5 en CSV")
@@ -943,6 +949,9 @@ def cmd_edge_scan(args: argparse.Namespace) -> int:
     cfg = make_config(args)
     candles = load_candles(args, cfg)
 
+    if getattr(args, "split", None):
+        return _confronter_balayage(args, candles)
+
     try:
         balayage = balayer(candles, horizon=args.horizon)
     except ValueError as exc:
@@ -1010,6 +1019,74 @@ def cmd_edge_scan(args: argparse.Namespace) -> int:
         "test qui compte est de\nrejouer la même mesure sur une période que "
         "ce balayage n'a pas vue."
     )
+    return 0
+
+
+def _confronter_balayage(args: argparse.Namespace, candles) -> int:
+    """Affiche chaque condition sur la période d'étude puis sur l'autre."""
+    if not 0.0 < args.split < 1.0:
+        raise SystemExit("--split doit être strictement compris entre 0 et 1.")
+
+    try:
+        couples, seuil = confronter(candles, args.horizon, args.split)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    if not couples:
+        raise SystemExit(
+            "Aucune cellule n'atteint le minimum d'observations des deux "
+            "côtés. Réduis l'horizon ou allonge l'historique."
+        )
+
+    coupure = int(len(candles) * args.split)
+    print(
+        f"Étude    : {coupure} bougies "
+        f"({candles[0].time:%Y-%m-%d} → {candles[coupure - 1].time:%Y-%m-%d})\n"
+        f"Contrôle : {len(candles) - coupure} bougies "
+        f"({candles[coupure].time:%Y-%m-%d} → {candles[-1].time:%Y-%m-%d})\n"
+        f"{len(couples)} cellules comparables, seuil de t {seuil:.2f}.\n"
+    )
+
+    print(
+        f"{'critère':<20}{'valeur':<12}"
+        f"{'rendement':>11}{'t':>7}  │{'rendement':>11}{'t':>7}"
+    )
+    print(f"{'':<32}{'— étude —':^18}│{'— contrôle —':^18}")
+    print("-" * 76)
+    for c in couples[: args.top]:
+        marque = "!" if not c.meme_sens else " "
+        print(
+            f"{marque}{c.critere:<19}{c.valeur:<12}"
+            f"{c.dedans.moyenne:>+10.3f}A{c.dedans.t:>7.2f}  │"
+            f"{c.dehors.moyenne:>+10.3f}A{c.dehors.t:>7.2f}"
+        )
+
+    inverses = [c for c in couples[: args.top] if not c.meme_sens]
+    if inverses:
+        print(
+            f"\n! = {len(inverses)} cellule(s) changent de signe hors "
+            "échantillon.\n"
+            "  C'est le verdict le plus net qui soit : ce n'était pas un "
+            "effet, c'était du bruit."
+        )
+
+    survivants = [
+        c for c in couples
+        if abs(c.dedans.t) > seuil and abs(c.dehors.t) > seuil and c.meme_sens
+    ]
+    print()
+    if survivants:
+        print(f"{len(survivants)} cellule(s) tiennent des deux côtés :")
+        for c in survivants:
+            print(f"  {c.critere} = {c.valeur}")
+        print("C'est le seul motif sérieux de construire une stratégie dessus.")
+    else:
+        print(
+            "Aucune condition ne franchit le seuil des deux côtés.\n"
+            "Les écarts observés sur la période d'étude ne se reproduisent "
+            "pas ailleurs :\n"
+            "c'est la définition d'un artefact de sélection."
+        )
     return 0
 
 

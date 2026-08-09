@@ -97,3 +97,33 @@ def test_le_rendement_est_normalise_par_la_volatilite():
     # Exprimés en multiples d'ATR, les rendements restent d'ordre 1.
     for cellule in balayage.examinees:
         assert abs(cellule.moyenne) < 20.0
+
+
+def test_confrontation_conserve_un_effet_reel():
+    """Un avantage injecté doit survivre au passage hors échantillon."""
+    from smcbot.edge import confronter
+
+    couples, seuil = confronter(
+        _serie(60000, biais_heure=10, force=0.35), horizon=15, split=0.6
+    )
+    dix = [c for c in couples if c.critere == "heure" and c.valeur == "10h"]
+    assert dix, "la cellule injectée n'est pas comparable des deux côtés"
+    assert dix[0].meme_sens, "l'effet injecté change de signe hors échantillon"
+    assert dix[0].dedans.moyenne > 0 and dix[0].dehors.moyenne > 0
+
+
+def test_confrontation_denonce_le_bruit():
+    """Sur du bruit, les meilleures cellules ne doivent pas tenir des deux côtés."""
+    from smcbot.edge import confronter
+
+    couples, seuil = confronter(_serie(60000), horizon=15, split=0.6)
+    assert couples, "aucune cellule comparable : test sans valeur"
+    survivants = [
+        c for c in couples
+        if abs(c.dedans.t) > seuil and abs(c.dehors.t) > seuil and c.meme_sens
+    ]
+    assert not survivants, f"du bruit tient des deux côtés : {survivants[:2]}"
+
+    # Et une bonne part des meilleures cellules doit changer de signe.
+    tetes = couples[:10]
+    assert sum(1 for c in tetes if not c.meme_sens) >= 2
