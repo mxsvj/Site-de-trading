@@ -291,6 +291,119 @@ class OpeningRangeStrategy:
         return None
 
 
+# -------------------------------------------------------------- vol-break
+
+
+class VolBreakStrategy:
+    """Cassure courte, mais uniquement quand la volatilité paie le spread.
+
+    Toutes les stratégies précédentes choisissaient **où** entrer et subissaient
+    le coût qui allait avec. Celle-ci choisit d'abord **quand** : le stop est
+    proportionnel à l'ATR courant, donc la part du risque absorbée par le
+    spread est constante par construction, et on n'ouvre que si cette part
+    reste sous `max_cost`.
+
+    Concrètement, sur l'or à 24 points de spread avec un stop d'un ATR et un
+    plafond de coût à 12 %, il faut un ATR d'au moins 200 points pour qu'un
+    trade soit seulement envisagé. Les heures calmes — où le spread représente
+    la moitié du mouvement — sont écartées avant même de regarder le prix.
+
+    C'est le seul levier qui reste après avoir mesuré que la forme du signal
+    ne porte aucune information : agir sur le dénominateur du rapport
+    frais / mouvement plutôt que sur le signal lui-même.
+
+    Paramètres :
+      atr_period       période de l'ATR (défaut 14)
+      lookback         bougies dont on casse l'extrême (défaut 15)
+      buffer_atr       marge de validation de la cassure, en ATR (défaut 0.10)
+      stop_atr         distance du stop, en ATR (défaut 1.0)
+      max_cost         part maximale du risque laissée au spread (défaut 0.12)
+      max_stop_points  plafond de stop, 0 = aucun
+      tp_r             take profit en R
+    """
+
+    name = "vol-break"
+
+    def __init__(self, cfg: BotConfig | None = None):
+        self.cfg = cfg or BotConfig()
+        p = self.cfg.strategy_params
+        self.atr = Atr(int(p.get("atr_period", 14)))
+        self.lookback = int(p.get("lookback", 15))
+        self.buffer_atr = float(p.get("buffer_atr", 0.10))
+        self.stop_atr = float(p.get("stop_atr", 1.0))
+        self.max_cost = float(p.get("max_cost", 0.12))
+        self.max_stop_points = float(p.get("max_stop_points", 0.0))
+        self.tp_r = float(p.get("tp_r", self.cfg.risk.tp_r))
+
+        self._hauts: list[float] = []
+        self._bas: list[float] = []
+        self._index = -1
+
+    @property
+    def atr_minimal(self) -> float:
+        """ATR en dessous duquel le spread coûte trop cher, en points.
+
+        Le stop vaut `stop_atr` × ATR ; le spread en représente
+        `spread / (stop_atr × ATR)`. Exiger que ce rapport reste sous
+        `max_cost` revient exactement à exiger cet ATR minimal.
+        """
+        if self.max_cost <= 0 or self.stop_atr <= 0:
+            return 0.0
+        return self.cfg.symbol.spread_points / (self.stop_atr * self.max_cost)
+
+    def on_candle(self, candle: Candle, can_open: bool = True) -> Signal | None:
+        self._index += 1
+        self.atr.push(candle)
+
+        hauts, bas = list(self._hauts), list(self._bas)
+        self._hauts.append(candle.high)
+        self._bas.append(candle.low)
+        if len(self._hauts) > self.lookback:
+            self._hauts.pop(0)
+            self._bas.pop(0)
+
+        atr = self.atr.value
+        if not can_open or atr <= 0 or len(hauts) < self.lookback:
+            return None
+
+        point = self.cfg.symbol.point
+        if atr / point < self.atr_minimal:
+            return None
+
+        distance = self.stop_atr * atr
+        if self.max_stop_points > 0 and distance / point > self.max_stop_points:
+            return None
+
+        marge = self.buffer_atr * atr
+        plafond, plancher = max(hauts), min(bas)
+
+        if candle.close > plafond + marge:
+            return Signal(
+                index=self._index,
+                time=candle.time,
+                direction=BULLISH,
+                entry_level=candle.close,
+                stop=candle.close - distance,
+                tp_r=self.tp_r,
+                entry_type="market",
+                reason=f"cassure haute, ATR {atr / point:.0f} pts",
+            )
+
+        if candle.close < plancher - marge:
+            return Signal(
+                index=self._index,
+                time=candle.time,
+                direction=BEARISH,
+                entry_level=candle.close,
+                stop=candle.close + distance,
+                tp_r=self.tp_r,
+                entry_type="market",
+                reason=f"cassure basse, ATR {atr / point:.0f} pts",
+            )
+
+        return None
+
+
 # ------------------------------------------------------------------- fade
 
 

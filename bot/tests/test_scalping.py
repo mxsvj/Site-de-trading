@@ -422,3 +422,134 @@ def test_seuil_impose_par_le_plafond_de_frais():
     assert large.implied_min_stop() == pytest.approx(1000.0)
 
     assert TradeFilters(FilterConfig(), xauusd()).implied_min_stop() == 0.0
+
+
+# ------------------------------------------------------------- vol-break
+
+
+def _cfg_volbreak(**params):
+    from smcbot.config import BotConfig, xauusd
+
+    cfg = BotConfig(symbol=xauusd())
+    cfg.symbol.spread_points = 24.0
+    cfg.strategy_params = dict(params)
+    return cfg
+
+
+def test_volbreak_deduit_l_atr_minimal_du_plafond_de_cout():
+    """Le seuil de volatilité découle du spread, il n'est pas choisi.
+
+    24 points de spread, stop d'un ATR, 12 % de frais tolérés : il faut
+    24 / (1 × 0.12) = 200 points d'ATR pour qu'un trade soit envisageable.
+    """
+    from smcbot.scalping import VolBreakStrategy
+
+    strat = VolBreakStrategy(_cfg_volbreak(stop_atr=1.0, max_cost=0.12))
+    assert strat.atr_minimal == pytest.approx(200.0)
+
+    # Un stop deux fois plus large divise l'exigence de volatilité par deux.
+    large = VolBreakStrategy(_cfg_volbreak(stop_atr=2.0, max_cost=0.12))
+    assert large.atr_minimal == pytest.approx(100.0)
+
+
+def test_volbreak_refuse_les_periodes_calmes():
+    """Sous l'ATR minimal, aucune cassure n'est prise, si nette soit-elle."""
+    from smcbot.scalping import VolBreakStrategy
+
+    strat = VolBreakStrategy(
+        _cfg_volbreak(atr_period=5, lookback=5, stop_atr=1.0, max_cost=0.12)
+    )
+    base = datetime(2025, 6, 2, 8, 0)
+
+    # Bougies de 20 points d'amplitude : ATR très en dessous des 200 requis.
+    for i in range(20):
+        strat.on_candle(
+            Candle(base + timedelta(minutes=i), 2000.0, 2000.2, 2000.0, 2000.1, 1.0)
+        )
+
+    # Cassure franche mais de faible amplitude, cohérente avec un marché calme.
+    cassure = Candle(
+        base + timedelta(minutes=21), 2000.1, 2000.5, 2000.1, 2000.4, 1.0
+    )
+    assert strat.on_candle(cassure) is None
+    assert strat.atr.value / 0.01 < strat.atr_minimal
+
+
+def test_volbreak_prend_la_cassure_quand_la_volatilite_suffit():
+    from smcbot.scalping import VolBreakStrategy
+    from smcbot.smc import BULLISH
+
+    strat = VolBreakStrategy(
+        _cfg_volbreak(atr_period=5, lookback=5, stop_atr=1.0, max_cost=0.12)
+    )
+    base = datetime(2025, 6, 2, 8, 0)
+
+    # Bougies de 400 points d'amplitude : ATR bien au-dessus des 200 requis.
+    prix = 2000.0
+    for i in range(20):
+        strat.on_candle(
+            Candle(base + timedelta(minutes=i), prix, prix + 4.0, prix, prix + 1.0, 1.0)
+        )
+
+    haut = max(strat._hauts)
+    cassure = Candle(
+        base + timedelta(minutes=21), prix, haut + 12.0, prix, haut + 10.0, 1.0
+    )
+    signal = strat.on_candle(cassure)
+    assert signal is not None
+    assert signal.direction == BULLISH
+    assert signal.entry_type == "market"
+    # Le stop vaut un ATR, donc le spread en représente bien moins de 12 %.
+    distance = abs(signal.entry_level - signal.stop) / 0.01
+    assert 24.0 / distance < 0.12
+
+
+def test_volbreak_respecte_le_plafond_de_stop():
+    """Un stop au-delà du plafond serait refusé par le volume : autant l'écarter."""
+    from smcbot.scalping import VolBreakStrategy
+
+    strat = VolBreakStrategy(
+        _cfg_volbreak(
+            atr_period=5, lookback=5, stop_atr=1.0, max_cost=0.12,
+            max_stop_points=100.0,
+        )
+    )
+    base = datetime(2025, 6, 2, 8, 0)
+    prix = 2000.0
+    for i in range(20):
+        strat.on_candle(
+            Candle(base + timedelta(minutes=i), prix, prix + 4.0, prix, prix + 1.0, 1.0)
+        )
+
+    haut = max(strat._hauts)
+    cassure = Candle(
+        base + timedelta(minutes=21), prix, haut + 12.0, prix, haut + 10.0, 1.0
+    )
+    assert strat.on_candle(cassure) is None
+
+
+def test_volbreak_ouvre_la_porte_sur_une_bougie_explosive():
+    """Une seule bougie violente suffit à franchir le seuil — c'est voulu.
+
+    L'ATR est mis à jour avec la bougie en cours avant d'évaluer le seuil. Ce
+    n'est pas du lookahead : la bougie est close au moment de la décision. Et
+    c'est exactement le régime qu'on cherche — un pic de volatilité est le seul
+    moment où 24 points de spread pèsent peu.
+    """
+    from smcbot.scalping import VolBreakStrategy
+
+    strat = VolBreakStrategy(
+        _cfg_volbreak(atr_period=5, lookback=5, stop_atr=1.0, max_cost=0.12)
+    )
+    base = datetime(2025, 6, 2, 8, 0)
+    for i in range(20):
+        strat.on_candle(
+            Candle(base + timedelta(minutes=i), 2000.0, 2000.2, 2000.0, 2000.1, 1.0)
+        )
+
+    explosive = Candle(
+        base + timedelta(minutes=21), 2000.1, 2010.0, 2000.1, 2009.0, 1.0
+    )
+    signal = strat.on_candle(explosive)
+    assert signal is not None
+    assert strat.atr.value / 0.01 >= strat.atr_minimal

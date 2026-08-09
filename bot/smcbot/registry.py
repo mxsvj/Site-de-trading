@@ -11,7 +11,12 @@ from typing import Protocol
 
 from .config import BotConfig
 from .data import Candle
-from .scalping import AsianSweepStrategy, FadeStrategy, OpeningRangeStrategy
+from .scalping import (
+    AsianSweepStrategy,
+    FadeStrategy,
+    OpeningRangeStrategy,
+    VolBreakStrategy,
+)
 from .strategy import Signal, SmcStrategy
 
 
@@ -30,6 +35,7 @@ STRATEGIES: dict[str, type] = {
     "asian-sweep": AsianSweepStrategy,
     "orb": OpeningRangeStrategy,
     "fade": FadeStrategy,
+    "vol-break": VolBreakStrategy,
 }
 
 
