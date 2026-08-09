@@ -570,3 +570,47 @@ def test_decomposition_ne_conclut_pas_sur_un_avantage_d_apprentissage(capsys):
     assert "ne vaut rien en lui-même" in sortie
     assert "n'existe qu'en apprentissage" in sortie
     assert "+0.071" in sortie and "-0.041" in sortie
+
+
+def test_strategy_param_atteint_la_strategie(capsys):
+    """--strategy-param doit arriver jusqu'à la stratégie, pas être ignoré."""
+    from smcbot.cli import build_parser, make_config
+
+    args = build_parser().parse_args([
+        "backtest", "--demo", "--symbol-preset", "xauusd",
+        "--strategy-param", "min_atr_points=200",
+        "--strategy-param", "stop_atr=1.5",
+    ])
+    cfg = make_config(args)
+    assert cfg.strategy_params["min_atr_points"] == 200.0
+    assert cfg.strategy_params["stop_atr"] == 1.5
+
+
+def test_strategy_param_mal_forme_est_refuse():
+    from smcbot.cli import build_parser, make_config
+
+    args = build_parser().parse_args([
+        "backtest", "--demo", "--strategy-param", "min_atr_points",
+    ])
+    with pytest.raises(SystemExit) as sortie:
+        make_config(args)
+    assert "NOM=VALEUR" in str(sortie.value)
+
+
+def test_seuil_fige_survit_a_un_spread_nul():
+    """Décomposer la perte exige de garder la même population de trades.
+
+    Sans figeage, rejouer à spread nul ramènerait le seuil de volatilité à
+    zéro : toutes les heures calmes entreraient, et on comparerait deux
+    stratégies différentes au lieu de mesurer un coût.
+    """
+    from smcbot.config import BotConfig, xauusd
+    from smcbot.scalping import VolBreakStrategy
+
+    cfg = BotConfig(symbol=xauusd())
+    cfg.symbol.spread_points = 0.0
+    cfg.strategy_params = {"min_atr_points": 200.0}
+    assert VolBreakStrategy(cfg).atr_minimal == 200.0
+
+    cfg.strategy_params = {}
+    assert VolBreakStrategy(cfg).atr_minimal == 0.0

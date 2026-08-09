@@ -100,6 +100,13 @@ def build_parser() -> argparse.ArgumentParser:
         cf.add_argument("--sl-buffer", type=float, help="marge du stop en points")
         cf.add_argument("--breakeven", type=float, help="passage à BE à N R (0=off)")
         cf.add_argument(
+            "--strategy-param",
+            action="append",
+            metavar="NOM=VALEUR",
+            help="paramètre propre à la stratégie, répétable "
+            "(ex. --strategy-param min_atr_points=200)",
+        )
+        cf.add_argument(
             "--time-exit",
             type=int,
             help="sortie sur le temps : clôture au marché après N bougies (0=off)",
@@ -334,6 +341,18 @@ def make_config(args: argparse.Namespace) -> BotConfig:
         cfg.risk.breakeven_at_r = args.breakeven
     if getattr(args, "time_exit", None) is not None:
         cfg.risk.max_bars_in_trade = args.time_exit
+    for brut in getattr(args, "strategy_param", None) or []:
+        if "=" not in brut:
+            raise SystemExit(
+                f"--strategy-param attend NOM=VALEUR, reçu : {brut!r}"
+            )
+        nom, _, valeur = brut.partition("=")
+        nom = nom.strip()
+        valeur = valeur.strip()
+        try:
+            cfg.strategy_params[nom] = float(valeur)
+        except ValueError:
+            cfg.strategy_params[nom] = valeur
     if getattr(args, "swing", None) is not None:
         cfg.smc.swing_lookback = args.swing
     if getattr(args, "spread", None) is not None:

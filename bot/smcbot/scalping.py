@@ -332,6 +332,7 @@ class VolBreakStrategy:
         self.buffer_atr = float(p.get("buffer_atr", 0.10))
         self.stop_atr = float(p.get("stop_atr", 1.0))
         self.max_cost = float(p.get("max_cost", 0.12))
+        self.min_atr_override = float(p.get("min_atr_points", 0.0))
         self.max_stop_points = float(p.get("max_stop_points", 0.0))
         self.tp_r = float(p.get("tp_r", self.cfg.risk.tp_r))
 
@@ -346,7 +347,15 @@ class VolBreakStrategy:
         Le stop vaut `stop_atr` × ATR ; le spread en représente
         `spread / (stop_atr × ATR)`. Exiger que ce rapport reste sous
         `max_cost` revient exactement à exiger cet ATR minimal.
+
+        `min_atr_points` fige ce seuil au lieu de le déduire. C'est
+        indispensable pour décomposer la perte : rejouer à spread nul
+        ramènerait sinon le seuil à zéro, ouvrirait la porte à toutes les
+        heures calmes, et comparerait deux populations de trades différentes
+        au lieu de mesurer un coût.
         """
+        if self.min_atr_override > 0:
+            return self.min_atr_override
         if self.max_cost <= 0 or self.stop_atr <= 0:
             return 0.0
         return self.cfg.symbol.spread_points / (self.stop_atr * self.max_cost)
