@@ -108,6 +108,14 @@ class RiskConfig:
     breakeven_at_r: float = 0.0
     """Passage du stop à l'entrée à N R (0 = désactivé)."""
 
+    max_bars_in_trade: int = 0
+    """Sortie sur le temps : clôture au marché après N bougies (0 = désactivé).
+
+    En scalping, un setup qui n'a pas travaillé rapidement est généralement
+    invalidé : le conserver revient à porter le risque sans l'espérance qui le
+    justifiait. C'est une sortie sur le temps écoulé, pas sur le prix — elle
+    peut donc clôturer en perte comme en gain."""
+
 
 @dataclass
 class FilterConfig:

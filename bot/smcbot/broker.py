@@ -130,6 +130,7 @@ class PaperBroker:
         self._roll_day(candle)
         self._session_open = self.filters.session_allows(candle.time)
         closed = self._check_exits(candle, index)
+        closed += self._apply_time_exit(candle, index)
         self._apply_breakeven(candle)
         self.equity_curve.append(
             EquityPoint(candle.time, self.balance, self.equity(candle))
@@ -291,6 +292,31 @@ class PaperBroker:
         self.trades.append(trade)
         self._check_daily_limit()
         return trade
+
+    def _apply_time_exit(self, candle: Candle, index: int) -> list[Trade]:
+        """Clôture les positions qui durent depuis trop de bougies.
+
+        Appliquée **après** les stops et les objectifs : si le prix a touché
+        l'un des deux pendant la bougie, c'est lui qui a clôturé la position,
+        pas l'horloge. Sortir sur le temps d'abord reviendrait à s'accorder un
+        prix de clôture alors que le stop avait déjà sauté.
+
+        La sortie se fait à la clôture de la bougie, au prix du marché — donc
+        en payant le spread comme n'importe quelle sortie discrétionnaire.
+        """
+        limite = self.cfg.risk.max_bars_in_trade
+        if limite <= 0:
+            return []
+
+        closed: list[Trade] = []
+        for pos in list(self.positions):
+            if index - pos.open_index < limite:
+                continue
+            price = (
+                candle.close if pos.direction == BULLISH else candle.close + self.spread
+            )
+            closed.append(self._close(pos, price, candle, index, "temps"))
+        return closed
 
     def _apply_breakeven(self, candle: Candle) -> None:
         """Remonte le stop à l'entrée une fois le seuil en R atteint.

@@ -100,6 +100,11 @@ def build_parser() -> argparse.ArgumentParser:
         cf.add_argument("--sl-buffer", type=float, help="marge du stop en points")
         cf.add_argument("--breakeven", type=float, help="passage à BE à N R (0=off)")
         cf.add_argument(
+            "--time-exit",
+            type=int,
+            help="sortie sur le temps : clôture au marché après N bougies (0=off)",
+        )
+        cf.add_argument(
             "--no-fvg",
             action="store_true",
             help="ne pas exiger de FVG dans la jambe impulsive",
@@ -251,6 +256,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_lab.add_argument(
         "--grid-tp", default="1.5,2,3", help="valeurs de tp_r à tester"
     )
+    p_lab.add_argument(
+        "--grid-time-exit",
+        help="valeurs de sortie sur le temps à tester, ex. 0,6,12 — 0 = aucune",
+    )
     p_lab.add_argument("--split", type=float, default=0.6)
     p_lab.add_argument(
         "--journal",
@@ -323,6 +332,8 @@ def make_config(args: argparse.Namespace) -> BotConfig:
         cfg.risk.sl_buffer_points = args.sl_buffer
     if getattr(args, "breakeven", None) is not None:
         cfg.risk.breakeven_at_r = args.breakeven
+    if getattr(args, "time_exit", None) is not None:
+        cfg.risk.max_bars_in_trade = args.time_exit
     if getattr(args, "swing", None) is not None:
         cfg.smc.swing_lookback = args.swing
     if getattr(args, "spread", None) is not None:
@@ -1075,11 +1086,19 @@ def cmd_lab(args: argparse.Namespace) -> int:
         )
 
     tps = _grille(args.grid_tp, float)
-    candidates = [
-        (nom, {"tp_r": tp}, f"{nom} tp={tp:g}")
-        for nom in strategies
-        for tp in tps
-    ]
+    barres = (
+        _grille(args.grid_time_exit, int) if args.grid_time_exit else [None]
+    )
+    candidates = []
+    for nom in strategies:
+        for tp in tps:
+            for limite in barres:
+                params: dict = {"tp_r": tp}
+                label = f"{nom} tp={tp:g}"
+                if limite is not None:
+                    params["max_bars_in_trade"] = limite
+                    label += f" temps={limite or 'off'}"
+                candidates.append((nom, params, label))
 
     chemin = Path(args.journal) if args.journal else None
     if chemin and args.reset_journal and chemin.exists():

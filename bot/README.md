@@ -432,6 +432,27 @@ C'est une projection à effet constant, pas une promesse — mais elle dit quell
 est la seule action utile : allonger l'historique. Multiplier les réglages ne
 ferait que relever la barre.
 
+### Sortie sur le temps
+
+```bash
+python -m smcbot lab --csv data/xauusd_m5.csv --grid-time-exit 0,3,6,12,24
+```
+
+Toutes les stratégies sortent sur un multiple fixe du risque. `--time-exit N`
+ajoute une sortie sur le **temps écoulé** : au bout de N bougies, la position est
+clôturée au marché, gagnante ou perdante. En scalping, un setup qui n'a pas
+travaillé rapidement est généralement invalidé, et le conserver revient à porter
+le risque sans l'espérance qui le justifiait.
+
+Deux points de mise en œuvre qui changent le résultat :
+
+- La sortie sur le temps est appliquée **après** les stops et les objectifs. Si
+  le prix a touché l'un des deux pendant la bougie, c'est lui qui a clôturé la
+  position, pas l'horloge. L'inverse s'accorderait un prix de clôture alors que
+  le stop avait déjà sauté — un gain silencieux sur chaque perte.
+- La clôture se fait au marché, donc en payant le spread, comme toute sortie
+  discrétionnaire.
+
 ### Muette ou bâillonnée : deux façons de n'avoir aucun trade
 
 Une candidate peut manquer de trades pour deux raisons opposées, que le seul

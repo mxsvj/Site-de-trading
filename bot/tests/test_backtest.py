@@ -8,7 +8,7 @@ import pytest
 
 from smcbot.backtest import run_backtest
 from smcbot.broker import PaperBroker
-from smcbot.config import BotConfig, RiskConfig, SmcConfig, SymbolSpec
+from smcbot.config import BotConfig, RiskConfig, SmcConfig, SymbolSpec, xauusd
 from smcbot.data import Candle, ReplayFeed, synthetic_series
 from smcbot.paper import PaperTrader
 from smcbot.smc import BEARISH, BULLISH, OrderBlock
@@ -437,3 +437,102 @@ def test_warmup_nul_equivaut_a_un_backtest_normal(demo_candles):
     b = run_backtest(demo_candles, BotConfig(), warmup=0)
     assert a.report.trades == b.report.trades
     assert a.report.final_balance == pytest.approx(b.report.final_balance)
+
+def _config_sortie_temps(limite: int) -> BotConfig:
+    cfg = BotConfig(symbol=xauusd())
+    cfg.risk.max_bars_in_trade = limite
+    cfg.risk.initial_balance = 10_000.0
+    cfg.filters.sessions = []
+    cfg.filters.min_stop_points = 0.0
+    cfg.filters.max_cost_ratio = 1.0
+    return cfg
+
+
+def _bougie(t: int, prix: float) -> Candle:
+    return Candle(
+        time=datetime(2025, 1, 6, 8, 0) + timedelta(minutes=5 * t),
+        open=prix,
+        high=prix + 0.5,
+        low=prix - 0.5,
+        close=prix,
+        volume=1.0,
+    )
+
+
+def test_sortie_sur_le_temps_cloture_apres_n_bougies():
+    """Un setup qui n'a pas travaillé est clôturé, gagnant ou perdant."""
+    broker = PaperBroker(_config_sortie_temps(3))
+    signal = Signal(
+        index=0,
+        time=_bougie(0, 2000.0).time,
+        direction=BULLISH,
+        entry_level=2000.0,
+        stop=1990.0,
+        tp_r=2.0,
+        entry_type="market",
+        reason="test",
+    )
+
+    broker.on_candle(_bougie(0, 2000.0), 0)
+    assert broker.execute(signal, _bougie(0, 2000.0), 0) is not None
+
+    for i in (1, 2):
+        broker.on_candle(_bougie(i, 2000.0), i)
+        assert broker.positions, f"clôture trop tôt à la bougie {i}"
+
+    broker.on_candle(_bougie(3, 2001.0), 3)
+    assert not broker.positions
+    assert broker.trades[-1].exit_reason == "temps"
+
+
+def test_sortie_sur_le_temps_desactivee_par_defaut():
+    broker = PaperBroker(_config_sortie_temps(0))
+    signal = Signal(
+        index=0,
+        time=_bougie(0, 2000.0).time,
+        direction=BULLISH,
+        entry_level=2000.0,
+        stop=1990.0,
+        tp_r=2.0,
+        entry_type="market",
+        reason="test",
+    )
+    broker.on_candle(_bougie(0, 2000.0), 0)
+    broker.execute(signal, _bougie(0, 2000.0), 0)
+
+    for i in range(1, 40):
+        broker.on_candle(_bougie(i, 2000.0), i)
+    assert broker.positions, "sans limite, la position doit rester ouverte"
+
+
+def test_le_stop_prime_sur_l_horloge():
+    """Si le stop saute pendant la bougie, c'est lui qui clôture.
+
+    Sortir sur le temps d'abord s'accorderait un prix de clôture alors que le
+    stop avait déjà été touché — un gain silencieux sur chaque perte.
+    """
+    broker = PaperBroker(_config_sortie_temps(2))
+    signal = Signal(
+        index=0,
+        time=_bougie(0, 2000.0).time,
+        direction=BULLISH,
+        entry_level=2000.0,
+        stop=1990.0,
+        tp_r=2.0,
+        entry_type="market",
+        reason="test",
+    )
+    broker.on_candle(_bougie(0, 2000.0), 0)
+    broker.execute(signal, _bougie(0, 2000.0), 0)
+    broker.on_candle(_bougie(1, 2000.0), 1)
+
+    effondrement = Candle(
+        time=_bougie(2, 1985.0).time,
+        open=2000.0,
+        high=2000.0,
+        low=1985.0,
+        close=1995.0,
+        volume=1.0,
+    )
+    broker.on_candle(effondrement, 2)
+    assert broker.trades[-1].exit_reason == "SL"

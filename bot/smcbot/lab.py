@@ -202,6 +202,11 @@ def evaluer(
         # `strategy_params` l'ignorent en silence et la grille ne teste rien.
         if "tp_r" in params:
             cfg.risk.tp_r = float(params["tp_r"])
+        # Même piège : la sortie sur le temps est portée par le courtier, pas
+        # par la stratégie. Laissée dans `strategy_params`, elle serait ignorée
+        # en silence et la grille comparerait des réglages identiques.
+        if "max_bars_in_trade" in params:
+            cfg.risk.max_bars_in_trade = int(params["max_bars_in_trade"])
 
         dedans = run_backtest(apprentissage, cfg)
         dehors = run_backtest(validation, cfg, warmup=decalage)
