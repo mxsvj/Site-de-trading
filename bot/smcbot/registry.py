@@ -14,6 +14,7 @@ from .data import Candle
 from .scalping import (
     AsianSweepStrategy,
     FadeStrategy,
+    LeadLagStrategy,
     OpeningRangeStrategy,
     VolBreakStrategy,
 )
@@ -36,6 +37,7 @@ STRATEGIES: dict[str, type] = {
     "orb": OpeningRangeStrategy,
     "fade": FadeStrategy,
     "vol-break": VolBreakStrategy,
+    "lead-lag": LeadLagStrategy,
 }
 
 

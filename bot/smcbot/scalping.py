@@ -12,12 +12,24 @@ la distance de son stop pour que les filtres de coût puissent trancher.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 
 from .config import BotConfig
 from .data import Candle
 from .smc import BEARISH, BULLISH
 from .strategy import Signal
+
+
+def _cle_temps(moment: datetime) -> datetime:
+    """Clé comparable entre deux séries, quelle que soit leur conscience du fuseau.
+
+    Une série chargée avec fuseau et une autre sans ne se croiseraient jamais :
+    tous les rapprochements échoueraient, la stratégie ne produirait aucun
+    signal, et le silence passerait pour une absence de setups.
+    """
+    if moment.tzinfo is not None:
+        return moment.astimezone(timezone.utc).replace(tzinfo=None)
+    return moment
 
 
 def _parse_hhmm(texte: str) -> time:
@@ -410,6 +422,193 @@ class VolBreakStrategy:
                 reason=f"cassure basse, ATR {atr / point:.0f} pts",
             )
 
+        return None
+
+
+# --------------------------------------------------------------- lead-lag
+
+
+class LeadLagStrategy:
+    """Retard de l'or sur un marché plus liquide lié au dollar.
+
+    Toutes les autres stratégies de ce dépôt lisent **le prix passé de l'or**,
+    et cinq mesures indépendantes disent que cette source ne contient aucune
+    information directionnelle. Celle-ci change de source.
+
+    L'or est coté en dollars : quand le dollar se déprécie, l'or monte
+    mécaniquement. Ce n'est pas une figure graphique, c'est de l'arithmétique
+    de cotation. Or l'EUR/USD traite des volumes bien supérieurs à ceux de
+    l'or : l'hypothèse est qu'il intègre une information sur le dollar
+    **avant** l'or, et que le retard se rattrape en quelques minutes.
+
+    On compare donc les deux variations récentes, chacune normalisée par sa
+    propre volatilité — sans quoi on comparerait des pourcentages qui n'ont
+    pas la même échelle. Quand la référence a bougé et pas l'or, on parie sur
+    le rattrapage.
+
+    Paramètres :
+      reference_csv        série de référence (ex. data/eurusd_m1.csv)
+      reference_tz_shift   décalage à lui appliquer, en heures
+      correlation_sign     +1 si référence et or montent ensemble
+      lookback             bougies sur lesquelles la variation est mesurée
+      window               profondeur de la normalisation
+      min_divergence       écart minimal, en écarts-types
+      atr_period, stop_atr, max_cost, min_atr_points, tp_r  — comme vol-break
+    """
+
+    name = "lead-lag"
+
+    def __init__(self, cfg: BotConfig | None = None):
+        from .data import load_csv
+        from .quality import shift_times
+
+        self.cfg = cfg or BotConfig()
+        p = self.cfg.strategy_params
+
+        chemin = str(p.get("reference_csv", "")).strip()
+        if not chemin:
+            raise ValueError(
+                "lead-lag exige une série de référence : "
+                "--strategy-param reference_csv=data/eurusd_m1.csv"
+            )
+        reference = load_csv(chemin)
+        decalage = float(p.get("reference_tz_shift", 0.0))
+        if decalage:
+            reference = shift_times(reference, decalage)
+        self.reference = {_cle_temps(c.time): c.close for c in reference}
+        if not self.reference:
+            raise ValueError(f"Série de référence vide : {chemin}")
+
+        self.signe = float(p.get("correlation_sign", 1.0))
+        self.lookback = int(p.get("lookback", 5))
+        self.window = int(p.get("window", 200))
+        self.min_divergence = float(p.get("min_divergence", 1.5))
+
+        self.atr = Atr(int(p.get("atr_period", 14)))
+        self.stop_atr = float(p.get("stop_atr", 1.0))
+        self.max_cost = float(p.get("max_cost", 0.12))
+        self.min_atr_override = float(p.get("min_atr_points", 0.0))
+        self.max_stop_points = float(p.get("max_stop_points", 0.0))
+        self.tp_r = float(p.get("tp_r", self.cfg.risk.tp_r))
+
+        self._or: list[float] = []
+        self._ref: list[float] = []
+        self._var_or: list[float] = []
+        self._var_ref: list[float] = []
+        self._index = -1
+
+        self.consultations = 0
+        self.manques = 0
+        self._alerte_donnee = False
+
+    @property
+    def atr_minimal(self) -> float:
+        if self.min_atr_override > 0:
+            return self.min_atr_override
+        if self.max_cost <= 0 or self.stop_atr <= 0:
+            return 0.0
+        return self.cfg.symbol.spread_points / (self.stop_atr * self.max_cost)
+
+    def _z(self, valeurs: list[float]) -> float:
+        """Dernière variation, en écarts-types de ses propres variations.
+
+        Normaliser est indispensable : une variation de 0,1 % sur l'EUR/USD et
+        0,1 % sur l'or ne représentent pas du tout le même évènement.
+        """
+        if len(valeurs) < self.window:
+            return 0.0
+        recent = valeurs[-self.window:]
+        moyenne = sum(recent) / len(recent)
+        variance = sum((v - moyenne) ** 2 for v in recent) / len(recent)
+        ecart = variance ** 0.5
+        # Une série quasi constante a un écart-type numériquement non nul mais
+        # dénué de sens : le rapport exploserait et fabriquerait des signaux à
+        # partir de bruit d'arrondi. Cas réel quand un marché est à l'arrêt.
+        echelle = max((abs(v) for v in recent), default=0.0)
+        if ecart <= 1e-12 or ecart <= 1e-9 * echelle:
+            return 0.0
+        return (valeurs[-1] - moyenne) / ecart
+
+    def _prevenir_si_desaligne(self) -> None:
+        """Deux séries mal alignées ne produiraient aucun signal, en silence."""
+        if self._alerte_donnee or self.consultations < 500:
+            return
+        if self.manques > self.consultations / 2:
+            self._alerte_donnee = True
+            print(
+                f"⚠ lead-lag : {self.manques} horodatages sur "
+                f"{self.consultations} n'ont aucune correspondance dans la "
+                f"série de référence.\n"
+                f"  Les deux séries ne sont pas alignées — décalage horaire "
+                f"différent, ou unités de temps différentes.\n"
+                f"  Tout résultat obtenu ainsi serait vide de sens."
+            )
+
+    def on_candle(self, candle: Candle, can_open: bool = True) -> Signal | None:
+        self._index += 1
+        self.atr.push(candle)
+
+        self.consultations += 1
+        ref = self.reference.get(_cle_temps(candle.time))
+        if ref is None:
+            self.manques += 1
+            self._prevenir_si_desaligne()
+            return None
+
+        self._or.append(candle.close)
+        self._ref.append(ref)
+        if len(self._or) > self.lookback + 1:
+            self._or.pop(0)
+            self._ref.pop(0)
+        if len(self._or) <= self.lookback:
+            return None
+
+        # Variations relatives sur la fenêtre, pour que les deux séries soient
+        # comparables malgré des niveaux de prix sans commune mesure.
+        if self._or[0] <= 0 or self._ref[0] <= 0:
+            return None
+        self._var_or.append((self._or[-1] - self._or[0]) / self._or[0])
+        self._var_ref.append((self._ref[-1] - self._ref[0]) / self._ref[0])
+        if len(self._var_or) > self.window:
+            self._var_or.pop(0)
+            self._var_ref.pop(0)
+
+        atr = self.atr.value
+        if not can_open or atr <= 0:
+            return None
+
+        point = self.cfg.symbol.point
+        if atr / point < self.atr_minimal:
+            return None
+
+        distance = self.stop_atr * atr
+        if self.max_stop_points > 0 and distance / point > self.max_stop_points:
+            return None
+
+        divergence = self.signe * self._z(self._var_ref) - self._z(self._var_or)
+
+        if divergence >= self.min_divergence:
+            return Signal(
+                index=self._index,
+                time=candle.time,
+                direction=BULLISH,
+                entry_level=candle.close,
+                stop=candle.close - distance,
+                tp_r=self.tp_r,
+                entry_type="market",
+                reason=f"or en retard de {divergence:.1f} ecarts-types",
+            )
+        if divergence <= -self.min_divergence:
+            return Signal(
+                index=self._index,
+                time=candle.time,
+                direction=BEARISH,
+                entry_level=candle.close,
+                stop=candle.close + distance,
+                tp_r=self.tp_r,
+                entry_type="market",
+                reason=f"or en avance de {abs(divergence):.1f} ecarts-types",
+            )
         return None
 
 

@@ -553,3 +553,80 @@ def test_volbreak_ouvre_la_porte_sur_une_bougie_explosive():
     signal = strat.on_candle(explosive)
     assert signal is not None
     assert strat.atr.value / 0.01 >= strat.atr_minimal
+
+
+# -------------------------------------------------------------- lead-lag
+
+
+def _serie_reference(tmp_path, decalage_minutes=0, n=800):
+    """Série de référence plate, sur laquelle on injectera des mouvements."""
+    from smcbot.data import Candle as C, save_csv
+
+    base = datetime(2025, 6, 2, 0, 0) + timedelta(minutes=decalage_minutes)
+    bougies = [
+        C(base + timedelta(minutes=i), 1.10, 1.1001, 1.0999, 1.10, 1.0)
+        for i in range(n)
+    ]
+    chemin = tmp_path / f"ref{decalage_minutes}.csv"
+    save_csv(bougies, chemin)
+    return chemin
+
+
+def _cfg_leadlag(chemin, **params):
+    from smcbot.config import BotConfig, xauusd
+
+    cfg = BotConfig(symbol=xauusd())
+    cfg.symbol.spread_points = 24.0
+    cfg.strategy_params = {"reference_csv": str(chemin), **params}
+    return cfg
+
+
+def test_leadlag_previent_quand_les_series_sont_desalignees(tmp_path, capsys):
+    """Deux séries décalées ne se croisent jamais — et le disent.
+
+    Sans avertissement, un décalage horaire oublié produirait zéro signal, et
+    le silence passerait pour une absence de setups plutôt que pour une
+    erreur de configuration.
+    """
+    from smcbot.scalping import LeadLagStrategy
+
+    strat = LeadLagStrategy(_cfg_leadlag(_serie_reference(tmp_path, 0)))
+    # Bougies d'or décalées d'une heure : aucune correspondance possible.
+    base = datetime(2025, 6, 2, 12, 0)
+    for i in range(600):
+        strat.on_candle(
+            Candle(base + timedelta(minutes=i), 2000.0, 2001.0, 1999.0, 2000.0, 1.0)
+        )
+
+    sortie = capsys.readouterr().out
+    assert "ne sont pas alignées" in sortie
+    assert strat.manques > 500
+
+
+def test_leadlag_se_tait_quand_les_series_sont_alignees(tmp_path, capsys):
+    from smcbot.scalping import LeadLagStrategy
+
+    strat = LeadLagStrategy(_cfg_leadlag(_serie_reference(tmp_path, 0)))
+    base = datetime(2025, 6, 2, 0, 0)
+    for i in range(600):
+        strat.on_candle(
+            Candle(base + timedelta(minutes=i), 2000.0, 2001.0, 1999.0, 2000.0, 1.0)
+        )
+    assert strat.manques == 0
+    assert "ne sont pas alignées" not in capsys.readouterr().out
+
+
+def test_leadlag_normalise_par_la_volatilite_de_chaque_serie(tmp_path):
+    """0,1 % sur l'EUR/USD et 0,1 % sur l'or ne sont pas le même évènement.
+
+    Comparer les variations brutes reviendrait à confondre deux échelles ; le
+    signal doit porter sur des écarts-types, pas sur des pourcentages.
+    """
+    from smcbot.scalping import LeadLagStrategy
+
+    strat = LeadLagStrategy(_cfg_leadlag(_serie_reference(tmp_path, 0), window=50))
+    # Une série de variations identiques a un écart-type nul : aucun z-score.
+    assert strat._z([0.001] * 50) == 0.0
+    # Une valeur aberrante en fin de série ressort largement.
+    valeurs = [0.0] * 49 + [0.01]
+    assert strat._z(valeurs) > 5.0

@@ -31,11 +31,35 @@ def m1(minute: int, o: float, h: float, l: float, c: float) -> Candle:
 # ------------------------------------------------------------------ registre
 
 
-def test_toutes_les_strategies_s_instancient():
+# `lead-lag` lit une seconde série : le registre ne peut pas l'instancier sans.
+def _params_pour(nom: str, tmp_path) -> dict:
+    if nom != "lead-lag":
+        return {}
+    from smcbot.data import save_csv, synthetic_series as serie
+
+    chemin = tmp_path / "reference.csv"
+    save_csv(serie(6000, start=1.10, point=0.00001, timeframe_minutes=1), chemin)
+    return {"reference_csv": str(chemin)}
+
+
+def test_toutes_les_strategies_s_instancient(tmp_path):
     for nom in STRATEGIES:
         cfg = BotConfig(strategy=nom, symbol=xauusd())
+        cfg.strategy_params = _params_pour(nom, tmp_path)
         strategie = make_strategy(cfg)
         assert strategie.name == nom
+
+
+def test_lead_lag_refuse_de_demarrer_sans_reference():
+    """Sans série de référence, la stratégie n'a aucune information.
+
+    Retourner silencieusement zéro signal ferait passer une configuration
+    incomplète pour une absence de setups.
+    """
+    cfg = BotConfig(strategy="lead-lag", symbol=xauusd())
+    with pytest.raises(ValueError) as erreur:
+        make_strategy(cfg)
+    assert "reference_csv" in str(erreur.value)
 
 
 def test_strategie_inconnue_est_refusee():
@@ -45,9 +69,10 @@ def test_strategie_inconnue_est_refusee():
 
 
 @pytest.mark.parametrize("nom", sorted(STRATEGIES))
-def test_chaque_strategie_tourne_de_bout_en_bout(nom):
+def test_chaque_strategie_tourne_de_bout_en_bout(nom, tmp_path):
     """Aucune ne doit planter, ni produire un signal incohérent."""
     cfg = BotConfig(strategy=nom, symbol=xauusd(), timeframe="M1")
+    cfg.strategy_params = _params_pour(nom, tmp_path)
     cfg.filters.sessions = []
     cfg.filters.weekdays = []
     candles = synthetic_series(6000, start=2650.0, point=0.01, timeframe_minutes=1)

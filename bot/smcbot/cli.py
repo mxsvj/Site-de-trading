@@ -354,6 +354,14 @@ def make_config(args: argparse.Namespace) -> BotConfig:
         cfg.risk.max_daily_loss_pct = args.max_daily_loss
     if getattr(args, "strategy", None):
         cfg.strategy = args.strategy
+
+    # Une série de référence doit subir le même décalage horaire que les
+    # bougies principales : sinon les deux ne se croisent jamais, la stratégie
+    # ne produit aucun signal, et le silence passe pour une absence de setup.
+    if "reference_csv" in cfg.strategy_params:
+        cfg.strategy_params.setdefault(
+            "reference_tz_shift", float(getattr(args, "tz_shift", 0.0) or 0.0)
+        )
     if getattr(args, "time_exit", None) is not None:
         cfg.risk.max_bars_in_trade = args.time_exit
     for brut in getattr(args, "strategy_param", None) or []:
