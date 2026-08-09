@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Historiques de marché : volumineux, et retéléchargeables avec `download`.
+bot/data/*.csv
+
+# État du paper trading en cours.
+bot/runtime/paper_state.json
+bot/runtime/paper.log
+bot/runtime/STOP
