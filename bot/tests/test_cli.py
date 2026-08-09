@@ -614,3 +614,37 @@ def test_seuil_fige_survit_a_un_spread_nul():
 
     cfg.strategy_params = {}
     assert VolBreakStrategy(cfg).atr_minimal == 0.0
+
+
+def test_max_daily_loss_desactivable():
+    from smcbot.cli import build_parser, make_config
+
+    args = build_parser().parse_args([
+        "backtest", "--demo", "--max-daily-loss", "0",
+    ])
+    assert make_config(args).risk.max_daily_loss_pct == 0.0
+
+
+def test_spread_nul_avertit_du_verrou_journalier(capsys):
+    """Le piège qui a invalidé deux décompositions doit être signalé.
+
+    Sans frais la stratégie perd moins, déclenche moins le verrou de perte
+    journalière, et trade donc bien plus. Comparer les deux runs revient à
+    comparer deux populations — avec un écart flatteur.
+    """
+    from smcbot.cli import _avertir_decomposition, build_parser, make_config
+
+    args = build_parser().parse_args(["backtest", "--demo", "--spread", "0"])
+    cfg = make_config(args)
+    assert cfg.risk.max_daily_loss_pct > 0
+    _avertir_decomposition(args, cfg)
+    sortie = capsys.readouterr().out
+    assert "--max-daily-loss 0" in sortie
+    assert "mêmes trades" in sortie
+
+    # Verrou désactivé : plus rien à signaler.
+    args = build_parser().parse_args([
+        "backtest", "--demo", "--spread", "0", "--max-daily-loss", "0",
+    ])
+    _avertir_decomposition(args, make_config(args))
+    assert capsys.readouterr().out == ""

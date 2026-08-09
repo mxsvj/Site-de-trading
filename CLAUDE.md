@@ -57,6 +57,12 @@ Conséquence pratique : chercher un cinquième motif de prix a peu de chances
 d'aboutir. Les pistes qui restent portent sur **le coût d'exécution** et sur
 **les conditions dans lesquelles on trade**, pas sur la forme du signal.
 
+## Durée du travail
+
+Le travail continue tant que le propriétaire n'est pas satisfait. Un résultat
+négatif ferme une piste, il ne ferme pas le projet : chercher la suivante à
+l'intérieur des contraintes ci-dessus. Ne pas proposer d'arrêter.
+
 ## Règles de méthode
 
 - Toute conclusion se lit sur la **période de validation**, jamais sur

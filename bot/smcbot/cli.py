@@ -147,6 +147,12 @@ def build_parser() -> argparse.ArgumentParser:
             help="part maximale du risque absorbée par les frais (0.30 = 30 %%)",
         )
         fl.add_argument("--min-stop", type=float, help="distance minimale du stop")
+        fl.add_argument(
+            "--max-daily-loss",
+            type=float,
+            help="perte journalière en %% au-delà de laquelle la journée est "
+            "verrouillée (0 = désactivé)",
+        )
         fl.add_argument("--max-trades-day", type=int, help="plafond de trades par jour")
 
     p_bt = sub.add_parser("backtest", help="rejouer la stratégie sur un historique")
@@ -339,6 +345,8 @@ def make_config(args: argparse.Namespace) -> BotConfig:
         cfg.risk.sl_buffer_points = args.sl_buffer
     if getattr(args, "breakeven", None) is not None:
         cfg.risk.breakeven_at_r = args.breakeven
+    if getattr(args, "max_daily_loss", None) is not None:
+        cfg.risk.max_daily_loss_pct = args.max_daily_loss
     if getattr(args, "time_exit", None) is not None:
         cfg.risk.max_bars_in_trade = args.time_exit
     for brut in getattr(args, "strategy_param", None) or []:
@@ -392,6 +400,29 @@ def _csv_voisins(chemin: Path) -> str:
     except OSError:
         return "(dossier illisible)"
     return ", ".join(noms) if noms else "aucun"
+
+
+def _avertir_decomposition(args: argparse.Namespace, cfg: BotConfig) -> None:
+    """Prévient quand un spread nul va fausser la comparaison.
+
+    Rejouer sans frais sert à isoler la valeur du signal. Mais le verrou de
+    perte journalière se déclenche bien plus souvent quand les frais sont
+    payés : la version avec spread trade alors beaucoup moins, et l'on
+    compare deux populations au lieu de mesurer un coût. Le piège est
+    silencieux et donne un écart flatteur.
+    """
+    if getattr(args, "spread", None) != 0:
+        return
+    if cfg.risk.max_daily_loss_pct > 0:
+        print(
+            "⚠ Spread nul avec verrou de perte journalière à "
+            f"{cfg.risk.max_daily_loss_pct:g} % :\n"
+            "  sans frais la stratégie perd moins, se verrouille moins souvent "
+            "et trade donc\n"
+            "  bien plus. Les deux runs ne porteraient pas sur les mêmes trades.\n"
+            "  Ajoute --max-daily-loss 0 aux DEUX runs pour comparer ce qui est "
+            "comparable."
+        )
 
 
 def load_candles(args: argparse.Namespace, cfg: BotConfig) -> list[Candle]:
@@ -1116,6 +1147,7 @@ def _verdict(lignes: list) -> None:
 
 def cmd_lab(args: argparse.Namespace) -> int:
     cfg = make_config(args)
+    _avertir_decomposition(args, cfg)
     candles = load_candles(args, cfg)
     if len(candles) < 2000:
         raise SystemExit("Historique trop court pour un banc d'essai.")
