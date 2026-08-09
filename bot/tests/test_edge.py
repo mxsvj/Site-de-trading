@@ -152,3 +152,31 @@ def test_puissance_compare_ce_qu_on_voit_a_ce_qu_il_faut():
     # Sur 40 000 bougies, on doit distinguer un effet de quelques centièmes
     # d'ATR sur les cellules les mieux fournies.
     assert detectable < 0.30
+
+
+def test_le_seuil_de_frais_est_propre_a_chaque_cellule():
+    """Une cellule à faible volatilité paie le spread plus cher.
+
+    Lui appliquer le seuil calculé sur l'ATR médian du marché flatterait
+    précisément les conditions calmes — celles où le spread pèse le plus.
+    """
+    from smcbot.edge import Cellule
+
+    calme = Cellule("volatilité", "Q2", 6659, 0.061, 1.0, atr_moyen=3.00)
+    agitee = Cellule("volatilité", "Q5", 6659, 0.061, 1.0, atr_moyen=8.00)
+
+    # 24 points de spread, point à 0,01 : 300 points contre 800 points d'ATR.
+    assert calme.rentable_a_partir_de(24.0, 0.01) == pytest.approx(0.08)
+    assert agitee.rentable_a_partir_de(24.0, 0.01) == pytest.approx(0.03)
+
+    assert not calme.couvre_ses_frais(24.0, 0.01)
+    assert agitee.couvre_ses_frais(24.0, 0.01)
+
+
+def test_l_atr_moyen_est_renseigne_par_cellule():
+    balayage = balayer(_serie(40000), horizon=15)
+    volatilite = [c for c in balayage.examinees if c.critere == "volatilité (ATR)"]
+    assert len(volatilite) >= 4
+    par_quintile = {c.valeur: c.atr_moyen for c in volatilite}
+    # Les quintiles doivent être ordonnés : Q1 plus calme que Q5.
+    assert par_quintile["Q1"] < par_quintile["Q5"]

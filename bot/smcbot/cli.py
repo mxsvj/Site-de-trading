@@ -975,16 +975,28 @@ def cmd_edge_scan(args: argparse.Namespace) -> int:
         f"{seuil:.2f} (Bonferroni).\n"
     )
 
+    point = cfg.symbol.point
+    spread = cfg.symbol.spread_points
     print(
-        f"{'critère':<20}{'valeur':<14}{'n':>7}{'rendement':>12}{'t':>8}"
+        f"{'critère':<20}{'valeur':<12}{'n':>7}{'rendement':>11}{'t':>7}"
+        f"{'seuil frais':>13}"
     )
-    print("-" * 61)
+    print("-" * 70)
     for cellule in examinees[: args.top]:
         marque = "*" if abs(cellule.t) > seuil else " "
+        besoin = cellule.rentable_a_partir_de(spread, point)
+        verdict = "" if cellule.couvre_ses_frais(spread, point) else "  <"
         print(
-            f"{marque}{cellule.critere:<19}{cellule.valeur:<14}{cellule.n:>7}"
-            f"{cellule.moyenne:>+11.3f}A{cellule.t:>8.2f}"
+            f"{marque}{cellule.critere:<19}{cellule.valeur:<12}{cellule.n:>7}"
+            f"{cellule.moyenne:>+10.3f}A{cellule.t:>7.2f}"
+            f"{besoin:>12.3f}A{verdict}"
         )
+    print(
+        "\n« seuil frais » est propre à chaque cellule : une condition sur la "
+        "volatilité\nne connaît pas l'ATR médian du marché. « < » signale un "
+        "effet qui ne couvrirait\nmême pas le spread, donc inexploitable "
+        "quelle que soit sa significativité."
+    )
 
     print(
         "\nLe rendement est exprimé en multiples de l'ATR courant : +0.100A "
@@ -1009,11 +1021,24 @@ def cmd_edge_scan(args: argparse.Namespace) -> int:
         )
         return 0
 
-    print(f"{len(survivants)} cellule(s) franchissent le seuil :")
+    print(f"{len(survivants)} cellule(s) franchissent le seuil statistique :")
     for c in survivants:
+        besoin = c.rentable_a_partir_de(spread, point)
+        etat = (
+            "couvre ses frais"
+            if c.couvre_ses_frais(spread, point)
+            else f"NE COUVRE PAS ses frais ({besoin:.3f} ATR exigés)"
+        )
         print(
             f"  {c.critere} = {c.valeur} : {c.moyenne:+.3f} ATR sur "
-            f"{c.n} observations, t = {c.t:.2f}"
+            f"{c.n} observations, t = {c.t:.2f} — {etat}"
+        )
+    exploitables = [c for c in survivants if c.couvre_ses_frais(spread, point)]
+    if not exploitables:
+        print(
+            "\nAucune ne couvre son propre spread : significatif ne veut pas "
+            "dire rentable.\nUn effet réel mais plus petit que les frais fait "
+            "perdre de l'argent avec régularité."
         )
     print(
         "\nÀ vérifier avant d'en faire quoi que ce soit : ces cellules sont "

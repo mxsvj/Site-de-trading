@@ -56,6 +56,23 @@ class Cellule:
     """Rendement futur moyen, en multiples de l'ATR courant."""
 
     ecart_type: float
+    atr_moyen: float = 0.0
+    """ATR moyen des observations de cette cellule, en prix.
+
+    Indispensable pour juger la rentabilité : une cellule conditionnée sur la
+    volatilité n'a pas l'ATR médian du marché. Lui appliquer le seuil global
+    flatterait les cellules calmes, qui sont justement celles où le spread
+    pèse le plus lourd."""
+
+    def rentable_a_partir_de(self, spread_points: float, point: float) -> float:
+        """Effet minimal, propre à cette cellule, pour couvrir le spread."""
+        atr_points = self.atr_moyen / point if point > 0 else 0.0
+        if atr_points <= 0:
+            return float("inf")
+        return spread_points / atr_points
+
+    def couvre_ses_frais(self, spread_points: float, point: float) -> bool:
+        return abs(self.moyenne) > self.rentable_a_partir_de(spread_points, point)
 
     @property
     def t(self) -> float:
@@ -225,6 +242,7 @@ def balayer(
     indices = range(debut, len(candles) - horizon, horizon)
 
     groupes: dict[tuple[str, str], list[float]] = {}
+    atrs_cellule: dict[tuple[str, str], list[float]] = {}
     observations = 0
     for i in indices:
         if atrs[i] <= 0:
@@ -238,6 +256,7 @@ def balayer(
             valeur = fonction(i)
             if valeur is not None:
                 groupes.setdefault((nom, valeur), []).append(futur)
+                atrs_cellule.setdefault((nom, valeur), []).append(atrs[i])
 
     cellules = []
     for (critere, valeur), echantillon in groupes.items():
@@ -247,8 +266,16 @@ def balayer(
             variance = sum((x - moyenne) ** 2 for x in echantillon) / (n - 1)
         else:
             variance = 0.0
+        propres = atrs_cellule.get((critere, valeur), [])
         cellules.append(
-            Cellule(critere, valeur, n, moyenne, variance ** 0.5)
+            Cellule(
+                critere,
+                valeur,
+                n,
+                moyenne,
+                variance ** 0.5,
+                atr_moyen=sum(propres) / len(propres) if propres else 0.0,
+            )
         )
 
     cellules.sort(key=lambda c: abs(c.t), reverse=True)
