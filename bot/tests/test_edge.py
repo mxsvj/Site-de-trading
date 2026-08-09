@@ -127,3 +127,28 @@ def test_confrontation_denonce_le_bruit():
     # Et une bonne part des meilleures cellules doit changer de signe.
     tetes = couples[:10]
     assert sum(1 for c in tetes if not c.meme_sens) >= 2
+
+
+def test_effet_rentable_est_en_multiples_d_atr():
+    """L'ATR est en prix, le spread en points : les confondre donne un non-sens.
+
+    Le seuil de rentabilité doit être comparable aux moyennes des cellules,
+    qui sont en multiples d'ATR. Une erreur d'unité produisait « 26 ATR »
+    au lieu de « 0,26 ATR » — et faisait passer n'importe quel balayage pour
+    largement assez puissant.
+    """
+    balayage = balayer(_serie(20000), horizon=15)
+    balayage.atr_median = 2.00          # 200 points si le point vaut 0,01
+    assert balayage.effet_rentable(24.0, 0.01) == pytest.approx(0.12)
+    # Un spread deux fois plus large exige un effet deux fois plus grand.
+    assert balayage.effet_rentable(48.0, 0.01) == pytest.approx(0.24)
+
+
+def test_puissance_compare_ce_qu_on_voit_a_ce_qu_il_faut():
+    """Un résultat nul n'a de sens que si l'on sait ce qu'on aurait pu voir."""
+    balayage = balayer(_serie(40000), horizon=15)
+    detectable = balayage.effet_detectable()
+    assert 0.0 < detectable < 1.0, "finesse de détection invraisemblable"
+    # Sur 40 000 bougies, on doit distinguer un effet de quelques centièmes
+    # d'ATR sur les cellules les mieux fournies.
+    assert detectable < 0.30

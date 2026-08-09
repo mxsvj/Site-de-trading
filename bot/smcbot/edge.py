@@ -73,6 +73,8 @@ class Balayage:
     cellules: list[Cellule] = field(default_factory=list)
     horizon: int = 15
     observations: int = 0
+    atr_median: float = 0.0
+    """ATR médian en points, pour rapporter les effets au spread."""
 
     @property
     def examinees(self) -> list[Cellule]:
@@ -83,6 +85,35 @@ class Balayage:
         """Seuil de t exigé, corrigé du nombre de cellules examinées."""
         n = max(1, len(self.examinees))
         return NormalDist().inv_cdf(1.0 - ALPHA / (2.0 * n))
+
+    def effet_detectable(self) -> float:
+        """Plus petit effet que ce balayage aurait pu déclarer significatif.
+
+        Un résultat nul ne vaut rien tant qu'on ignore ce qu'on aurait été
+        capable de voir. Si la finesse de détection est plus grossière que
+        l'effet recherché, « rien trouvé » signifie seulement « pas assez de
+        données » — et n'autorise aucune conclusion sur le marché.
+
+        Calculé sur la cellule la mieux fournie, donc la plus favorable.
+        """
+        candidates = [c for c in self.examinees if c.ecart_type > 0]
+        if not candidates:
+            return float("inf")
+        meilleure = max(candidates, key=lambda c: c.n)
+        return self.seuil * meilleure.ecart_type / (meilleure.n ** 0.5)
+
+    def effet_rentable(self, spread_points: float, point: float) -> float:
+        """Effet minimal pour qu'un trade couvre seulement son spread.
+
+        Exprimé dans la même unité que les cellules — des multiples de l'ATR —
+        pour être directement comparable à `effet_detectable`. L'ATR est
+        stocké en prix et le spread en points : les confondre donnerait un
+        seuil absurde de plusieurs dizaines d'ATR.
+        """
+        atr_points = self.atr_median / point if point > 0 else 0.0
+        if atr_points <= 0:
+            return float("inf")
+        return spread_points / atr_points
 
 
 def _quintile(valeur: float, bornes: Sequence[float]) -> str:
@@ -221,7 +252,14 @@ def balayer(
         )
 
     cellules.sort(key=lambda c: abs(c.t), reverse=True)
-    return Balayage(cellules=cellules, horizon=horizon, observations=observations)
+    positifs = sorted(a for a in atrs if a > 0)
+    median = positifs[len(positifs) // 2] if positifs else 0.0
+    return Balayage(
+        cellules=cellules,
+        horizon=horizon,
+        observations=observations,
+        atr_median=median,
+    )
 
 
 @dataclass

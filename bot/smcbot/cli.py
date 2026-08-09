@@ -992,6 +992,8 @@ def cmd_edge_scan(args: argparse.Namespace) -> int:
         f"{args.horizon} bougies."
     )
 
+    _puissance(balayage, cfg)
+
     survivants = [c for c in examinees if abs(c.t) > seuil]
     print()
     if not survivants:
@@ -1020,6 +1022,46 @@ def cmd_edge_scan(args: argparse.Namespace) -> int:
         "ce balayage n'a pas vue."
     )
     return 0
+
+
+def _puissance(balayage, cfg: BotConfig) -> None:
+    """Dit ce que ce balayage aurait été capable de voir.
+
+    Sans ce chiffre, « aucune cellule ne ressort » est ambigu : cela peut
+    vouloir dire qu'il n'y a rien, ou que l'échantillon est trop mince pour
+    le montrer. Les deux mènent à des décisions opposées.
+    """
+    point = cfg.symbol.point
+    detectable = balayage.effet_detectable()
+    rentable = balayage.effet_rentable(cfg.symbol.spread_points, point)
+    if detectable == float("inf") or rentable == float("inf"):
+        return
+
+    print("\n── Puissance de ce balayage ───────────────────────")
+    print(
+        f"ATR médian                        : "
+        f"{balayage.atr_median / point:.0f} points"
+    )
+    print(f"Plus petit effet détectable       : {detectable:.3f} ATR")
+    print(
+        f"Plus petit effet rentable         : {rentable:.3f} ATR "
+        f"(spread {cfg.symbol.spread_points:.0f} pts)"
+    )
+
+    if detectable <= rentable:
+        print(
+            "\nLa détection est plus fine que le seuil de rentabilité : un "
+            "avantage\nexploitable aurait été vu. Son absence n'est donc pas "
+            "un manque de données."
+        )
+    else:
+        manque = (detectable / rentable) ** 2
+        print(
+            f"\nLa détection est plus grossière que le seuil de rentabilité.\n"
+            f"Un avantage tout juste rentable passerait inaperçu : il faudrait "
+            f"environ\n{manque:.0f} fois plus d'observations pour trancher. "
+            f"Ce balayage ne conclut donc rien."
+        )
 
 
 def _confronter_balayage(args: argparse.Namespace, candles) -> int:
