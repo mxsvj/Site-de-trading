@@ -196,7 +196,12 @@ def evaluer(
     for numero, (strategie, params, label) in enumerate(candidates, 1):
         cfg = _copie(base)
         cfg.strategy = strategie
-        cfg.strategy_params = dict(params)
+        # Les paramètres de la grille se superposent à ceux de la configuration,
+        # ils ne les remplacent pas. Écraser ferait disparaître en silence tout
+        # ce qui vient de --strategy-param ou d'un fichier de configuration :
+        # une série de référence, un seuil figé — et la stratégie tournerait
+        # avec d'autres réglages que ceux demandés, sans le dire.
+        cfg.strategy_params = {**base.strategy_params, **params}
         # `tp_r` est commun à toutes les stratégies : il doit atterrir dans la
         # configuration de risque, sans quoi celles qui ne lisent pas
         # `strategy_params` l'ignorent en silence et la grille ne teste rien.

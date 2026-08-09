@@ -608,3 +608,42 @@ def test_un_parametre_neutre_ne_cree_pas_une_hypothese(tmp_path):
     )
     assert nouvelles == 0
     assert suite.total == 1
+
+
+def test_la_grille_ne_efface_pas_les_parametres_de_configuration():
+    """Les réglages de base doivent survivre à la grille du banc d'essai.
+
+    `evaluer` remplaçait `strategy_params` par les seuls paramètres de la
+    grille. Tout ce qui venait de --strategy-param disparaissait en silence :
+    une série de référence, un seuil de volatilité figé. La stratégie tournait
+    alors avec d'autres réglages que ceux demandés, sans rien signaler.
+    """
+    from smcbot.data import synthetic_series as serie
+    from smcbot.lab import evaluer
+
+    base = BotConfig(symbol=xauusd(), timeframe="M1")
+    base.strategy_params = {"min_atr_points": 200.0, "max_cost": 0.12}
+    base.filters.sessions = []
+    base.filters.weekdays = []
+
+    vus = []
+    candles = serie(6000, start=2650.0, point=0.01, timeframe_minutes=1)
+
+    import smcbot.lab as lab
+
+    reel = lab.run_backtest
+
+    def espion(bougies, cfg=None, warmup=0):
+        vus.append(dict(cfg.strategy_params))
+        return reel(bougies, cfg, warmup)
+
+    lab.run_backtest = espion
+    try:
+        evaluer([("vol-break", {"tp_r": 3.0}, "vol-break tp=3")], candles, base)
+    finally:
+        lab.run_backtest = reel
+
+    assert vus, "aucun backtest lancé"
+    for params in vus:
+        assert params["min_atr_points"] == 200.0, "paramètre de base effacé"
+        assert params["tp_r"] == 3.0, "paramètre de grille non appliqué"
