@@ -370,3 +370,37 @@ def test_config_json_conserve_filtres_et_htf(tmp_path):
     assert relu.filters.max_cost_ratio == origine.filters.max_cost_ratio
     assert relu.htf_smc.swing_lookback == origine.htf_smc.swing_lookback
     assert relu.symbol.point == origine.symbol.point
+
+
+# ------------------------------------------------------ configuration M15
+
+
+def test_preset_m15_est_coherent():
+    """Les deux seuils de coût doivent rester compatibles entre eux."""
+    from smcbot.config import m15_xauusd
+
+    cfg = m15_xauusd()
+    assert cfg.timeframe == "M15" and cfg.htf == "H1"
+
+    filtres = TradeFilters(cfg.filters, cfg.symbol)
+    ratio = filtres.cost_ratio(cfg.filters.min_stop_points)
+    assert ratio <= cfg.filters.max_cost_ratio, (
+        f"plancher de stop incohérent : {ratio:.1%} de frais pour un plafond "
+        f"de {cfg.filters.max_cost_ratio:.0%}"
+    )
+
+
+def test_preset_m15_reduit_bien_la_ponction():
+    """Le passage en M15 doit diviser la ponction du spread par plus de deux."""
+    from smcbot.config import m15_xauusd, scalping_xauusd
+
+    scalp = scalping_xauusd()
+    m15 = m15_xauusd()
+
+    ponction_scalp = TradeFilters(scalp.filters, scalp.symbol).cost_ratio(
+        scalp.filters.min_stop_points
+    )
+    ponction_m15 = TradeFilters(m15.filters, m15.symbol).cost_ratio(
+        m15.filters.min_stop_points
+    )
+    assert ponction_m15 < ponction_scalp / 2

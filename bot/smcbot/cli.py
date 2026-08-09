@@ -19,6 +19,7 @@ from .data import (
     ReplayFeed,
     download_mt5,
     load_csv,
+    resample,
     save_csv,
     synthetic_series,
 )
@@ -47,6 +48,12 @@ def build_parser() -> argparse.ArgumentParser:
             "--demo-bars", type=int, default=3000, help="taille de la série de démo"
         )
         src.add_argument("--seed", type=int, default=7, help="graine de la démo")
+        src.add_argument(
+            "--resample",
+            help="agréger les bougies vers une unité de temps supérieure, "
+            "ex. M15 — évite de réexporter depuis MT5 pour tester un autre "
+            "horizon",
+        )
         src.add_argument(
             "--tz-shift",
             type=float,
@@ -323,17 +330,42 @@ def load_candles(args: argparse.Namespace, cfg: BotConfig) -> list[Candle]:
         if not candles:
             raise SystemExit(f"Aucune bougie lue dans {chemin}")
         decalage = getattr(args, "tz_shift", 0.0)
-        return shift_times(candles, decalage) if decalage else candles
+        if decalage:
+            candles = shift_times(candles, decalage)
+        return _agreger(candles, args, cfg)
     if getattr(args, "demo", False):
         # La série de démo suit l'échelle de prix et la cadence du symbole visé.
-        return synthetic_series(
+        return _agreger(synthetic_series(
             n=args.demo_bars,
             start=2650.0 if cfg.symbol.point >= 0.01 else 1.10000,
             point=cfg.symbol.point,
             seed=args.seed,
             timeframe_minutes=TIMEFRAMES.get(cfg.timeframe, 15),
-        )
+        ), args, cfg)
     raise SystemExit("Précise une source de données : --csv FICHIER ou --demo")
+
+
+def _agreger(candles, args, cfg: BotConfig):
+    """Applique --resample : mêmes données, horizon plus large.
+
+    Élargir l'unité de temps élargit mécaniquement les stops, donc réduit la
+    part du risque absorbée par un spread fixe. C'est la réponse au cas où le
+    signal a un avantage réel mais inférieur aux frais.
+    """
+    cible = getattr(args, "resample", None)
+    if not cible:
+        return candles
+
+    minutes = TIMEFRAMES.get(cible)
+    if minutes is None:
+        raise SystemExit(f"Unité de temps inconnue : {cible}")
+
+    agregees = resample(candles, minutes)
+    print(
+        f"Agrégation : {len(candles)} bougies → {len(agregees)} bougies {cible}"
+    )
+    cfg.timeframe = cible
+    return agregees
 
 
 # ------------------------------------------------------------------ commandes

@@ -375,6 +375,25 @@ python -m smcbot optimize --csv data/xauusd_m1.csv --preset xauusd-scalp \
 | ≤ 0 | Le signal ne vaut rien par lui-même. Le spread n'a fait qu'aggraver une absence d'avantage : changer d'instrument ou de timeframe ne sauvera rien, il faut changer de schéma. |
 | > 0 | Le signal a un avantage réel, mais inférieur aux frais. Il faut des stops plus larges — donc un timeframe supérieur — pour que le spread pèse une part plus faible du risque. |
 
+**La ponction du spread vaut à peu près le rapport frais / distance au stop.**
+Mesuré sur XAUUSD : 24 points de spread contre 245 points de risque coûtaient
+0,098 R par trade. D'où le dimensionnement du remède :
+
+| Ponction visée | Risque minimal nécessaire (spread 24 pts) |
+|---|---|
+| 0,05 R | 480 points |
+| 0,03 R | 800 points |
+
+### Changer d'horizon sans réexporter
+
+`--resample` agrège tes bougies vers une unité de temps supérieure. Des M1
+suffisent donc à tester M5, M15 ou H1 :
+
+```bash
+python -m smcbot optimize --csv data/xauusd_m1.csv --symbol-spec spec.json \
+    --preset xauusd-m15 --resample M15 --tz-shift -3 --grid-spread 0,24 --split 0.6
+```
+
 ---
 
 ## La stratégie
@@ -481,7 +500,7 @@ bot/
 │   └── cli.py         interface en ligne de commande
 ├── mt5/
 │   └── ExportBars.mq5 export CSV + spécification, sans Python
-└── tests/            149 tests
+└── tests/            151 tests
 ```
 
 Le backtest et le paper trading utilisent **le même** moteur SMC et **le même**
@@ -495,7 +514,7 @@ cd bot && python -m pytest
 ```
 
 ```
-149 passed
+151 passed
 ```
 
 Ils couvrent la détection SMC (swings, CHoCH/BOS, order blocks, FVG, sweeps),

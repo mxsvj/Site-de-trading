@@ -257,6 +257,59 @@ def scalping_xauusd() -> BotConfig:
     )
 
 
+def m15_xauusd() -> BotConfig:
+    """XAUUSD en M15, biais H1 — la réponse à un signal mangé par les frais.
+
+    Mesuré sur des données réelles, le schéma SMC en M1 sur l'or dégage environ
+    +0,06 R par trade avant frais, pour un spread qui en coûte 0,098 : l'avantage
+    est réel mais insuffisant. Le spread étant fixe, le seul levier est
+    d'élargir le risque — donc de monter d'unité de temps.
+
+    La ponction du spread sur l'espérance vaut à peu près le rapport
+    frais / distance au stop : sur l'or, 24 points de spread contre 245 points
+    de risque coûtaient 0,098 R par trade. Ramener cette ponction sous 0,05 R
+    exige donc un risque d'au moins 480 points, et 800 pour descendre à 0,03 R —
+    d'où les seuils ci-dessous, calculés et non ajustés après coup.
+
+    Les autres paramètres reprennent le meilleur réglage validé en M1
+    (tp_r = 3, swings = 3, breakeven à 1 R).
+
+    Cette configuration est une **hypothèse dérivée d'une mesure**, pas un
+    réglage validé : le signal M15 n'est pas le signal M1, et rien ne garantit
+    que l'avantage se transporte. À vérifier avec `optimize --split`.
+    """
+    return BotConfig(
+        symbol=xauusd(),
+        timeframe="M15",
+        htf="H1",
+        smc=SmcConfig(
+            swing_lookback=3,
+            ob_lookback=10,
+            ob_max_age=40,
+            require_fvg=True,
+        ),
+        htf_smc=SmcConfig(swing_lookback=3, ob_lookback=12, ob_max_age=60),
+        risk=RiskConfig(
+            risk_pct=0.5,
+            sl_buffer_points=60.0,
+            tp_r=3.0,
+            max_concurrent=1,
+            max_daily_loss_pct=3.0,
+            breakeven_at_r=1.0,
+        ),
+        filters=FilterConfig(
+            sessions=["07:00-11:00", "13:00-17:00"],
+            weekdays=[0, 1, 2, 3, 4],
+            max_spread_points=40.0,
+            # 5 % de frais au maximum, soit une ponction d'environ 0,05 R :
+            # c'est tout l'intérêt de monter d'unité de temps, autant l'imposer.
+            max_cost_ratio=0.05,
+            min_stop_points=600.0,
+            max_trades_per_day=4,
+        ),
+    )
+
+
 def swing_eurusd() -> BotConfig:
     """Configuration d'origine : EURUSD M15, sans filtre horaire."""
     return BotConfig(symbol=eurusd(), timeframe="M15")
@@ -264,5 +317,6 @@ def swing_eurusd() -> BotConfig:
 
 PRESETS = {
     "eurusd-m15": swing_eurusd,
+    "xauusd-m15": m15_xauusd,
     "xauusd-scalp": scalping_xauusd,
 }
