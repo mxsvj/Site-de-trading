@@ -249,7 +249,7 @@ fois **terminées** — le biais accuse donc le retard qu'il aurait en direct.
 Sans ça, la structure M1 prise seule n'est guère que du bruit.
 
 ```bash
-python -m smcbot backtest --csv xauusd_m1.csv --timeframe M1 --htf M15 --symbol-preset xauusd
+python -m smcbot backtest --csv data/xauusd_m1.csv --timeframe M1 --htf M15 --symbol-preset xauusd
 ```
 
 Option supplémentaire `--htf-zone` : n'entrer que si l'order block M1 recoupe un
