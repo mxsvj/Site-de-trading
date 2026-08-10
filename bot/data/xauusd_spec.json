@@ -1,0 +1,14 @@
+{
+  "name": "XAUUSD",
+  "digits": 2,
+  "point": 0.01,
+  "contract_size": 100.0,
+  "value_per_point_per_lot": 0.865171650055371,
+  "min_lot": 0.01,
+  "max_lot": 50.0,
+  "lot_step": 0.01,
+  "spread_points": 24.0,
+  "swap_long_points": -81.8,
+  "swap_short_points": 28.81,
+  "commission_per_lot": 0.0
+}
