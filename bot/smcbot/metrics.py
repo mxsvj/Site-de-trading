@@ -9,6 +9,7 @@ from datetime import timedelta
 from typing import Sequence
 
 from .broker import EquityPoint, Trade
+from .config import SymbolSpec
 from .risk import rollovers
 
 
@@ -48,6 +49,19 @@ class Report:
     total_swap: float = 0.0
     exit_reasons: dict[str, int] = field(default_factory=dict)
 
+    risk_efficiency: float = 0.0
+    """Risque réellement pris / risque visé, moyenné sur les trades.
+
+    Le volume est tronqué au pas du courtier (`risk.position_size`). Sur un
+    petit compte cette troncature retire jusqu'à la moitié du risque prévu, et
+    d'autant plus que le stop est large. `expectancy_r` n'en voit rien :
+    `r_multiple()` ne dépend que de distances de prix, pas du volume. Deux
+    stratégies de même espérance en R n'ont donc pas la même espérance en
+    euros si leurs stops diffèrent — d'où cette mesure, à lire à côté.
+    """
+    risk_efficiency_min: float = 0.0
+    """Pire trade de la série, même rapport."""
+
     def to_text(self) -> str:
         """Rendu console lisible."""
         lines = [
@@ -77,6 +91,21 @@ class Report:
             f"│ Sharpe (par trade)  : {self.sharpe:.2f}",
             "└────────────────────────────────────────────",
         ]
+        if self.risk_efficiency > 0:
+            lines.insert(
+                -1,
+                f"│ Risque réel / visé  : {self.risk_efficiency:.0%}  "
+                f"(pire trade {self.risk_efficiency_min:.0%})",
+            )
+            if self.risk_efficiency < 0.95:
+                manque = 1.0 - self.risk_efficiency
+                lines.append(
+                    f"⚠ L'arrondi du lot retire {manque:.0%} du risque prévu. "
+                    f"L'espérance en R\n"
+                    f"  ci-dessus l'ignore — elle ne dépend pas du volume. En "
+                    f"euros, les trades\n"
+                    f"  à stop large pèsent moins que les autres."
+                )
         if self.exit_reasons:
             detail = ", ".join(
                 f"{k}: {v}" for k, v in sorted(self.exit_reasons.items())
@@ -101,8 +130,16 @@ def build_report(
     trades: Sequence[Trade],
     equity_curve: Sequence[EquityPoint],
     initial_balance: float,
+    symbol: SymbolSpec | None = None,
+    risk_pct: float = 0.0,
 ) -> Report:
-    """Agrège les trades et la courbe de capital en un rapport."""
+    """Agrège les trades et la courbe de capital en un rapport.
+
+    `symbol` et `risk_pct` ne servent qu'à mesurer l'efficacité du risque —
+    l'écart entre ce que le bot voulait risquer et ce que la troncature du
+    volume lui a laissé risquer. Sans eux, le rapport reste complet mais muet
+    sur ce point.
+    """
     report = Report(
         initial_balance=initial_balance,
         final_balance=equity_curve[-1].balance if equity_curve else initial_balance,
@@ -154,7 +191,41 @@ def build_report(
         )
 
     _add_durations(report, trades)
+    _add_risk_efficiency(report, trades, symbol, risk_pct)
     return report
+
+
+def _add_risk_efficiency(
+    report: Report,
+    trades: Sequence[Trade],
+    symbol: SymbolSpec | None,
+    risk_pct: float,
+) -> None:
+    """Compare le risque réellement engagé au risque visé, trade par trade.
+
+    Le capital avant le trade se reconstitue par `balance_after - pnl` : le
+    viser directement serait plus simple, mais `Trade` ne le porte pas, et
+    prendre le capital initial fausserait la mesure dès que le compte bouge.
+    """
+    if symbol is None or risk_pct <= 0 or symbol.point <= 0:
+        return
+    if symbol.value_per_point_per_lot <= 0:
+        return
+
+    rapports = []
+    for t in trades:
+        capital_avant = t.balance_after - t.pnl
+        vise = capital_avant * risk_pct / 100.0
+        if vise <= 0:
+            continue
+        distance = abs(t.entry - t.stop) / symbol.point
+        pris = t.lots * distance * symbol.value_per_point_per_lot
+        if pris > 0:
+            rapports.append(pris / vise)
+
+    if rapports:
+        report.risk_efficiency = statistics.fmean(rapports)
+        report.risk_efficiency_min = min(rapports)
 
 
 def _add_durations(report: Report, trades: Sequence[Trade]) -> None:

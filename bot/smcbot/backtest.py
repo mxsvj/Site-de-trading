@@ -117,7 +117,13 @@ def run_backtest(
     # La préchauffe ne compte pas dans les statistiques : son drawdown est nul
     # par construction et fausserait la comparaison entre périodes.
     courbe = broker.equity_curve[warmup:]
-    report = build_report(broker.trades, courbe, cfg.risk.initial_balance)
+    report = build_report(
+        broker.trades,
+        courbe,
+        cfg.risk.initial_balance,
+        symbol=cfg.symbol,
+        risk_pct=cfg.risk.risk_pct,
+    )
     return BacktestResult(
         report=report,
         trades=broker.trades,

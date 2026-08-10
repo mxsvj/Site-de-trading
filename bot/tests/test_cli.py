@@ -389,10 +389,15 @@ def test_decomposition_muette_sur_petit_echantillon(capsys):
 
 
 def test_scan_exige_metatrader(monkeypatch):
-    """Hors Windows, `scan` doit le dire au lieu de planter."""
+    """Hors Windows, `scan` doit le dire au lieu de planter.
+
+    Une entrée `None` dans `sys.modules` fait échouer l'import quoi qu'il
+    arrive : c'est ce qui rend le test valable aussi sur la machine Windows,
+    où MetaTrader5 est réellement installé. La supprimer ensuite rendrait
+    l'import de nouveau possible, et le test ne vérifierait plus rien.
+    """
     import sys
     monkeypatch.setitem(sys.modules, "MetaTrader5", None)
-    monkeypatch.delitem(sys.modules, "MetaTrader5")
     with pytest.raises(SystemExit) as sortie:
         main(["scan", "--symbols", "XAUUSD"])
     assert "MetaTrader5" in str(sortie.value)
@@ -751,7 +756,6 @@ def test_spread_profile_exige_metatrader(monkeypatch):
     import sys
 
     monkeypatch.setitem(sys.modules, "MetaTrader5", None)
-    monkeypatch.delitem(sys.modules, "MetaTrader5")
     with pytest.raises(SystemExit) as sortie:
         main(["spread-profile", "--symbol", "XAUUSD"])
     assert "MetaTrader5" in str(sortie.value)

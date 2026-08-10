@@ -1,0 +1,68 @@
+﻿Capital 1,000 €, risque 0.5 % = 5.00 € par trade.
+Stop maximal praticable : 578 points.
+
+── Stops efficaces : ceux où la troncature ne coûte rien ──
+    lots    stop exact    risque   +0,1 pt →
+----------------------------------------------
+    0.01        577.90      5.00 €         0%
+    0.02        288.95      5.00 €        50%
+    0.03        192.63      5.00 €        67%
+    0.04        144.48      5.00 €        75%
+    0.05        115.58      5.00 €        80%
+    0.06         96.32      5.00 €        83%
+    0.07         82.56      5.00 €        86%
+    0.08         72.24      5.00 €        88%
+    0.09         64.21      5.00 €        89%
+    0.10         57.79      5.00 €        90%
+  La dernière colonne est le risque obtenu 0,1 point plus loin : ces
+  valeurs sont des lames de rasoir, pas des plages.
+
+── Ce que coûte un stop mal placé ──
+    stop    lots  risque réel   du visé
+----------------------------------------
+     289    0.01        2.50 €      50%
+     300    0.01        2.60 €      52%
+     192    0.03        4.98 €     100%
+     200    0.02        3.46 €      69%
+     144    0.04        4.98 €     100%
+     150    0.03        3.89 €      78%
+     115    0.05        4.97 €      99%
+     120    0.04        4.15 €      83%
+      96    0.06        4.98 €     100%
+     100    0.05        4.33 €      87%
+
+── Sur toute la fenêtre praticable (40 à 578 points) ──
+Efficacité moyenne du risque : 81.1%
+Efficacité médiane           : 83.9%
+Pire cas                     : 50.0% (stop 289.0 points)
+
+Autrement dit : en moyenne le bot risque 81% de ce qu'il annonce, et la perte
+n'est pas uniforme — elle frappe d'autant plus fort que le stop est
+large, donc elle pénalise systématiquement les setups à stop ample.
+
+── L'arrondi frappe-t-il également tous les stops ? ──
+     tranche de stop    efficacité moyenne
+------------------------------------------
+       40–100                       93.9%
+      100–200                       87.7%
+      200–300                       80.9%
+      300–450                       64.9%
+      450–578                       88.9%
+
+Conséquence pour la mesure : deux stratégies de même espérance en R
+n'ont pas la même espérance en euros si leurs stops diffèrent. Aucun
+backtest du projet ne pouvait le voir, puisqu'ils concluent tous en R.
+
+── Récupération par ajustement toléré du stop ──
+   tolérance   efficacité   stops ajustés
+-----------------------------------------
+       0.0%        81.1%             0%
+       0.5%        81.4%             1%
+       1.0%        81.7%             2%
+       2.0%        82.3%             5%
+       5.0%        84.1%            13%
+      10.0%        86.8%            26%
+
+Un resserrement de 2 % suffit à récupérer l'essentiel : c'est le cas
+où le stop tombe juste au-dessus d'une marche. Au-delà, on ne corrige
+plus un arrondi, on déplace le stop — donc on change le trade.

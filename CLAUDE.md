@@ -176,6 +176,52 @@ Le M1, lui, ne conclut rien : détection 0,167 contre 0,126 requis, il faudrait
 deux fois plus d'observations. Le courtier plafonnant à 100 000 bougies
 (≈ 101 jours en M1), la seule voie est d'accumuler l'historique dans le temps.
 
+### L'arrondi du lot : 19 % du risque perdu, invisible en R
+
+Mesuré le 2026-08-10. Le volume vaut `risque / (stop × valeur du point)`, puis
+`risk.py` le **tronque** au pas du courtier (`math.floor`, jamais d'arrondi au
+plus proche). À 1 000 € de capital le volume tourne entre 0,01 et 0,10 lot : la
+troncature y pèse énormément.
+
+Le point aveugle est ailleurs. **`r_multiple()` ne dépend que de distances de
+prix** — le volume n'y entre pas. Tous les verdicts du projet sont en R, donc
+aucun n'a jamais vu cet effet.
+
+| | |
+|---|---|
+| Efficacité moyenne du risque (40 à 578 pts) | **81 %** |
+| Mesurée sur un vrai backtest M1 | **79 %**, pire trade 51 % |
+| Pire cas théorique | **50 %**, à un stop de 289 points |
+
+**Les stops efficaces sont des lames de rasoir.** Le volume tombe pile sur un
+multiple du pas quand `stop = 578 / k` : 577,90 · 288,97 · 192,63 · 144,48 ·
+115,58 · 96,32 · 82,56 · 72,24 · 64,21 · 57,79. Un stop de **288,97** points
+risque 5,00 € ; un stop de **289,00** points en risque 2,50 €. Trois centièmes
+de point coûtent la moitié du risque.
+
+**Piste explorée et refermée : ajuster le stop sur ces valeurs.** Comme ce sont
+des points isolés et non des plages, tolérer 2 % de déplacement ne récupère que
+1,2 point sur les 19 perdus ; il faudrait tolérer 10 % pour en gagner 6, et à ce
+niveau on ne corrige plus un arrondi, on change le trade.
+
+La cause n'est pas le placement du stop : à 1 000 € il n'existe que **dix
+volumes distincts** sur toute la fenêtre praticable. Les seuls vrais remèdes
+sont plus de capital ou un courtier au pas plus fin. À défaut, le backtest
+affiche désormais `Risque réel / visé` et avertit sous 95 %.
+
+Et le biais n'est pas uniforme — il frappe d'autant plus que le stop est large :
+
+| tranche de stop | efficacité |
+|---|---|
+| 40–100 | 94 % |
+| 100–200 | 88 % |
+| 200–300 | 81 % |
+| 300–450 | **65 %** |
+
+Conséquence de méthode : deux stratégies de même espérance en R n'ont pas la
+même espérance en euros si leurs stops diffèrent. **Comparer des stratégies en R
+sans regarder la distribution des stops est faux.**
+
 ### Approximation levée le 2026-08-10
 
 Cette section disait : « les backtests supposent 24 points constants ; sur l'or
@@ -212,6 +258,7 @@ décision qui en dépend.
 | `check` | qualité des données, fenêtre praticable de stops | non |
 | `scan` | classer des instruments par coût de scalping | non |
 | `spread-profile` | spread réel heure par heure, depuis les ticks | non |
+| `outils_mesure/arrondi_lot.py` | ce que la troncature du volume retire au risque, et où sont les stops efficaces | non |
 | `outils_mesure/excursion_tick.py` | de combien l'or bouge en 1 à 120 s, et ce que le spread y coûte | non |
 | `outils_mesure/asymetrie_tick.py` | asymétrie directionnelle sous la minute, fenêtres disjointes et contrôle de puissance | oui, en interne |
 | `download` | exporter un historique MT5 en CSV | non |
@@ -240,6 +287,14 @@ Chacun a produit un résultat faux et convaincant avant d'être trouvé.
   venait de `--strategy-param` disparaissait en silence.
 - **Seuil de rentabilité calculé sur l'ATR médian global** : flatte précisément
   les cellules à faible volatilité, où le spread pèse le plus.
+- **Conclure en R sans regarder le risque réellement pris** : `r_multiple()` ne
+  dépend que de distances de prix, donc l'espérance en R est aveugle à la
+  troncature du volume, qui retire 19 % du risque en moyenne et jusqu'à 50 %.
+  Le rapport affiche maintenant `Risque réel / visé` : le lire.
+- **Test neutralisé par son propre montage** : `test_scan_exige_metatrader`
+  posait `sys.modules["MetaTrader5"] = None` puis **supprimait** l'entrée, ce
+  qui rendait l'import de nouveau possible. Le test ne passait que sur une
+  machine sans MT5 — c'est-à-dire jamais sur la machine cible.
 - **Spread relevé une fois et pris pour une constante** : les 24 points venaient
   d'un relevé fait au pire moment de la période. Le vrai spread va de 12 à 24
   selon l'époque, et le seuil de rentabilité d'`edge-scan` lui est
