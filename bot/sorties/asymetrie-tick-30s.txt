@@ -1,0 +1,37 @@
+﻿Collecte XAUUSD, 60 jours, horizon 30 s, fenêtres disjointes.
+
+113,037 observations disjointes.
+Étude    : 67,822 (2026-06-11 → 2026-07-16)
+Contrôle : 45,215 (2026-07-16 → 2026-08-10)
+51 cellules comparables, seuil de t 3.30 (Bonferroni).
+
+critère     valeur         n  rendement      t   frais  │  rendement      t
+                                     — étude —          │      — contrôle —
+----------------------------------------------------------------------------------
+ spread     Q1         13688      -2.3p  -2.31       9  │      -2.3p  -2.36
+ activité   Q1         14129      -1.1p  -1.77      14  │      -0.6p  -0.98
+ heure      06h         2996      +3.5p   1.70      12  │      +2.3p   1.19
+ spread     Q5           355     +26.5p   1.69      25  │      +0.3p   0.26
+ momentum   Q5         13559      -2.1p  -1.64      13  │      -3.8p  -3.04
+ heure      04h         2964      -2.5p  -1.62      15  │      -0.3p  -0.24
+ momentum   hausse     33429      -1.0p  -1.43      13  │      -1.3p  -1.92
+!heure      16h         3082      -2.6p  -1.42      11  │      +0.4p   0.19
+ activité   Q5         13414      +2.3p   1.38      12  │      +3.4p   2.03
+ heure      02h         2996      -2.8p  -1.37      15  │      -0.2p  -0.07
+ volatilité Q1         13590      -0.8p  -1.35      13  │      -0.2p  -0.34
+ activité   Q4         13139      -1.4p  -1.24      13  │      -0.1p  -0.08
+
+! = 1 cellule(s) changent de signe hors échantillon.
+  C'est le verdict le plus net qui soit : ce n'était pas un effet,
+  c'était du bruit.
+
+── Puissance de ce balayage ───────────────────────
+Cellule la mieux fournie          : 34,393 observations
+Plus petit effet détectable       : 2.2 points
+Plus petit effet rentable         : 13.0 points (spread moyen)
+
+La détection est plus fine que le seuil de rentabilité.
+Un avantage exploitable aurait été vu. Ce balayage conclut.
+
+── Verdict ────────────────────────────────────────
+Aucune cellule ne franchit le seuil statistique sur l'étude.

@@ -85,11 +85,50 @@ et 17,6 millions de ticks.
 | `vol-break` (cassure à volatilité gated) | M1 | −0,071 R sur 706 trades ; brut, frais retirés : **−0,018 R** |
 | `lead-lag` (retard de l'or sur EUR/USD) | M1 | −0,178 R hors échantillon, pire qu'en apprentissage |
 | `edge-scan` (46 conditions × 3 horizons) | M1, M5 | aucune condition à la fois significative et rentable |
+| `asymetrie_tick` (51 conditions) | **30 s, 60 s** | aucune condition significative ; le balayage **conclut** (détection 3 à 6 fois plus fine que le seuil de rentabilité) |
 
-**Régularité à retenir.** Trois échelles de temps séparées par un facteur 300,
-avec et sans frais, donnent toutes un taux de réussite **un point sous le seuil
-d'équilibre à coût nul**. Les motifs de prix, à toutes ces échelles, ne portent
-aucune information directionnelle sur l'or.
+**Régularité à retenir.** Quatre échelles de temps, de 1,5 seconde à M5, avec et
+sans frais, donnent toutes le même résultat : aucune information directionnelle
+exploitable. Les motifs de prix, à toutes ces échelles, ne portent rien.
+
+### La fenêtre 30–60 s, ouverte puis refermée le 2026-08-10
+
+Elle méritait d'être ouverte : à 24 points de spread, le plus court horizon
+finançable était d'environ 120 s ; à 12 points, il tombe à **30 s**. Cette
+région était refusée par le coût, plus par les données. `ScalpXAU` échouait à
+1,5 s, mais à cet horizon le spread vaut **171 %** du mouvement médian — perdu
+d'avance quel que soit le signal, donc il ne concluait rien sur 30 s.
+
+Mesuré sur 60 jours de ticks, fenêtres **disjointes**, 51 conditions, chaque
+cellule jugée sur **son propre spread** lu dans le tick à l'instant de la
+décision :
+
+| horizon | observations | effet détectable | effet rentable | conclut ? |
+|---|---|---|---|---|
+| 30 s | 113 037 | 2,2 points | 13,0 points | **oui**, détection 6× plus fine |
+| 60 s | 56 682 | 4,3 points | 13,0 points | **oui**, détection 3× plus fine |
+
+Aucune cellule ne franchit le seuil de Bonferroni sur l'étude, et 5 changent de
+signe hors échantillon. Comme sur le M5, ce n'est pas « on n'a rien trouvé »,
+c'est **« un avantage exploitable aurait été vu »**.
+
+**Le détail qui compte, et qui ferme la piste pour de bon.** Il y a bien de la
+structure à cette échelle, et elle tient hors échantillon :
+
+| cellule | étude | contrôle | frais |
+|---|---|---|---|
+| `spread Q1` (30 s) | −2,3 p | −2,3 p | 9 p |
+| `momentum Q5` (30 s) | −2,1 p | −3,8 p | 13 p |
+| `momentum baisse` (60 s) | +1,7 p | +2,1 p | 13 p |
+
+Un léger retour à la moyenne, de signe stable dans les deux périodes. Mais il
+pèse **2 à 4 points quand le spread en coûte 9 à 13** : l'effet réel est un
+ordre de grandeur sous son propre coût. Baisser le spread de 24 à 12 points n'y
+change rien — il faudrait le diviser encore par trois ou quatre.
+
+Conséquence : inutile de revenir chercher un signal sous la minute. Ce n'est pas
+une question de finesse de détection ni de quantité de données, c'est que ce qui
+existe est trop petit d'un facteur 4 pour payer le passage du spread.
 
 Conséquence pratique : chercher un motif de prix de plus a peu de chances
 d'aboutir. Les pistes qui restent portent sur **le coût d'exécution** et sur
@@ -173,6 +212,8 @@ décision qui en dépend.
 | `check` | qualité des données, fenêtre praticable de stops | non |
 | `scan` | classer des instruments par coût de scalping | non |
 | `spread-profile` | spread réel heure par heure, depuis les ticks | non |
+| `outils_mesure/excursion_tick.py` | de combien l'or bouge en 1 à 120 s, et ce que le spread y coûte | non |
+| `outils_mesure/asymetrie_tick.py` | asymétrie directionnelle sous la minute, fenêtres disjointes et contrôle de puissance | oui, en interne |
 | `download` | exporter un historique MT5 en CSV | non |
 
 Les cinq dernières lignes marquées MT5 (`scan`, `spread-profile`, `download`,

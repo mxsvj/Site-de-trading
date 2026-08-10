@@ -1,0 +1,19 @@
+﻿1,502,711 ticks → 460,033 secondes cotées sur 10 jours.
+
+ horizon      paires  |Δ| médian   90e c.   frais si stop = |Δ| médian
+----------------------------------------------------------------------
+      1s     435,057           7       30                        171%
+      2s     432,621          12       44                        100%
+      3s     432,019          15       54                         80%
+      5s     431,634          20       70                         60%
+     10s     431,492          30      100                         40%
+     15s     431,216          38      122                         32%
+     30s     430,822          54      170                         22%  ← finançable
+     60s     430,727          77      237                         16%  ← finançable
+    120s     430,346         110      339                         11%  ← finançable
+
+Lecture : « frais » = spread 12 pts rapporté au stop.
+Le projet plafonne à 30 % du risque. Au-dessus, le trade est refusé.
+
+Horizon le plus court finançable : 30 s, stop ≈ 54 points.
+C'est le plancher réel du scalping sur cet instrument à ce spread.
