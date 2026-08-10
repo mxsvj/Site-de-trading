@@ -255,6 +255,62 @@ Conséquence de méthode : deux stratégies de même espérance en R n'ont pas l
 même espérance en euros si leurs stops diffèrent. **Comparer des stratégies en R
 sans regarder la distribution des stops est faux.**
 
+### Payer moins de spread : la question est mal posée
+
+Cherché le 2026-08-10. Trois constats, dans l'ordre où ils se sont imposés.
+
+**Le modèle de coût est juste.** `broker.py` traite les bougies comme du bid,
+achète à l'ask et sort au bid : le spread est facturé **une fois** par
+aller-retour, pas deux. Rien à récupérer de ce côté.
+
+**Baisser le spread ne suffira jamais.** Les avantages réels et reproductibles
+mesurés valent 2 à 3 points :
+
+| effet, validé hors échantillon | vaut | il faudrait un spread de |
+|---|---|---|
+| `sens de la bougie` baissière, M1 | 0,021 ATR = **2,7 points** | < 2,7 |
+| retour à la moyenne, 30 s | **2,3 points** | < 2,3 |
+| retour à la moyenne, 60 s | **2,1 points** | < 2,1 |
+
+Le meilleur spread jamais relevé sur ce compte est de **10 points**. Il
+faudrait donc diviser encore par quatre le meilleur cas, sur un instrument dont
+le spread institutionnel tourne autour de 2 à 3 points sans marge pour le
+glissement. Passer de 18 à 11 points fait gagner 1,6× quand il en faudrait 4 à
+7. **Aucun courtier ne comble cet écart.**
+
+**Tenir plus longtemps ne le comble pas non plus — et le mesurer naïvement
+fabrique un faux positif.** Le spread est fixe par aller-retour, donc allonger
+la détention devrait le diluer. L'effet grandit bien avec l'horizon :
+
+| horizon | `sens baissière` | `corps Q5` | frais requis |
+|---|---|---|---|
+| 3 bougies | +0,021 A | +0,023 A | 0,105 A |
+| 12 bougies | +0,058 A | — | 0,105 A |
+| 60 bougies | — | **+0,464 A** | 0,108 A |
+
+À 60 bougies une cellule couvrait enfin ses frais. **C'était un artefact, et sa
+cause est instructive.** Le rendement inconditionnel de l'or est linéaire en
+horizon, alors que le spread est fixe :
+
+| horizon | dérive, étude | dérive, contrôle | spread |
+|---|---|---|---|
+| 3 bougies | +1,1 pt | +0,2 pt | 18 |
+| 60 bougies | **+22,7 pt** | +4,7 pt | 18 |
+
+Sur la période d'étude l'or est passé de 2 524 à 4 119, soit +63 %. À 60
+bougies, la dérive seule dépassait le spread — **sans aucune condition**. Toutes
+les cellules ressortaient positives parce qu'elles héritaient de la hausse, pas
+parce qu'elles apprenaient quoi que ce soit. Hors échantillon la dérive retombe
+à +4,7 points et tout s'effondre : `corps Q5` passe de +0,462 à +0,176, t = 0,87.
+
+**Correction apportée à l'outil.** `edge-scan` juge désormais chaque cellule sur
+son **excès** par rapport au rendement moyen inconditionnel, pour la
+significativité comme pour la couverture des frais. Tester une moyenne contre
+zéro revient à demander « l'or a-t-il bougé ? » — vrai partout dans un marché
+qui monte. Après correction, la cellule qui passait à t = 3,39 ne passe plus
+(la plus forte tombe à t = −2,93 pour 3,27 exigé). Deux tests verrouillent ça,
+dont un contrôle négatif sur une dérive pure.
+
 ### Approximation levée le 2026-08-10
 
 Cette section disait : « les backtests supposent 24 points constants ; sur l'or
@@ -321,6 +377,12 @@ Chacun a produit un résultat faux et convaincant avant d'être trouvé.
   venait de `--strategy-param` disparaissait en silence.
 - **Seuil de rentabilité calculé sur l'ATR médian global** : flatte précisément
   les cellules à faible volatilité, où le spread pèse le plus.
+- **Cellule jugée contre zéro dans un marché en tendance** : tester une moyenne
+  contre zéro demande « l'or a-t-il bougé ? », vrai pour toutes les cellules
+  d'un marché qui monte. La dérive inconditionnelle est linéaire en horizon
+  quand le spread est fixe, donc le biais **croît avec l'horizon** : à 60
+  bougies, +22,7 points de dérive dépassaient à eux seuls les 18 points de
+  spread. Juger sur l'**excès** par rapport au rendement inconditionnel.
 - **Tranche de ticks qui coupe une bougie en deux** : si la borne d'un
   téléchargement ne tombe pas sur un début de bougie, chaque moitié part dans
   une tranche différente et l'ouverture reconstruite est celle du **milieu** de

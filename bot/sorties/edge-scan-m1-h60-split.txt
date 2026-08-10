@@ -1,0 +1,17 @@
+﻿Étude    : 417822 bougies (2024-08-20 → 2025-10-24)
+Contrôle : 278549 bougies (2025-10-24 → 2026-08-10)
+45 cellules comparables, seuil de t 3.27.
+
+critère             valeur        rendement      t  │  rendement      t
+                                    — étude —     │   — contrôle —   
+----------------------------------------------------------------------------
+ volatilité (ATR)   Q3              +0.606A   3.71  │    +0.102A   0.49
+ sens de la bougie  haussière       +0.326A   3.00  │    +0.161A   1.12
+ sens de la bougie  baissière       +0.320A   2.96  │    +0.051A   0.37
+ corps de bougie    Q5              +0.462A   2.76  │    +0.176A   0.87
+ jour               mardi           +0.448A   2.69  │    +0.221A   1.05
+ volatilité (ATR)   Q1              +0.545A   2.63  │    +0.479A   1.63
+
+Aucune condition ne franchit le seuil des deux côtés.
+Les écarts observés sur la période d'étude ne se reproduisent pas ailleurs :
+c'est la définition d'un artefact de sélection.

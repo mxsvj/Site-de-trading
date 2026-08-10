@@ -1,0 +1,20 @@
+﻿Étude    : 417822 bougies (2024-08-20 → 2025-10-24)
+Contrôle : 278549 bougies (2025-10-24 → 2026-08-10)
+46 cellules comparables, seuil de t 3.27.
+
+critère             valeur        rendement      t  │  rendement      t
+                                    — étude —     │   — contrôle —   
+----------------------------------------------------------------------------
+!momentum récent    Q5              +0.133A   4.14  │    -0.060A  -1.47
+ sens de la bougie  baissière       +0.076A   3.63  │    +0.051A   1.87
+ volatilité (ATR)   Q3              +0.106A   3.36  │    +0.034A   0.87
+ heure              22h             +0.220A   3.06  │    +0.104A   1.20
+ jour               mardi           +0.095A   3.01  │    +0.022A   0.56
+ volatilité (ATR)   Q1              +0.108A   2.77  │    +0.052A   0.91
+
+! = 1 cellule(s) changent de signe hors échantillon.
+  C'est le verdict le plus net qui soit : ce n'était pas un effet, c'était du bruit.
+
+Aucune condition ne franchit le seuil des deux côtés.
+Les écarts observés sur la période d'étude ne se reproduisent pas ailleurs :
+c'est la définition d'un artefact de sélection.

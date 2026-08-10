@@ -1,0 +1,31 @@
+﻿696371 bougies, horizon 60 bougies.
+11605 observations disjointes — une bougie sur 60, pour que les fenêtres ne se recouvrent pas.
+46 cellules examinées → seuil de t exigé 3.27 (Bonferroni).
+
+critère             valeur            n  rendement      t  seuil frais
+----------------------------------------------------------------------
+ volatilité (ATR)   Q5             2333    -0.086A  -2.93       0.045A
+ heure              20h             474    +1.833A   2.90       0.159A
+ volatilité (ATR)   Q2             2297    +0.593A   2.53       0.209A
+ corps de bougie    Q5             2373    +0.464A   1.70       0.108A
+ heure              09h             508    -0.192A  -1.69       0.122A
+
+« seuil frais » est propre à chaque cellule : une condition sur la volatilité
+ne connaît pas l'ATR médian du marché. « < » signale un effet qui ne couvrirait
+même pas le spread, donc inexploitable quelle que soit sa significativité.
+
+Le rendement est exprimé en multiples de l'ATR courant : +0.100A signifie
+un dixième d'amplitude de bougie gagné en moyenne sur 60 bougies.
+
+── Puissance de ce balayage ───────────────────────
+ATR médian                        : 128 points
+Plus petit effet détectable       : 0.282 ATR
+Plus petit effet rentable         : 0.141 ATR (spread 18 pts)
+
+La détection est plus grossière que le seuil de rentabilité.
+Un avantage tout juste rentable passerait inaperçu : il faudrait environ
+4 fois plus d'observations pour trancher. Ce balayage ne conclut donc rien.
+
+Aucune cellule ne franchit le seuil. La plus forte est volatilité (ATR) = Q5 avec t = -2.93, contre 3.27 exigé.
+Sur ces conditions, le rendement futur de l'or est indiscernable de zéro.
+Aucune stratégie construite dessus ne peut fonctionner — ce n'est pas une opinion, c'est cette mesure.

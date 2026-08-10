@@ -180,3 +180,50 @@ def test_l_atr_moyen_est_renseigne_par_cellule():
     par_quintile = {c.valeur: c.atr_moyen for c in volatilite}
     # Les quintiles doivent être ordonnés : Q1 plus calme que Q5.
     assert par_quintile["Q1"] < par_quintile["Q5"]
+
+
+def test_une_derive_pure_ne_cree_aucune_cellule_significative():
+    """Un marché qui monte sans condition ne doit rien faire ressortir.
+
+    Sinon, à long horizon, toutes les cellules héritent de la tendance et l'une
+    d'elles finit par « couvrir ses frais » sans rien apprendre. C'est ce qui
+    s'était produit le 2026-08-10 sur 696 371 bougies M1 : à 60 bougies
+    d'horizon, l'or dérivait de +22,7 points par fenêtre et toutes les cellules
+    ressortaient positives.
+    """
+    debut = datetime(2026, 1, 1)
+    bougies = []
+    prix = 2000.0
+    for i in range(4000):
+        # Hausse régulière, plus un bruit sans lien avec la moindre condition.
+        prix += 0.05 + random.Random(i).uniform(-0.10, 0.10)
+        bougies.append(
+            Candle(debut + timedelta(minutes=i), prix, prix + 0.3, prix - 0.3, prix)
+        )
+
+    balayage = balayer(bougies, horizon=12)
+    assert balayage.moyenne_globale > 0, "la serie doit bien deriver vers le haut"
+
+    seuil = balayage.seuil
+    survivants = [c for c in balayage.examinees if abs(c.t) > seuil]
+    assert not survivants, (
+        "une derive sans condition ne doit produire aucune cellule "
+        f"significative, or : {[(c.critere, c.valeur, round(c.t, 2)) for c in survivants]}"
+    )
+
+
+def test_l_exces_retire_la_derive():
+    """`exces` mesure l'ecart au marche sans condition, pas le rendement brut."""
+    debut = datetime(2026, 1, 1)
+    prix = 2000.0
+    bougies = []
+    for i in range(2000):
+        prix += 0.05
+        bougies.append(
+            Candle(debut + timedelta(minutes=i), prix, prix + 0.3, prix - 0.3, prix)
+        )
+    balayage = balayer(bougies, horizon=6)
+    for cellule in balayage.examinees:
+        assert cellule.exces == pytest.approx(
+            cellule.moyenne - balayage.moyenne_globale
+        )

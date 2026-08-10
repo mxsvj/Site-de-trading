@@ -64,6 +64,18 @@ class Cellule:
     flatterait les cellules calmes, qui sont justement celles où le spread
     pèse le plus lourd."""
 
+    moyenne_globale: float = 0.0
+    """Rendement moyen inconditionnel, en multiples de l'ATR.
+
+    Une cellule ne prouve quelque chose que si elle bat le marché sans
+    condition, pas si elle se contente de le suivre. Mesuré le 2026-08-10 sur
+    696 371 bougies M1 : à 60 bougies d'horizon, l'or dérivait de +22,7 points
+    par fenêtre sur la période d'étude — l'or est passé de 2 524 à 4 119. Toutes
+    les cellules ressortaient positives et l'une d'elles « couvrait ses frais »,
+    alors qu'aucune n'apportait la moindre information : elles héritaient de la
+    hausse. Le biais croît avec l'horizon, puisque la dérive est linéaire en
+    temps."""
+
     def rentable_a_partir_de(self, spread_points: float, point: float) -> float:
         """Effet minimal, propre à cette cellule, pour couvrir le spread."""
         atr_points = self.atr_moyen / point if point > 0 else 0.0
@@ -71,14 +83,31 @@ class Cellule:
             return float("inf")
         return spread_points / atr_points
 
+    @property
+    def exces(self) -> float:
+        """Ce que la cellule apporte en plus du marché sans condition."""
+        return self.moyenne - self.moyenne_globale
+
     def couvre_ses_frais(self, spread_points: float, point: float) -> bool:
-        return abs(self.moyenne) > self.rentable_a_partir_de(spread_points, point)
+        """Jugé sur l'excès : suivre la dérive ne coûte pas de condition.
+
+        Prendre `moyenne` ici ferait passer pour rentable toute cellule d'un
+        marché en tendance, y compris celles qui n'apportent rien.
+        """
+        return abs(self.exces) > self.rentable_a_partir_de(spread_points, point)
 
     @property
     def t(self) -> float:
+        """Statistique sur l'excès, pas sur le rendement brut.
+
+        Tester la moyenne contre zéro revient à demander « l'or a-t-il bougé ? »
+        — vrai pour toutes les cellules d'un marché qui monte. La question utile
+        est « cette condition dit-elle quelque chose de plus que l'absence de
+        condition ? », donc l'écart à la moyenne globale.
+        """
         if self.n < 2 or self.ecart_type <= 0:
             return 0.0
-        return self.moyenne / (self.ecart_type / (self.n ** 0.5))
+        return self.exces / (self.ecart_type / (self.n ** 0.5))
 
     @property
     def exploitable(self) -> bool:
@@ -92,6 +121,9 @@ class Balayage:
     observations: int = 0
     atr_median: float = 0.0
     """ATR médian en points, pour rapporter les effets au spread."""
+
+    moyenne_globale: float = 0.0
+    """Rendement moyen sans aucune condition, en multiples de l'ATR."""
 
     @property
     def examinees(self) -> list[Cellule]:
@@ -243,6 +275,7 @@ def balayer(
 
     groupes: dict[tuple[str, str], list[float]] = {}
     atrs_cellule: dict[tuple[str, str], list[float]] = {}
+    tous_les_retours: list[float] = []
     observations = 0
     for i in indices:
         if atrs[i] <= 0:
@@ -251,12 +284,19 @@ def balayer(
         if avant <= 0:
             continue
         futur = (candles[i + horizon].close - avant) / atrs[i]
+        tous_les_retours.append(futur)
         observations += 1
         for nom, fonction in criteres.items():
             valeur = fonction(i)
             if valeur is not None:
                 groupes.setdefault((nom, valeur), []).append(futur)
                 atrs_cellule.setdefault((nom, valeur), []).append(atrs[i])
+
+    # Référence inconditionnelle : ce que rapporte le fait de ne rien
+    # conditionner. Une cellule n'apprend quelque chose que si elle s'en écarte.
+    globale = (
+        sum(tous_les_retours) / len(tous_les_retours) if tous_les_retours else 0.0
+    )
 
     cellules = []
     for (critere, valeur), echantillon in groupes.items():
@@ -275,6 +315,7 @@ def balayer(
                 moyenne,
                 variance ** 0.5,
                 atr_moyen=sum(propres) / len(propres) if propres else 0.0,
+                moyenne_globale=globale,
             )
         )
 
@@ -286,6 +327,7 @@ def balayer(
         horizon=horizon,
         observations=observations,
         atr_median=median,
+        moyenne_globale=globale,
     )
 
 
