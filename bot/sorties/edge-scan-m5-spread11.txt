@@ -1,0 +1,44 @@
+﻿100000 bougies, horizon 3 bougies.
+33328 observations disjointes — une bougie sur 3, pour que les fenêtres ne se recouvrent pas.
+46 cellules examinées → seuil de t exigé 3.27 (Bonferroni).
+
+critère             valeur            n  rendement      t  seuil frais
+----------------------------------------------------------------------
+*volatilité (ATR)   Q2             6659    +0.061A   3.50       0.038A
+ momentum récent    Q5             6669    +0.049A   2.84       0.023A
+ jour               lundi          6666    +0.040A   2.70       0.022A
+ heure              23h            1386    +0.148A   2.36       0.030A
+ sens de la bougie  baissière     16398    +0.023A   2.27       0.023A
+ heure              14h            1456    +0.074A   2.09       0.026A
+ heure              03h            1456    +0.076A   1.95       0.022A
+ corps de bougie    Q3             6756    +0.030A   1.78       0.022A
+ volatilité (ATR)   Q1             6668    +0.030A   1.73       0.063A  <
+ corps de bougie    Q2             6665    +0.025A   1.61       0.023A
+ momentum récent    Q1             6622    +0.026A   1.60       0.020A
+ heure              09h            1456    +0.048A   1.57       0.023A
+ jour               mercredi       6787    +0.024A   1.57       0.023A
+ heure              01h            1455    +0.050A   1.50       0.026A
+ heure              07h            1456    +0.049A   1.47       0.032A
+
+« seuil frais » est propre à chaque cellule : une condition sur la volatilité
+ne connaît pas l'ATR médian du marché. « < » signale un effet qui ne couvrirait
+même pas le spread, donc inexploitable quelle que soit sa significativité.
+
+Le rendement est exprimé en multiples de l'ATR courant : +0.100A signifie
+un dixième d'amplitude de bougie gagné en moyenne sur 3 bougies.
+
+── Puissance de ce balayage ───────────────────────
+ATR médian                        : 393 points
+Plus petit effet détectable       : 0.033 ATR
+Plus petit effet rentable         : 0.028 ATR (spread 11 pts)
+
+La détection est plus grossière que le seuil de rentabilité.
+Un avantage tout juste rentable passerait inaperçu : il faudrait environ
+1 fois plus d'observations pour trancher. Ce balayage ne conclut donc rien.
+
+1 cellule(s) franchissent le seuil statistique :
+  volatilité (ATR) = Q2 : +0.061 ATR sur 6659 observations, t = 3.50 — couvre ses frais
+
+À vérifier avant d'en faire quoi que ce soit : ces cellules sont issues d'un
+balayage, donc choisies pour être les meilleures. Le test qui compte est de
+rejouer la même mesure sur une période que ce balayage n'a pas vue.

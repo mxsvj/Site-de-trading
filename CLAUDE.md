@@ -18,20 +18,55 @@ une autre piste **à l'intérieur de ces contraintes**.
 
 ## Ce que ces contraintes impliquent, chiffré
 
-Courtier de référence : Pepperstone, spread mesuré **24 points** sur l'or,
-valeur du point **0,8652 €** pour 1 lot, lot minimum **0,01**.
+Courtier de référence : Pepperstone, compte **Retail** (`Retail\Commodities\
+Gold\XAUUSD`), valeur du point **0,8652 €** pour 1 lot, lot minimum **0,01**.
+**Aucune commission** : vérifié sur les deals 1 lot de l'historique du compte,
+`commission = 0,0`. Le spread est donc le coût total.
+
+**Le spread n'est pas une constante — mesuré, plus supposé.** 2026-08-10,
+`spread-profile` sur 1,5 million de ticks (10 jours, serveur UTC+3 ramené en
+UTC) :
+
+| | points |
+|---|---|
+| médiane sur la journée | **11** |
+| heures pleines, 06h–19h UTC | 11 |
+| heures creuses, 20h–05h UTC | 16 à 17 |
+| rapport creux / plein | **1,5** |
+
+Et par fenêtres de 7 jours pleins réparties sur les 17 mois (donc à mélange
+d'heures identique, comparables entre elles) :
+
+| fenêtre | 2025-03 | 2025-06 | 2025-09 | 2025-12 | 2026-03 | 2026-06 | 2026-08 |
+|---|---|---|---|---|---|---|---|
+| médian | 18 | 15 | 21 | 23 | **24** | 12 | **12** |
+
+Deux corrections en découlent, dans des directions opposées :
+
+- Les **24 points** supposés partout ne sont pas la norme, c'est le **pire
+  moment** de la période (2026-03). La moyenne sur les 17 mois de backtest est
+  **≈ 18 points** : les résultats déjà obtenus ont été chargés d'environ **un
+  tiers de frais en trop**.
+- Le régime **actuel est de 12 points**, moitié moins que l'hypothèse. Ce qui
+  est trop cher aujourd'hui ne l'est pas au même niveau qu'affiché.
 
 **Plafond de stop.** Pour risquer 5 € (0,5 % de 1 000 €) au lot minimum, le stop
 ne peut pas dépasser `5 / (0,01 × 0,8652)` = **578 points**. Au-delà, le volume
 calculé tombe sous 0,01 lot et le trade est refusé — ce n'est pas un réglage,
-c'est le pas de lot du courtier.
+c'est le pas de lot du courtier. Ce plafond ne dépend pas du spread.
 
-**Plancher de stop.** Le spread est prélevé sur le risque. À 24 points, un stop
-de 120 points laisse 20 % du risque aux frais, un stop de 80 points en laisse
-30 %, un stop de 40 points en laisse 60 %.
+**Plancher de stop.** Le spread est prélevé sur le risque, donc le plancher suit
+le régime de spread — il n'y a pas un plancher, il y en a un par époque :
 
-La fenêtre praticable est donc **≈ 100 à 578 points de stop**, ce qui
-correspond à des horizons de l'ordre de la minute à la dizaine de minutes.
+| part du risque mangée par les frais | à 24 pts | à 18 pts | à 12 pts |
+|---|---|---|---|
+| 20 % | 120 | 90 | **60** |
+| 30 % | 80 | 60 | **40** |
+
+La fenêtre praticable est donc **≈ 60 à 578 points de stop au régime actuel**,
+contre ≈ 100 à 578 à 24 points. **Des horizons plus courts sont redevenus
+jouables** — précisément la direction que demandent les contraintes (seconde à
+M1). C'est la piste ouverte par cette mesure.
 
 ## Ce qui a déjà été réfuté — ne pas y revenir sans raison nouvelle
 
@@ -67,28 +102,65 @@ sous 46 conditions observables (heure, jour, volatilité, momentum, forme de
 bougie), sans stop, sans objectif, sans spread. Sur le M5, 33 328 observations
 disjointes couvrant 17 mois :
 
-- finesse de détection **0,033 ATR**, seuil de rentabilité **0,061 ATR** ;
-- la détection est donc **plus fine que ce qu'il faudrait pour gagner** ;
+- finesse de détection **0,033 ATR** — elle ne dépend pas du spread ;
+- seuil de rentabilité **proportionnel au spread**, donc pas unique ;
 - une seule cellule franchit le seuil statistique — `volatilité Q2`, +0,061 ATR,
-  t = 3,50 — et elle **ne couvre pas ses propres frais** (0,084 ATR exigés) ;
-- elle change de signe hors échantillon (+0,058 → −0,000).
+  t = 3,50 sur 6 659 observations ;
+- elle **change de signe hors échantillon** (+0,058 → −0,000).
 
-Ce résultat n'est pas « on n'a rien trouvé ». C'est **« un avantage
-exploitable aurait été vu »**. La différence est décisive : elle interdit de
-conclure qu'il manque des données.
+Le seuil de rentabilité étant proportionnel au spread, la mesure du 2026-08-10
+oblige à relire ce résultat à trois niveaux de coût (vérifié en rejouant
+`edge-scan --spread`) :
+
+| spread | seuil de rentabilité | vs détection 0,033 | le balayage conclut-il ? |
+|---|---|---|---|
+| 24 pts (supposé) | 0,061 ATR | détection plus fine | **oui** |
+| 18 pts (moyenne réelle de la période) | 0,046 ATR | détection plus fine | **oui** |
+| 12 pts (régime actuel) | 0,030 ATR | détection plus **grossière** | **non** |
+
+Ce qu'il faut en retenir, dans cet ordre :
+
+1. Sur la période des backtests, le coût correct est 18 points, et à 18 points
+   la conclusion **tient** : « un avantage exploitable aurait été vu ». Le
+   résultat n'est pas annulé par la mesure de spread.
+2. La cellule `volatilité Q2` reste morte quel que soit le coût — à 12 points
+   elle couvre ses frais, mais elle change de signe hors échantillon, et c'est
+   la validation qui tranche, pas la rentabilité théorique.
+3. En revanche, **au régime actuel de 12 points le balayage ne conclut plus
+   rien** : un avantage tout juste rentable (0,030 à 0,033 ATR) passerait
+   maintenant sous la finesse de détection. À ce coût-là, « rien trouvé »
+   redevient « pas assez d'observations ». C'est la seule chose que la baisse
+   du spread rouvre côté signal — et elle demande plus de données, pas une
+   idée de plus.
 
 Le M1, lui, ne conclut rien : détection 0,167 contre 0,126 requis, il faudrait
 deux fois plus d'observations. Le courtier plafonnant à 100 000 bougies
 (≈ 101 jours en M1), la seule voie est d'accumuler l'historique dans le temps.
 
-### Approximation encore non levée
+### Approximation levée le 2026-08-10
 
-Tous les backtests supposent un **spread constant de 24 points**. Sur l'or il
-double ou triple hors des séances de Londres et New York. Les résultats
-obtenus avec `--no-sessions` sont donc **optimistes**, et les stratégies déjà
-réfutées le sont encore plus qu'affiché. `spread-profile` mesure le spread
-réel heure par heure depuis les ticks — à lancer sur la machine Windows, et à
-reporter dans les seuils de coût.
+Cette section disait : « les backtests supposent 24 points constants ; sur l'or
+le spread double ou triple hors Londres et New York, donc les résultats
+`--no-sessions` sont **optimistes** ». La mesure contredit les deux moitiés de
+cette phrase.
+
+| ce qui était supposé | ce qui est mesuré |
+|---|---|
+| creux 2 à 3 fois plus cher | **1,5 fois** (11 → 17 points) |
+| 24 points constants | **12 à 24 selon l'époque**, ≈ 18 en moyenne |
+| résultats trop optimistes | trop **pessimistes** d'environ un tiers de frais |
+
+Le biais allait donc dans l'autre sens : les stratégies déjà réfutées l'ont été
+avec trop de frais, pas trop peu. Cela ne les réhabilite pas — `smc` et
+`vol-break` restent négatives **frais retirés**, ce qui ne doit rien au
+spread — mais tout jugement au bord du seuil est à refaire à 18 points sur la
+période, et à 12 points pour ce qui se joue aujourd'hui.
+
+**Ce qui reste non levé.** La mesure vient d'un compte **démo** ; les spreads
+d'un compte réel peuvent être moins bons. À confronter le jour où un compte
+réel existe. Le régime de 12 points date de 2026-06 : il est récent, et rien
+ne garantit qu'il tienne — `spread-profile` est à relancer avant toute
+décision qui en dépend.
 
 ## Outils disponibles
 
@@ -127,6 +199,11 @@ Chacun a produit un résultat faux et convaincant avant d'être trouvé.
   venait de `--strategy-param` disparaissait en silence.
 - **Seuil de rentabilité calculé sur l'ATR médian global** : flatte précisément
   les cellules à faible volatilité, où le spread pèse le plus.
+- **Spread relevé une fois et pris pour une constante** : les 24 points venaient
+  d'un relevé fait au pire moment de la période. Le vrai spread va de 12 à 24
+  selon l'époque, et le seuil de rentabilité d'`edge-scan` lui est
+  proportionnel — de quoi faire conclure un balayage qui ne conclut rien.
+  Relever le spread de la **période testée**, pas celui du jour du test.
 - **Fenêtres de rendement qui se recouvrent** : gonflent la statistique t
   d'environ racine(horizon).
 

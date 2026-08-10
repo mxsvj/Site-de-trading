@@ -1,0 +1,36 @@
+﻿Lecture des ticks XAUUSD sur 10 jours — cela peut prendre une minute.
+
+1,501,367 ticks retenus.
+
+heure        ticks    médian    90e c.  profil
+----------------------------------------------------------
+00h         65,657        17        17  ########
+01h         78,157        15        17  #######
+02h         69,311        14        17  #######
+03h         56,845        14        17  #######
+04h         50,303        15        17  #######
+05h         64,675        14        17  #######
+06h         70,231        11        14  #####
+07h         64,211        11        14  #####
+08h         65,626        11        14  #####
+09h         62,463        11        13  #####
+10h         58,221        11        14  #####
+11h         69,838        11        14  #####
+12h         78,846        11        14  #####
+13h         92,847        11        14  #####
+14h         92,153        11        14  #####
+15h         84,249        11        14  #####
+16h         73,450        11        13  #####
+17h         68,366        11        13  #####
+18h         60,463        11        13  #####
+19h         63,248        12        13  #####
+20h         35,498        17        17  ########
+22h         32,908        17        17  ########
+23h         43,801        16        17  #######
+
+Moins cher : 07h à 11 points.
+Plus cher  : 20h à 17 points, soit 1.5 fois plus.
+Médiane sur la journée : 11 points.
+
+À confronter aux cellules d'edge-scan : un avantage mesuré à une heure creuse
+doit être jugé sur LE spread de cette heure-là, pas sur la moyenne du marché.
