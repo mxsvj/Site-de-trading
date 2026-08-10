@@ -142,6 +142,10 @@ class PaperBroker:
         if not self.can_open:
             return None
 
+        if signal.entry_type != "market" and not self._limite_remplie(signal, candle):
+            self._reject(candle, "niveau effleuré, pas traversé")
+            return None
+
         entry = self._fill_price(signal, candle)
         stop = signal.stop
         risk_distance = abs(entry - stop)
@@ -206,6 +210,31 @@ class PaperBroker:
         return closed
 
     # -------------------------------------------------------------- interne
+
+    def _limite_remplie(self, signal: Signal, candle: Candle) -> bool:
+        """Un ordre limite posé sur ce niveau aurait-il vraiment été servi ?
+
+        Le moteur remplissait dès que la bougie touchait le niveau, en totalité
+        et au meilleur prix de l'excursion. C'est faux : il faut que le marché
+        traite au-delà du niveau pour purger la file d'attente devant nous. Un
+        plus bas qui vient effleurer le niveau au centième près ne sert
+        personne.
+
+        Le biais jouait en faveur des entrées limite, donc précisément dans le
+        sens qui aurait pu faire croire qu'elles échappent au spread.
+
+        Une ouverture déjà au-delà du niveau est un cas distinct : l'ordre est
+        alors servi au marché à l'ouverture, sans file d'attente à purger.
+        """
+        marge = self.cfg.risk.limit_fill_margin_points * self.cfg.symbol.point
+        level = signal.entry_level
+        if signal.direction == BULLISH:
+            if candle.open <= level:
+                return True
+            return candle.low <= level - marge
+        if candle.open >= level:
+            return True
+        return candle.high >= level + marge
 
     def _fill_price(self, signal: Signal, candle: Candle) -> float:
         """Prix d'exécution, selon la nature de l'ordre.

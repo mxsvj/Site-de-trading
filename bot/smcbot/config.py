@@ -108,6 +108,25 @@ class RiskConfig:
     breakeven_at_r: float = 0.0
     """Passage du stop à l'entrée à N R (0 = désactivé)."""
 
+    limit_fill_margin_points: float = 1.0
+    """Traversée exigée d'un niveau pour qu'un ordre limite soit rempli, en points.
+
+    Un ordre limite ne se remplit pas parce que le prix a effleuré son niveau :
+    il faut que le marché y traite assez de volume pour purger la file d'attente
+    devant nous. Sans cette marge, le moteur accorde un remplissage certain, en
+    totalité, au meilleur prix de l'excursion — dès que le plus bas de la bougie
+    touche le niveau au centième près.
+
+    Ce biais flatte exactement les entrées limite, donc toute comparaison entre
+    entrée limite et entrée au marché serait faussée en faveur de la première.
+
+    1 point est le minimum qui ait un sens : le prix doit avoir réellement coté
+    au-delà du niveau, pas seulement l'avoir touché. Ce n'est pas pour autant
+    une valeur mesurée — la vraie probabilité de remplissage au plus bas d'une
+    bougie est bien inférieure à 1. Avant de conclure quoi que ce soit sur une
+    stratégie à entrée limite, faire varier ce paramètre et regarder si le
+    verdict tient."""
+
     max_bars_in_trade: int = 0
     """Sortie sur le temps : clôture au marché après N bougies (0 = désactivé).
 

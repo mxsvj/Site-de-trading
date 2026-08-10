@@ -107,6 +107,13 @@ def build_parser() -> argparse.ArgumentParser:
         cf.add_argument("--sl-buffer", type=float, help="marge du stop en points")
         cf.add_argument("--breakeven", type=float, help="passage à BE à N R (0=off)")
         cf.add_argument(
+            "--limit-margin",
+            type=float,
+            help="traversée exigée d'un niveau pour remplir un ordre limite, "
+            "en points (défaut 1). Mettre 0 rétablit l'ancien remplissage "
+            "au simple contact, qui flatte les entrées limite.",
+        )
+        cf.add_argument(
             "--strategy-param",
             action="append",
             metavar="NOM=VALEUR",
@@ -419,6 +426,8 @@ def make_config(args: argparse.Namespace) -> BotConfig:
             cfg.strategy_params[nom] = valeur
     if getattr(args, "swing", None) is not None:
         cfg.smc.swing_lookback = args.swing
+    if getattr(args, "limit_margin", None) is not None:
+        cfg.risk.limit_fill_margin_points = args.limit_margin
     if getattr(args, "spread", None) is not None:
         cfg.symbol.spread_points = args.spread
     if getattr(args, "commission", None) is not None:

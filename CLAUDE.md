@@ -255,6 +255,61 @@ Conséquence de méthode : deux stratégies de même espérance en R n'ont pas l
 même espérance en euros si leurs stops diffèrent. **Comparer des stratégies en R
 sans regarder la distribution des stops est faux.**
 
+### L'entrée à l'ordre limite : impossible ici, et déjà mesurée
+
+Fermée le 2026-08-10. L'idée était d'échapper au spread en entrant sur un
+niveau posé à l'avance plutôt qu'au marché. Elle bute sur une contrainte
+d'exécution, pas sur une mesure.
+
+**Sur MT5, un ordre limite traverse le spread comme un ordre au marché.** Un
+*buy limit* s'exécute quand l'**ask** atteint le niveau, un *sell limit* quand
+le **bid** l'atteint. `broker.py` le modélise correctement : le remplissage
+d'un achat renvoie `bid_fill + spread`, inconditionnellement. Se poster au bid
+et se faire toucher suppose d'être fournisseur de liquidité sur un carnet, avec
+rétrocession *maker* — ça n'existe pas en CFD retail.
+
+L'ordre limite n'est donc pas un outil pour **économiser** le spread, mais pour
+**attendre un meilleur prix**, et il se paie en trades manqués.
+
+**Et c'était déjà mesuré sans qu'on le sache.** `strategy.py` fixe
+`entry_type = "limit"` par défaut et `SmcStrategy` ne le surcharge jamais :
+**`smc` entre à l'ordre limite depuis toujours**. Seules les stratégies de
+`scalping.py` forcent `entry_type = "market"`. Or `smc` est négative, et
+négative **frais retirés**. L'entrée limite a donc été éprouvée sur ~450 trades
+hors échantillon sans jamais rien sauver.
+
+### Le remplissage au simple contact fabriquait un faux positif
+
+Trouvé en examinant le moteur avant de tester quoi que ce soit — la bonne
+méthode, et elle a payé.
+
+Le courtier simulé remplissait un ordre limite **dès que la bougie touchait son
+niveau**, en totalité et au meilleur prix de l'excursion. C'est faux : il faut
+que le marché traite au-delà du niveau pour purger la file d'attente. Un plus
+bas qui vient effleurer le niveau au centième près ne sert personne.
+
+`limit_fill_margin_points` (défaut **1 point**, option `--limit-margin`) exige
+désormais une traversée réelle. Sensibilité mesurée sur `smc`, M5, spread 12 :
+
+| marge | trades | espérance | winrate |
+|---|---|---|---|
+| **0 pt** (ancien modèle) | 1 214 | **+0,007 R** | 33,6 % |
+| **1 pt** (défaut) | 1 138 | **−0,015 R** | 32,9 % |
+| 5 pts | 1 061 | −0,028 R | 32,4 % |
+| 20 pts | 864 | −0,091 R | 30,3 % |
+| 50 pts | 645 | −0,141 R | 28,7 % |
+
+**Un seul point de traversée fait changer le signe.** Le biais valait +0,022 R
+par trade et suffisait à rendre `smc` positive. Il flattait exactement les
+entrées limite, donc précisément la piste qu'on s'apprêtait à explorer.
+
+1 point est le minimum qui ait un sens — le prix doit avoir coté au-delà, pas
+seulement touché — mais **ce n'est pas une valeur mesurée** : la vraie
+probabilité d'être servi au plus bas d'une bougie est bien inférieure à 1.
+Avant tout verdict sur une stratégie à entrée limite, faire varier
+`--limit-margin` et vérifier que la conclusion tient. La colonne ci-dessus
+montre qu'elle se dégrade continûment : aucune valeur ne la sauve.
+
 ### Payer moins de spread : la question est mal posée
 
 Cherché le 2026-08-10. Trois constats, dans l'ordre où ils se sont imposés.
@@ -377,6 +432,12 @@ Chacun a produit un résultat faux et convaincant avant d'être trouvé.
   venait de `--strategy-param` disparaissait en silence.
 - **Seuil de rentabilité calculé sur l'ATR médian global** : flatte précisément
   les cellules à faible volatilité, où le spread pèse le plus.
+- **Ordre limite rempli au simple contact** : remplir dès que la bougie touche
+  le niveau accorde un service certain, en totalité, au meilleur prix de
+  l'excursion — alors qu'il faut traiter au-delà pour purger la file d'attente.
+  Valait **+0,022 R par trade** et rendait `smc` positive. Une traversée d'un
+  seul point suffit à inverser le signe. Régler `--limit-margin` et vérifier
+  que tout verdict sur une entrée limite tient quand on le fait varier.
 - **Cellule jugée contre zéro dans un marché en tendance** : tester une moyenne
   contre zéro demande « l'or a-t-il bougé ? », vrai pour toutes les cellules
   d'un marché qui monte. La dérive inconditionnelle est linéaire en horizon
