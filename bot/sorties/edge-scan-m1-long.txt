@@ -1,0 +1,48 @@
+﻿696371 bougies, horizon 3 bougies.
+232118 observations disjointes — une bougie sur 3, pour que les fenêtres ne se recouvrent pas.
+46 cellules examinées → seuil de t exigé 3.27 (Bonferroni).
+
+critère             valeur            n  rendement      t  seuil frais
+----------------------------------------------------------------------
+*sens de la bougie  baissière    114241    +0.021A   5.21       0.105A  <
+*momentum récent    Q1            46261    +0.026A   4.08       0.097A  <
+*corps de bougie    Q5            46376    +0.023A   3.72       0.105A  <
+ corps de bougie    Q4            46390    +0.017A   2.90       0.104A  <
+ heure              00h           10160    +0.039A   2.88       0.094A  <
+ heure              20h            9473    +0.067A   2.80       0.165A  <
+ volatilité (ATR)   Q1            46377    +0.019A   2.74       0.358A  <
+ volatilité (ATR)   Q2            46478    +0.017A   2.73       0.210A  <
+ jour               lundi         46697    +0.015A   2.61       0.106A  <
+ heure              22h            9985    +0.033A   2.39       0.110A  <
+ jour               mardi         46879    +0.012A   2.07       0.109A  <
+ heure              19h            9760    +0.027A   1.99       0.128A  <
+ momentum récent    Q5            46402    +0.012A   1.88       0.107A  <
+ heure              09h           10160    -0.021A  -1.72       0.122A  <
+ heure              06h           10160    +0.020A   1.64       0.108A  <
+
+« seuil frais » est propre à chaque cellule : une condition sur la volatilité
+ne connaît pas l'ATR médian du marché. « < » signale un effet qui ne couvrirait
+même pas le spread, donc inexploitable quelle que soit sa significativité.
+
+Le rendement est exprimé en multiples de l'ATR courant : +0.100A signifie
+un dixième d'amplitude de bougie gagné en moyenne sur 3 bougies.
+
+── Puissance de ce balayage ───────────────────────
+ATR médian                        : 128 points
+Plus petit effet détectable       : 0.013 ATR
+Plus petit effet rentable         : 0.141 ATR (spread 18 pts)
+
+La détection est plus fine que le seuil de rentabilité : un avantage
+exploitable aurait été vu. Son absence n'est donc pas un manque de données.
+
+3 cellule(s) franchissent le seuil statistique :
+  sens de la bougie = baissière : +0.021 ATR sur 114241 observations, t = 5.21 — NE COUVRE PAS ses frais (0.105 ATR exigés)
+  momentum récent = Q1 : +0.026 ATR sur 46261 observations, t = 4.08 — NE COUVRE PAS ses frais (0.097 ATR exigés)
+  corps de bougie = Q5 : +0.023 ATR sur 46376 observations, t = 3.72 — NE COUVRE PAS ses frais (0.105 ATR exigés)
+
+Aucune ne couvre son propre spread : significatif ne veut pas dire rentable.
+Un effet réel mais plus petit que les frais fait perdre de l'argent avec régularité.
+
+À vérifier avant d'en faire quoi que ce soit : ces cellules sont issues d'un
+balayage, donc choisies pour être les meilleures. Le test qui compte est de
+rejouer la même mesure sur une période que ce balayage n'a pas vue.

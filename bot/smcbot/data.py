@@ -96,6 +96,66 @@ def load_csv(path: str | Path) -> list[Candle]:
     return candles
 
 
+def debut_de_bougie(epoch: int, secondes: int) -> int:
+    """Instant de départ de la bougie contenant `epoch`."""
+    if secondes <= 0:
+        raise ValueError("La durée d'une bougie doit être positive.")
+    return epoch - (epoch % secondes)
+
+
+def agreger_ticks(
+    ticks: Sequence, secondes: int, complete_seulement: bool = False
+) -> list[Candle]:
+    """Reconstruit des bougies OHLC à partir de ticks, sur le **bid**.
+
+    Le courtier plafonne `copy_rates` à 100 000 bougies, soit environ 101 jours
+    en M1, alors que `copy_ticks_range` remonte bien plus loin — 30 mois relevés
+    le 2026-08-10. Reconstruire les bougies depuis les ticks donne donc accès à
+    un historique plusieurs fois plus profond, tout de suite, sans attendre
+    qu'il s'accumule.
+
+    On agrège le bid, comme MetaTrader : prendre le milieu ou l'ask ferait
+    entrer le spread dans la bougie, alors qu'il est déjà compté dans les frais.
+
+    Attention à l'appelant : les bornes des tranches téléchargées doivent tomber
+    sur des débuts de bougie. Sinon une bougie est coupée en deux, chaque moitié
+    part dans une tranche différente, et l'ouverture reconstruite est celle du
+    milieu de la bougie. Écart mesuré jusqu'à 165 points avant correction.
+    `complete_seulement` écarte la dernière bougie, celle qui est encore en
+    cours de formation.
+    """
+    bougies: list[Candle] = []
+    debut: int | None = None
+    o = h = l = c = 0.0
+    n = 0
+
+    for tick in ticks:
+        bid = float(tick["bid"])
+        if bid <= 0:
+            continue
+        seau = debut_de_bougie(int(tick["time"]), secondes)
+        if seau != debut:
+            if debut is not None:
+                bougies.append(
+                    Candle(
+                        datetime.fromtimestamp(debut, tz=timezone.utc), o, h, l, c, n
+                    )
+                )
+            debut, o, h, l, c, n = seau, bid, bid, bid, bid, 0
+        h = max(h, bid)
+        l = min(l, bid)
+        c = bid
+        n += 1
+
+    if debut is not None:
+        bougies.append(
+            Candle(datetime.fromtimestamp(debut, tz=timezone.utc), o, h, l, c, n)
+        )
+    if complete_seulement and bougies:
+        bougies.pop()
+    return bougies
+
+
 def save_csv(candles: Sequence[Candle], path: str | Path) -> None:
     """Écrit les bougies au format CSV standard."""
     with Path(path).open("w", newline="", encoding="utf-8") as fh:

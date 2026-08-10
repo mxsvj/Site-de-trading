@@ -172,9 +172,42 @@ Ce qu'il faut en retenir, dans cet ordre :
    du spread rouvre côté signal — et elle demande plus de données, pas une
    idée de plus.
 
-Le M1, lui, ne conclut rien : détection 0,167 contre 0,126 requis, il faudrait
-deux fois plus d'observations. Le courtier plafonnant à 100 000 bougies
-(≈ 101 jours en M1), la seule voie est d'accumuler l'historique dans le temps.
+Le M1, lui, ne concluait rien : détection 0,167 contre 0,126 requis, il faudrait
+environ deux fois plus d'observations.
+
+**Le plafond de 100 000 bougies a été levé le 2026-08-10.** Il portait sur
+`copy_rates`, pas sur `copy_ticks_range`. Sondage du même jour : `copy_rates`
+refuse au-delà de 100 000 bougies (≈ 101 jours en M1), mais les ticks remontent
+à **au moins 30 mois**. L'historique exploitable était donc environ neuf fois
+plus profond que ce que le projet utilisait, et disponible tout de suite — pas
+« à accumuler dans le temps ».
+
+`agreger_ticks()` reconstruit les bougies depuis les ticks, sur le **bid**
+comme MetaTrader. Validation contre les bougies du courtier : **27 544 bougies
+communes, 100,00 % identiques au centime**.
+
+**Le M1 conclut désormais, et il conclut non.** Reconstruit sur 24 mois :
+696 371 bougies depuis 121,7 millions de ticks, soit **7 fois le plafond**.
+
+| | à 100 000 bougies | à 696 371 bougies |
+|---|---|---|
+| effet détectable | 0,167 ATR | **0,013 ATR** |
+| effet rentable (18 pts) | 0,126 ATR | 0,141 ATR |
+| le balayage conclut ? | **non** | **oui**, détection 11× plus fine |
+
+Trois cellules franchissent le seuil statistique, **aucune ne couvre ses
+frais** : elles rendent 0,021 à 0,026 ATR quand il en faudrait 0,097 à 0,105.
+Hors échantillon, aucune ne franchit le seuil des deux côtés et cinq changent
+de signe.
+
+Le détail qui compte est le même qu'à 30 secondes : `sens de la bougie =
+baissière` **tient hors échantillon** (+0,022 ATR, t = 4,22 en étude ; +0,020,
+t = 3,09 en contrôle). C'est un effet réel et reproductible. Il rend cinq fois
+moins que ce que coûtent les frais.
+
+Conclusion : le manque de données n'était pas la cause. À toutes les échelles
+mesurées — 30 s, 60 s, M1, M5 — il existe de la structure réelle, et elle est
+systématiquement **un ordre de grandeur sous le coût de passage**.
 
 ### L'arrondi du lot : 19 % du risque perdu, invisible en R
 
@@ -259,6 +292,7 @@ décision qui en dépend.
 | `scan` | classer des instruments par coût de scalping | non |
 | `spread-profile` | spread réel heure par heure, depuis les ticks | non |
 | `outils_mesure/arrondi_lot.py` | ce que la troncature du volume retire au risque, et où sont les stops efficaces | non |
+| `outils_mesure/bougies_depuis_ticks.py` | reconstruit des bougies depuis les ticks, au-delà du plafond de 100 000 du courtier | non |
 | `outils_mesure/excursion_tick.py` | de combien l'or bouge en 1 à 120 s, et ce que le spread y coûte | non |
 | `outils_mesure/asymetrie_tick.py` | asymétrie directionnelle sous la minute, fenêtres disjointes et contrôle de puissance | oui, en interne |
 | `download` | exporter un historique MT5 en CSV | non |
@@ -287,6 +321,12 @@ Chacun a produit un résultat faux et convaincant avant d'être trouvé.
   venait de `--strategy-param` disparaissait en silence.
 - **Seuil de rentabilité calculé sur l'ATR médian global** : flatte précisément
   les cellules à faible volatilité, où le spread pèse le plus.
+- **Tranche de ticks qui coupe une bougie en deux** : si la borne d'un
+  téléchargement ne tombe pas sur un début de bougie, chaque moitié part dans
+  une tranche différente et l'ouverture reconstruite est celle du **milieu** de
+  la bougie. Erreur mesurée jusqu'à **165 points**, et invisible : 99,99 % des
+  bougies restaient justes, seules celles des frontières étaient fausses.
+  Aligner les bornes sur des débuts de bougie.
 - **Conclure en R sans regarder le risque réellement pris** : `r_multiple()` ne
   dépend que de distances de prix, donc l'espérance en R est aveugle à la
   troncature du volume, qui retire 19 % du risque en moyenne et jusqu'à 50 %.
