@@ -1,0 +1,23 @@
+﻿696,371 bougies — 2024-08-20 15:10:00+00:00 → 2026-08-10 15:09:00+00:00
+Tolérance de mèche : 5 points
+
+Bougies sans mèche : 170,062 (24.4 % des bougies)
+
+── Le prix revient-il sur l'ouverture ? ──
+  fenêtre   sans mèche    témoin    écart
+------------------------------------------
+       3b       54.6%     64.5%    -9.9%
+       6b       66.3%     73.5%    -7.2%
+      20b       81.1%     85.2%    -4.1%
+      50b       88.1%     90.7%    -2.6%
+
+── Trade de comblement, RR 1:1, entrée au marché ──
+  spread   trades   réussite   espérance
+----------------------------------------
+      0  170,061     44.7%     -0.107R
+     12  170,061     42.2%     -0.603R
+     18  170,061     40.2%     -0.852R
+
+Lecture : le taux de remplissage ne vaut que comparé à son témoin.
+Un écart nul signifie que « sans mèche » n'apporte aucune information,
+quelle que soit la valeur absolue du taux.

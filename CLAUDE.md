@@ -86,6 +86,7 @@ et 17,6 millions de ticks.
 | `lead-lag` (retard de l'or sur EUR/USD) | M1 | −0,178 R hors échantillon, pire qu'en apprentissage |
 | `edge-scan` (46 conditions × 3 horizons) | M1, M5 | aucune condition à la fois significative et rentable |
 | `asymetrie_tick` (51 conditions) | **30 s, 60 s** | aucune condition significative ; le balayage **conclut** (détection 3 à 6 fois plus fine que le seuil de rentabilité) |
+| imbalance « bougie sans mèche » | M1 | prémisse **inversée** : le bord est comblé moins souvent qu'un témoin apparié ; +0,004 R à spread nul sur 52 477 trades |
 
 **Régularité à retenir.** Quatre échelles de temps, de 1,5 seconde à M5, avec et
 sans frais, donnent toutes le même résultat : aucune information directionnelle
@@ -254,6 +255,49 @@ Et le biais n'est pas uniforme — il frappe d'autant plus que le stop est large
 Conséquence de méthode : deux stratégies de même espérance en R n'ont pas la
 même espérance en euros si leurs stops diffèrent. **Comparer des stratégies en R
 sans regarder la distribution des stops est faux.**
+
+### L'imbalance de bougie sans mèche : la prémisse est inversée
+
+Testée le 2026-08-11, reprise de `bot-scalping-gold/no_wick.py` qui la mesurait
+sur M15 — hors contraintes — et la laissait sans verdict.
+
+Prémisse : une bougie qui ferme sans mèche d'un côté laisse une « imbalance »
+que le prix reviendrait combler, en retouchant le bord sans mèche (l'ouverture).
+
+**Le test original était ininterprétable faute de témoin.** Il annonçait un taux
+de remplissage sans jamais mesurer à quelle fréquence le prix revient sur
+l'ouverture d'une bougie *quelconque*. Or le prix revient constamment sur ses
+pas : 80 % de remplissage peut très bien être **moins** que le hasard.
+
+Mesuré en M1 sur 696 371 bougies, avec témoin apparié — mêmes bougies, même
+cible, sans la condition « sans mèche ». Corps ≥ 100 points, 52 478 signaux :
+
+| fenêtre | sans mèche | témoin | écart |
+|---|---|---|---|
+| 3 bougies | 37,2 % | 43,9 % | **−6,7 %** |
+| 6 bougies | 51,7 % | 56,8 % | −5,1 % |
+| 20 bougies | 71,6 % | 75,1 % | −3,5 % |
+| 50 bougies | 81,7 % | 83,9 % | −2,3 % |
+
+**L'écart est négatif à toutes les fenêtres, et sans filtre de taille aussi**
+(−9,9 % à 3 bougies sur les 170 062 signaux). Le bord d'une bougie sans mèche
+est comblé **moins souvent** que l'ouverture d'une bougie ordinaire. C'est
+cohérent : une bougie sans mèche est une impulsion, le prix s'en éloigne.
+
+Attention à ne pas en déduire l'inverse comme stratégie. Avec un stop
+symétrique, la course entre le bord et le stop donne **50,2 % de réussite** et
+**+0,004 R à spread nul** sur 52 477 trades, quand l'écart-type de l'espérance y
+vaut 0,004 R : exactement pile ou face, dans un sens comme dans l'autre. Le
+moindre remplissage tient à la durée illimitée de la mesure de fréquence, pas à
+un avantage dans la course. Avec frais : −0,067 R à 12 points.
+
+`compensation.py` du même projet est bâtie sur cette imbalance (tendance +
+comblement + continuation). Sa base ne portant aucune information, elle hérite
+d'un fondement nul — à tester seulement si une raison nouvelle apparaît.
+
+**Les autres pistes de ce projet sont hors contraintes** : `pbd.py`, `lvn_v2.py`
+et `meanrev.py` déclarent toutes `SYMBOL = "USTECH"` — elles portent sur le
+NASDAQ, pas sur l'or. C'est pourquoi elles n'ont jamais eu de verdict ici.
 
 ### `momentum récent = Q1` : un vrai petit effet, 3,7 fois trop petit
 
