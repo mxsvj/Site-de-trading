@@ -255,6 +255,71 @@ Conséquence de méthode : deux stratégies de même espérance en R n'ont pas l
 même espérance en euros si leurs stops diffèrent. **Comparer des stratégies en R
 sans regarder la distribution des stops est faux.**
 
+### `momentum récent = Q1` : un vrai petit effet, 3,7 fois trop petit
+
+Suivi le 2026-08-11, parce qu'il était le seul à ressortir **plus fort hors
+échantillon qu'en étude** — l'inverse du motif d'un artefact.
+
+La correction de la dérive a d'abord tranché à moitié : le t d'étude s'effondre
+de 2,30 à **0,61**, mais celui de contrôle tient, 3,73 → **3,54**. Normal : la
+dérive valait +1,1 point sur l'étude contre +0,2 sur le contrôle, donc la
+retirer ne pouvait pas affecter les deux périodes de la même façon.
+
+Restait à savoir si le contrôle était un régime ou un accident.
+`stabilite_cellule.py` découpe les 24 mois en huit tranches :
+
+| | |
+|---|---|
+| Sous-périodes de signe positif | **7 / 8** |
+| Effet par sous-période | −4,7 à +4,6 points |
+| Aucune ne franchit son seuil | t max 2,10 pour 3,27 exigé |
+
+Ce n'est donc **pas une bouffée** : l'effet est là presque partout, trop faible
+pour être significatif sur 5 800 observations à la fois. Mesure poolée sur les
+24 mois complets :
+
+| | |
+|---|---|
+| Effet | +0,026 ATR = **3,3 points** |
+| t | **2,65** — sous le seuil de 3,27 |
+| Frais exigés (ATR propre à la cellule) | 0,097 ATR = **12,4 points** |
+
+**Verdict : probablement un retour à la moyenne réel, et inexploitable.** Il ne
+franchit pas le seuil de significativité une fois corrigé du nombre de cellules,
+et surtout il rend **3,7 fois moins que son propre coût**. Même lecture qu'à 30
+et 60 secondes : le retour à la moyenne existe à toutes les échelles, il pèse
+2 à 5 points, les frais en coûtent 9 à 24.
+
+Ne pas y revenir en espérant plus de données : l'obstacle n'est pas la
+significativité, c'est l'ordre de grandeur.
+
+### Les réfutations tiennent au coût corrigé
+
+Rejeu du 2026-08-11 sur le moteur corrigé, M5 sauf mention. Les verdicts avaient
+été rendus à 24 points de spread, alors que la période en valait ≈ 18 et que le
+régime actuel est à 12 — il fallait vérifier qu'aucun ne basculait.
+
+| stratégie | 24 pts | 18 pts | 12 pts |
+|---|---|---|---|
+| `smc` | −0,052 R | −0,043 R | **−0,015 R** |
+| `fade` | −0,128 R | −0,120 R | −0,068 R |
+| `asian-sweep` | −0,190 R | −0,186 R | −0,188 R |
+| `vol-break` (M1) | −0,159 R | −0,179 R | −0,136 R |
+| `orb` | 2 trades | 3 trades | 3 trades |
+
+**Aucune ne devient positive.** Diviser le spread par deux améliore `smc` de
++0,037 R et `fade` de +0,060 R, sans suffire.
+
+**La nuance qui compte, et elle porte sur `smc`.** À 12 points elle vaut
+−0,015 R sur 1 138 trades, quand l'écart-type de l'espérance y est de **0,030 R**.
+Elle n'est donc plus distinguable de zéro. Ce n'est pas un encouragement : une
+espérance nulle ne paie rien, la lecture est faite sur l'échantillon complet et
+non sur une validation, et `smc` reste négative **frais retirés** — ce qui ne
+doit rien au spread.
+
+`asian-sweep` ne bouge quasiment pas (−0,190 → −0,188) : ses stops sont assez
+larges pour que le spread y pèse peu. Son problème n'a jamais été le coût.
+
 ### L'entrée à l'ordre limite : impossible ici, et déjà mesurée
 
 Fermée le 2026-08-10. L'idée était d'échapper au spread en entrant sur un
@@ -403,6 +468,7 @@ décision qui en dépend.
 | `scan` | classer des instruments par coût de scalping | non |
 | `spread-profile` | spread réel heure par heure, depuis les ticks | non |
 | `outils_mesure/arrondi_lot.py` | ce que la troncature du volume retire au risque, et où sont les stops efficaces | non |
+| `outils_mesure/stabilite_cellule.py` | une cellule d'`edge-scan` tient-elle sur toutes les sous-périodes, ou par bouffées | non |
 | `outils_mesure/bougies_depuis_ticks.py` | reconstruit des bougies depuis les ticks, au-delà du plafond de 100 000 du courtier | non |
 | `outils_mesure/excursion_tick.py` | de combien l'or bouge en 1 à 120 s, et ce que le spread y coûte | non |
 | `outils_mesure/asymetrie_tick.py` | asymétrie directionnelle sous la minute, fenêtres disjointes et contrôle de puissance | oui, en interne |

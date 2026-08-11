@@ -1,0 +1,24 @@
+﻿Étude    : 417822 bougies (2024-08-20 → 2025-10-24)
+Contrôle : 278549 bougies (2025-10-24 → 2026-08-10)
+46 cellules comparables, seuil de t 3.27.
+
+critère             valeur        rendement      t  │  rendement      t
+                                    — étude —     │   — contrôle —   
+----------------------------------------------------------------------------
+ corps de bougie    Q1              -0.002A  -2.03  │    -0.004A  -0.61
+ heure              13h             -0.017A  -1.94  │    -0.022A  -1.18
+ corps de bougie    Q4              +0.029A   1.93  │    +0.003A   0.10
+!heure              19h             +0.047A   1.88  │    -0.004A  -0.29
+ heure              22h             +0.045A   1.70  │    +0.015A   0.60
+!momentum récent    Q4              +0.001A  -1.68  │    -0.001A  -0.35
+!sens de la bougie  haussière       +0.007A  -1.51  │    -0.016A  -2.73
+!momentum récent    Q5              +0.026A   1.49  │    -0.011A  -1.17
+ sens de la bougie  baissière       +0.022A   1.48  │    +0.020A   2.79
+ corps de bougie    Q5              +0.025A   1.44  │    +0.017A   1.55
+
+! = 4 cellule(s) changent de signe hors échantillon.
+  C'est le verdict le plus net qui soit : ce n'était pas un effet, c'était du bruit.
+
+Aucune condition ne franchit le seuil des deux côtés.
+Les écarts observés sur la période d'étude ne se reproduisent pas ailleurs :
+c'est la définition d'un artefact de sélection.

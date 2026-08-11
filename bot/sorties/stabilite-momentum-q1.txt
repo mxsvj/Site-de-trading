@@ -1,0 +1,21 @@
+﻿696,371 bougies — 2024-08-20 15:10:00+00:00 → 2026-08-10 15:09:00+00:00
+Cellule suivie : momentum récent = Q1, horizon 3
+
+période                        n  excès (ATR)   points       t   seuil
+----------------------------------------------------------------------
+2024-08-20 → 11-15         5,794      +0.000A     +0.0    0.01    3.27 
+2024-11-15 → 02-17         5,776      +0.020A     +2.6    1.11    3.27 
+2025-02-17 → 05-16         5,809      -0.037A     -4.7   -1.80    3.27 
+2025-05-16 → 08-14         5,807      +0.036A     +4.6    2.10    3.27 
+2025-08-14 → 11-11         5,822      +0.005A     +0.7    0.29    3.27 
+2025-11-11 → 02-11         5,841      +0.028A     +3.6    1.57    3.27 
+2026-02-11 → 05-12         5,783      +0.036A     +4.6    1.89    3.27 
+2026-05-12 → 08-10         5,818      +0.025A     +3.1    1.40    3.27 
+
+7/8 sous-périodes de signe positif.
+Seuil de rentabilité : 0.141 ATR = 18 points de frais.
+
+Un effet réel se voit sur la majorité des sous-périodes, même sans
+franchir le seuil sur chacune — la puissance y est plus faible.
+Un effet concentré sur une seule tranche est une bouffée, pas un
+régime.
