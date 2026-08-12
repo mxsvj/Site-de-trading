@@ -582,6 +582,53 @@ Le travail continue tant que le propriétaire n'est pas satisfait. Un résultat
 négatif ferme une piste, il ne ferme pas le projet : chercher la suivante à
 l'intérieur des contraintes ci-dessus. Ne pas proposer d'arrêter.
 
+## Travailler sans supervision
+
+Le propriétaire n'est pas développeur et ne veut pas arbitrer chaque étape.
+**Ne pas lui demander de choisir entre deux pistes techniques** : trancher,
+expliquer le choix en deux lignes, et avancer. Il interviendra s'il n'est pas
+d'accord.
+
+### Ce qui se décide seul
+
+Écrire et modifier du code, ajouter des tests, lancer backtests, balayages et
+mesures, corriger un défaut découvert en chemin, committer et pousser sur la
+branche de travail. Choisir quelle piste explorer ensuite.
+
+### Ce qui ne se décide jamais seul
+
+- **Passer un ordre, sur quelque compte que ce soit.** Le dépôt n'a aucune
+  couche d'exécution réelle et ne doit pas en acquérir. `paper` reste une
+  simulation ; l'activer en continu se demande.
+- **Dépenser de l'argent** : frais d'évaluation d'une prop firm, abonnement à
+  des données, compte réel.
+- **Changer les réglages du compte** de trading ou du terminal.
+- **Modifier ou supprimer les contraintes de ce fichier.** Elles viennent du
+  propriétaire, pas d'une mesure.
+- **Réinitialiser le compteur d'hypothèses.**
+
+### Ordre de priorité quand une piste se ferme
+
+1. **Un défaut de mesure suspecté prime sur tout le reste.** Un chiffre
+   flatteur est un chiffre à vérifier : dans ce projet, chacun cachait un
+   bug — lookahead, stop appliqué à sa propre bougie, décomposition lue sur
+   l'apprentissage, paramètres écrasés en silence, dérive prise pour un signal.
+2. **Une approximation encore non levée** vaut mieux qu'une idée neuve : elle
+   se mesure, alors qu'une idée se teste et consomme une hypothèse.
+3. **Un levier de l'ordre de grandeur du problème.** Les effets réels valent
+   2 à 3 points, le spread en coûte 9 à 24 : une piste qui améliore de 0,5
+   point ne sert à rien, quelle que soit son élégance.
+4. **Une nouvelle source d'information**, plutôt qu'une forme de plus sur la
+   même source. Sept familles de motifs de prix ont échoué ; la huitième
+   échouera aussi.
+
+### Rendre compte
+
+Après chaque avancée, dire en quelques lignes : ce qui a été mesuré, le
+chiffre obtenu, et ce qu'il ferme ou ouvre. Pas de tableau de bord, pas de
+question ouverte en fin de message — sauf si une décision de la liste
+« jamais seul » est réellement en jeu.
+
 ## Règles de méthode
 
 - Toute conclusion se lit sur la **période de validation**, jamais sur
