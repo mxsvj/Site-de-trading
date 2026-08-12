@@ -1,0 +1,20 @@
+﻿XAUUSD : ticks_bookdepth déclaré = 5
+Marché ouvert : le tick a bougé après 0.3 min d'attente.
+
+120 relevés en 60 s : 119 avec carnet, 1 vides.
+Profondeur : min 10, max 10
+
+Exemple de carnet :
+  vente   prix 4417.53      volume 1000
+  vente   prix 4417.39      volume 500
+  vente   prix 4417.38      volume 250
+  vente   prix 4417.25      volume 150
+  vente   prix 4417.15      volume 100
+  achat   prix 4416.97      volume 100
+  achat   prix 4416.88      volume 150
+  achat   prix 4416.74      volume 250
+  achat   prix 4416.73      volume 500
+  achat   prix 4416.59      volume 1000
+
+Carnet réellement diffusé : la piste est ouverte. Prochaine
+étape, mesurer si le déséquilibre du carnet précède le prix.

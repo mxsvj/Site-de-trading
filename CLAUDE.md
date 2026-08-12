@@ -256,6 +256,39 @@ Conséquence de méthode : deux stratégies de même espérance en R n'ont pas l
 même espérance en euros si leurs stops diffèrent. **Comparer des stratégies en R
 sans regarder la distribution des stops est faux.**
 
+### Le carnet d'ordres : diffusé, mais cosmétique
+
+Testé le 2026-08-12. C'était le seul champ d'information jamais exploré — tout
+le reste vient du prix seul.
+
+**Le carnet est bien diffusé sur l'or** : 10 niveaux (5 achat, 5 vente), reçus
+sur 119 relevés sur 120, `ticks_bookdepth = 5` déclaré. Le doute portait sur son
+existence, il est levé.
+
+**Mais les volumes sont fabriqués.** Sur 2 053 états relevés en 8 minutes :
+
+| | |
+|---|---|
+| Échelles de volumes distinctes, côté vente | **2** |
+| Échelles distinctes, côté achat | **2** |
+| Valeurs distinctes du déséquilibre | **3** (−0,429 · 0 · +0,429) |
+| Déséquilibre exactement nul | **48 %** des états |
+
+Les deux gabarits sont `(100, 150, 250, 500, 1000)` dans 75 % des cas et
+`(100, 150, 750, 1000, 3000)` dans 25 %. Les **prix** des niveaux suivent le
+marché, les **volumes** ne prennent que ces deux formes. Un déséquilibre calculé
+là-dessus ne mesure pas la pression acheteuse ou vendeuse : il mesure lequel des
+deux gabarits est affiché.
+
+Piste fermée. Le carnet ne portera pas d'information tant que ce courtier
+affiche une profondeur synthétique.
+
+**Vérifier avant de collecter.** MT5 ne conserve aucun historique de carnet : il
+aurait fallu plusieurs jours d'enregistrement pour obtenir la puissance de nos
+autres mesures. Compter les combinaisons de volumes distinctes coûte 8 minutes
+et tranche la question. `enregistre_carnet.py` reste utilisable si un jour le
+compte ou le courtier change.
+
 ### L'imbalance de bougie sans mèche : la prémisse est inversée
 
 Testée le 2026-08-11, reprise de `bot-scalping-gold/no_wick.py` qui la mesurait
@@ -542,6 +575,14 @@ Chacun a produit un résultat faux et convaincant avant d'être trouvé.
   venait de `--strategy-param` disparaissait en silence.
 - **Seuil de rentabilité calculé sur l'ATR médian global** : flatte précisément
   les cellules à faible volatilité, où le spread pèse le plus.
+- **Sonder un instrument pendant sa coupure quotidienne** : l'or ne cote pas
+  entre 21:00 et 22:00 UTC. Une sonde du carnet y a renvoyé zéro niveau sur l'or
+  contre dix sur EURUSD, ce qui semblait prouver que le courtier ne diffuse rien
+  sur l'or. Il diffuse bien dix niveaux. Exiger qu'un tick vienne de bouger
+  avant de conclure à l'absence de quoi que ce soit.
+- **Profondeur de marché prise pour un vrai carnet** : compter les combinaisons
+  de volumes distinctes avant d'engager une collecte. Deux gabarits sur
+  2 053 états signifient une profondeur cosmétique.
 - **Ordre limite rempli au simple contact** : remplir dès que la bougie touche
   le niveau accorde un service certain, en totalité, au meilleur prix de
   l'excursion — alors qu'il faut traiter au-delà pour purger la file d'attente.
