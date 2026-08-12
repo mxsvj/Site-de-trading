@@ -1,0 +1,48 @@
+﻿Collecte XAUUSD et XAGUSD, 60 j, horizon 30 s, mémoire 30 s.
+
+113,460 observations disjointes où les deux métaux cotent.
+Étude 68,076, contrôle 45,384.
+Dérive de l'or : -0.43 pts en étude, +0.72 en contrôle — retirée des deux côtés.
+15 cellules, seuil de t 2.94 (Bonferroni).
+
+critère               valeur        n    excès      t  frais  │    excès      t
+------------------------------------------------------------------------------
+ avance de l'argent   Q5        13615    +3.3p   2.80     13  │    +2.5p   2.11
+ momentum de l'or     Q5        13612    -2.6p  -2.19     13  │    -3.9p  -3.01
+ momentum de l'or     Q1        13629    +1.8p   1.47     13  │    +4.7p   3.73
+ momentum de l'or     Q2        13659    +1.2p   1.33     13  │    +0.2p   0.21
+!avance de l'argent   Q2        13615    -1.2p  -1.30     13  │    +0.3p   0.27
+ avance de l'argent   Q3        13616    -1.0p  -1.15     13  │    -0.0p  -0.01
+ avance de l'argent   Q1        13616    -1.3p  -1.04     13  │    -4.1p  -3.24
+!momentum de l'argent Q3        13579    +0.7p   0.81     13  │    -2.6p  -2.93
+ momentum de l'argent Q4        13607    -0.7p  -0.73     13  │    -0.3p  -0.32
+ momentum de l'argent Q1        13618    +0.5p   0.41     13  │    +3.2p   2.60
+ momentum de l'argent Q5        13612    -0.5p  -0.40     13  │    -1.3p  -1.03
+!momentum de l'or     Q3        13579    -0.3p  -0.34     13  │    +0.4p   0.41
+ avance de l'argent   Q4        13614    +0.1p   0.16     13  │    +1.3p   1.32
+!momentum de l'argent Q2        13660    -0.1p  -0.10     13  │    +1.0p   1.09
+ momentum de l'or     Q4        13597    -0.1p  -0.07     13  │    -1.3p  -1.36
+
+── Puissance ──────────────────────────────────────
+Plus petit effet détectable       : 2.7 points
+Plus petit effet rentable         : 13.0 points
+
+La détection est plus fine que le seuil : un avantage exploitable
+aurait été vu.
+
+── L'effet croît-il avec l'ampleur de la divergence ? ──
+queue                n   achat   vente  │      n   achat   vente
+                             — étude —  │           — contrôle —
+----------------------------------------------------------------
+20 % extrêmes   13,615   +3.3p   +1.3p  │  9,076   +2.5p   +4.1p
+5 % extrêmes     3,403   +5.8p   +0.5p  │  2,269   -0.1p   +3.1p
+1 % extrêmes       680  +15.3p   -4.1p  │    453   +5.8p   +2.1p
+
+« achat » = avantage d'une position longue sur la queue haute,
+« vente » = avantage d'une position courte sur la queue basse.
+Chacune est un trade séparé qui paie ses 13 points de
+spread : c'est à ce chiffre-là qu'il faut les comparer, pas à leur somme.
+
+── Verdict ────────────────────────────────────────
+Aucune condition ne franchit le seuil des deux côtés.
+L'argent ne précède pas l'or à cette échelle.

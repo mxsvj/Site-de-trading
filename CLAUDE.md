@@ -256,6 +256,46 @@ Conséquence de méthode : deux stratégies de même espérance en R n'ont pas l
 même espérance en euros si leurs stops diffèrent. **Comparer des stratégies en R
 sans regarder la distribution des stops est faux.**
 
+### L'argent précède-t-il l'or ? Un vrai signal, 3 à 5 fois trop petit
+
+Testé le 2026-08-12. `lead-lag` avait échoué avec EUR/USD (−0,178 R), mais le
+lien y est macro et lent. L'argent est le substitut direct de l'or, coté à la
+même densité (3,2 contre 3,3 ticks/s). On ne trade toujours que XAUUSD :
+l'argent est une entrée, jamais une position.
+
+Variable mesurée : la **divergence**, mouvement de l'argent moins celui de l'or,
+chacun rapporté à sa propre volatilité. Témoin obligatoire, le momentum de l'or
+seul — sans lui, on ne saurait pas si la divergence apporte autre chose que ce
+que l'or contient déjà. 60 jours, 113 435 observations disjointes.
+
+**Le signal existe, et il est monotone.** Ce n'est pas du bruit :
+
+| avance de l'argent | étude | contrôle |
+|---|---|---|
+| Q1 | −1,5 p | −3,8 p |
+| Q3 | −0,9 p | −0,6 p |
+| Q5 | **+2,9 p** | **+2,4 p** |
+
+Signe stable dans les deux périodes, progression régulière du bas vers le haut.
+Mais aucune cellule ne franchit le seuil de 2,94 des deux côtés, et le balayage
+**conclut** : détection 2,6 points contre 13,0 de seuil de rentabilité.
+
+**L'effet ne grandit pas dans la queue de façon reproductible.**
+
+| queue | achat étude | achat contrôle | vente étude | vente contrôle |
+|---|---|---|---|---|
+| 20 % | +3,3 p | +2,5 p | +1,3 p | +4,1 p |
+| 5 % | +5,8 p | **−0,1 p** | +0,5 p | +3,1 p |
+| 1 % | **+15,3 p** | **+5,8 p** | −4,1 p | **+2,1 p** |
+
+Le +15,3 de la queue à 1 % aurait battu les 13 points de spread. Il tombe à
++5,8 hors échantillon et le côté vente change de signe : sur 680 observations,
+c'était de la sélection. Seul le seuil à 20 % tient des deux côtés, à 2 à 4
+points — le même ordre de grandeur que tout le reste.
+
+L'argent porte donc une information réelle sur l'or à 30 secondes, et elle est
+3 à 5 fois trop petite pour payer le passage.
+
 ### La microstructure des ticks : le rythme ne dit rien de plus que la forme
 
 Testée le 2026-08-12. Dernière source d'information que les bougies détruisent
@@ -641,6 +681,11 @@ Chacun a produit un résultat faux et convaincant avant d'être trouvé.
   venait de `--strategy-param` disparaissait en silence.
 - **Seuil de rentabilité calculé sur l'ATR médian global** : flatte précisément
   les cellules à faible volatilité, où le spread pèse le plus.
+- **Additionner les deux côtés d'un écart longue/courte** : la différence entre
+  la queue haute et la queue basse n'est pas ce qu'une position capte. Chaque
+  côté est un trade distinct qui paie **son propre spread**. Les sommer double
+  l'avantage apparent — dans la mesure argent/or, l'écart haut-bas affichait
+  +8,2 points là où une position n'en captait que 3 à 4.
 - **Sonder un instrument pendant sa coupure quotidienne** : l'or ne cote pas
   entre 21:00 et 22:00 UTC. Une sonde du carnet y a renvoyé zéro niveau sur l'or
   contre dix sur EURUSD, ce qui semblait prouver que le courtier ne diffuse rien
