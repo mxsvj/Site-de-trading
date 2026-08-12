@@ -256,6 +256,36 @@ Conséquence de méthode : deux stratégies de même espérance en R n'ont pas l
 même espérance en euros si leurs stops diffèrent. **Comparer des stratégies en R
 sans regarder la distribution des stops est faux.**
 
+### Pourquoi rien ne marche : avantage et coût varient en sens inverse
+
+Mesuré le 2026-08-12, et c'est l'explication structurelle du projet.
+
+Le seuil de rentabilité vaut `spread / ATR`. Le spread est **fixe en points**,
+l'ATR non : le seuil est donc bien plus bas quand la volatilité est haute. Le
+levier est réel et vaut un facteur 8 entre les quintiles extrêmes — exactement
+l'ordre de grandeur qui manque. Sur 696 371 bougies M1, horizon 3, spread 12 :
+
+| volatilité | effet | frais exigés | effet / frais |
+|---|---|---|---|
+| Q1 | +0,019 A | 0,239 A | 0,08 |
+| Q2 | +0,017 A | 0,140 A | 0,12 |
+| Q3 | +0,006 A | 0,093 A | 0,06 |
+| Q4 | +0,010 A | 0,063 A | **0,16** |
+| Q5 | **−0,005 A** | **0,030 A** | −0,17 |
+
+**Là où le coût est le plus bas, l'effet est nul.** Le quintile le plus volatil
+ne réclame que 0,030 ATR pour couvrir ses frais — huit fois moins que le plus
+calme — et il ne rend rien, voire un peu moins que rien. Symétriquement, le
+quintile le plus calme porte le plus gros effet et exige le seuil le plus haut.
+
+Le meilleur rapport, tous régimes confondus, est **0,16** : il manque encore un
+facteur 6. Ce n'est donc pas qu'on n'a pas trouvé le bon régime — c'est que le
+rapport avantage/coût reste borné autour de 0,1 quel que soit le régime.
+
+Conséquence de méthode : inutile de chercher « le bon moment » pour trader. La
+sélection par la volatilité, par l'heure ou par l'activité déplace les deux
+termes ensemble.
+
 ### Le carnet d'ordres : diffusé, mais cosmétique
 
 Testé le 2026-08-12. C'était le seul champ d'information jamais exploré — tout
