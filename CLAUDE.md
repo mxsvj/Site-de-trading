@@ -256,6 +256,54 @@ Conséquence de méthode : deux stratégies de même espérance en R n'ont pas l
 même espérance en euros si leurs stops diffèrent. **Comparer des stratégies en R
 sans regarder la distribution des stops est faux.**
 
+### Combiner les signaux faibles : indépendants, et toujours insuffisants
+
+Mesuré le 2026-08-12. Chaque effet réel trouvé vaut 2 à 4 points quand le spread
+en coûte 12. Comme ils viennent de sources différentes, restait la seule voie
+arithmétique : non pas trouver un meilleur signal, mais vérifier si trois
+faibles s'additionnent.
+
+**Ils sont bien indépendants.** Corrélations sur 91 411 observations :
+
+| | retour à la moyenne | avance de l'argent | côté qui bouge |
+|---|---|---|---|
+| retour à la moyenne | 1,000 | 0,289 | −0,009 |
+| avance de l'argent | 0,289 | 1,000 | −0,009 |
+| côté qui bouge | −0,009 | −0,009 | 1,000 |
+
+**Et la combinaison apporte réellement quelque chose**, à poids égaux, jamais
+ajustés, avec une normalisation calculée sur l'étude seule puis appliquée telle
+quelle au contrôle :
+
+| signal, meilleur quintile | étude | contrôle |
+|---|---|---|
+| retour à la moyenne | +1,9 p | +1,5 p |
+| avance de l'argent | +2,5 p | +2,2 p |
+| côté qui se repositionne | −0,2 p | +1,7 p |
+| **score combiné** | +2,6 p | **+3,9 p** |
+
+Mieux que le meilleur signal seul, et confirmé hors échantillon. La queue à 5 %
+monte même à **+5,7 points** en contrôle — le meilleur chiffre du projet,
+ramenant l'écart au spread de 5× à 2,1×.
+
+**Mais l'estimation ne tient pas d'un horizon à l'autre**, ce qui interdit d'y
+croire :
+
+| horizon | queue 5 %, étude | queue 5 %, contrôle |
+|---|---|---|
+| 30 s | +5,1 p | **+5,7 p** |
+| 60 s | +9,3 p | **+1,5 p** |
+| 120 s | +16,9 p | **+4,4 p** |
+
+En étude, l'avantage explose avec l'horizon — jusqu'à +30,0 points sur la queue
+à 1 % à 120 s. En contrôle, il reste plat entre 1,5 et 5,7, et devient négatif à
+60 s. C'est la signature du surajustement, pas d'un effet qui grandit avec le
+temps de détention.
+
+Conclusion : la combinaison est légitime et aide vraiment, elle ramène l'écart
+d'un facteur 5 à un facteur 2 ou 3, et l'estimation reste trop instable pour
+qu'on puisse la distinguer du bruit. Aucun horizon n'approche les 12 points.
+
 ### L'argent précède-t-il l'or ? Un vrai signal, 3 à 5 fois trop petit
 
 Testé le 2026-08-12. `lead-lag` avait échoué avec EUR/USD (−0,178 R), mais le

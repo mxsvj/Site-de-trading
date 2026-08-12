@@ -1,0 +1,34 @@
+﻿Collecte, 60 j, horizon 30 s.
+91,414 observations — étude 54,848, contrôle 36,566.
+
+── Corrélation entre prédicteurs (période d'étude) ──
+                            retour à la mo  avance de l'ar  côté qui se re
+retour à la moyenne                  1.000           0.290          -0.008
+avance de l'argent                   0.290           1.000          -0.008
+côté qui se repositionne            -0.008          -0.008           1.000
+
+Proche de 0 : sources indépendantes, les avantages peuvent s'additionner.
+Proche de ±1 : redondants, combiner n'apporte rien.
+
+── Avantage du meilleur quintile, en points ──
+signal                           étude   contrôle   frais
+----------------------------------------------------------
+retour à la moyenne              +1.8p      +1.6p      12
+avance de l'argent               +2.5p      +2.2p      12
+côté qui se repositionne         -0.2p      +1.7p      12
+SCORE COMBINÉ                    +2.5p      +4.0p      12
+
+Lecture : chaque ligne est l'avantage d'une position longue prise
+sur le cinquième le plus favorable, à comparer aux 12 points
+de spread qu'elle paierait. Le score combiné est la somme des trois
+prédicteurs normalisés, à poids égaux — jamais ajustés.
+
+── Queue du score combiné ──
+queue             n étude    étude  │ n contrôle  contrôle
+----------------------------------------------------------
+20 % meilleurs     10,969    +2.5p  │      7,313     +4.0p
+5 % meilleurs       2,742    +5.1p  │      1,828     +5.7p
+1 % meilleurs         548    -5.6p  │        365     +0.2p
+
+Il faudrait dépasser 12 points **sur le contrôle** pour qu'une
+position couvre seulement son spread, avant tout gain.
