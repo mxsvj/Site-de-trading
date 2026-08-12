@@ -256,6 +256,42 @@ Conséquence de méthode : deux stratégies de même espérance en R n'ont pas l
 même espérance en euros si leurs stops diffèrent. **Comparer des stratégies en R
 sans regarder la distribution des stops est faux.**
 
+### La microstructure des ticks : le rythme ne dit rien de plus que la forme
+
+Testée le 2026-08-12. Dernière source d'information que les bougies détruisent
+par construction — la cadence des cotations, plutôt que la forme du prix.
+
+**Ce que les ticks de l'or contiennent, vérifié avant de bâtir.** Sur 506 357
+ticks : **aucun drapeau BUY/SELL**, `last` inutilisé, `volume` **nul à 100 %**.
+Pas de sens de transaction, pas de volume échangé — c'est un flux de cotation,
+pas un flux de transactions. Il reste malgré tout deux choses réelles :
+
+- **les mises à jour unilatérales** : 6,3 % des ticks ne bougent que l'ask,
+  6,0 % que le bid. Quel côté se repositionne seul n'apparaît nulle part dans
+  une bougie ;
+- **`time_msc`**, l'horodatage à la milliseconde, donc la cadence et son
+  accélération.
+
+Quatre conditions bâties là-dessus — déséquilibre du côté qui bouge, cadence du
+flux, accélération, respiration du spread — mesurées sur 60 jours, fenêtres
+disjointes, excès sur la moyenne inconditionnelle, 115 989 observations :
+
+| | |
+|---|---|
+| Cellules comparables | 22, seuil de t **3,05** |
+| Plus fort effet en étude | t = 2,48 — **sous le seuil** |
+| Cellules changeant de signe hors échantillon | 10 sur 14 |
+| Effets observés | ±0,4 à 2,5 points |
+| Frais | 12 à 15 points |
+
+**Le balayage conclut** : détection **2,0 points** contre 13,2 de seuil de
+rentabilité, soit 6,6 fois plus fin qu'il ne faudrait. Un avantage exploitable
+aurait été vu.
+
+Le rythme du flux ne porte donc pas plus que la forme du prix, et les effets
+qu'on y trouve ont exactement la même taille qu'ailleurs : quelques points
+contre un spread qui en coûte treize.
+
 ### Pourquoi rien ne marche : avantage et coût varient en sens inverse
 
 Mesuré le 2026-08-12, et c'est l'explication structurelle du projet.
