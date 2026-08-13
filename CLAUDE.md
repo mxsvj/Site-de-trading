@@ -256,6 +256,39 @@ Conséquence de méthode : deux stratégies de même espérance en R n'ont pas l
 même espérance en euros si leurs stops diffèrent. **Comparer des stratégies en R
 sans regarder la distribution des stops est faux.**
 
+### Recoupement Dukascopy : nos mesures portent bien sur le marché
+
+Levé le 2026-08-13. Toutes les conclusions du projet reposaient sur un seul
+flux — celui de Pepperstone. Deux d'entre elles auraient été fragiles si ce flux
+était particulier : le profil de spread, qui fixe tous les seuils de
+rentabilité, et le constat que l'avantage ne vit que dans les moments chers.
+
+Dukascopy fournit bid **et** ask, indépendamment, avec une couverture M1 pleine
+depuis ~2005. Sur 45 jours et 41 929 minutes communes :
+
+| | |
+|---|---|
+| Corrélation des rendements M1 | **0,9932** |
+| Écart de niveau médian | 27 points |
+
+Les deux flux décrivent le même marché. Ce qu'on mesure est l'or, pas une
+particularité de cotation.
+
+**La respiration du spread est une propriété du marché.** Profil horaire
+Dukascopy : moins cher à 07 h, plus cher à 22 h, **rapport 1,4**. Le nôtre :
+moins cher en séance, plus cher hors séance, **rapport 1,5**. Mêmes heures,
+même forme. Le creux et le plein ne viennent donc pas du courtier.
+
+Conséquence pour la piste précédente : si le spread s'élargit chez tout le monde
+au même moment, l'avantage trouvé au-delà de 16 points de spread est encore
+moins exploitable qu'écrit — changer de courtier ne le rendrait pas payable.
+
+**Ne jamais substituer leurs chiffres aux nôtres.** Le niveau diffère du tout au
+tout : 58 à 79 points chez Dukascopy contre 11 à 17 chez Pepperstone. Le niveau
+est propre à chaque courtier, et comparer la clôture d'une bougie ask à celle
+d'une bougie bid est de toute façon moins propre qu'une lecture directe des
+ticks. Dukascopy sert à valider une **forme**, jamais à chiffrer un coût.
+
 ### Le seul rapport supérieur à 1 du projet — et pourquoi il ne se trade pas
 
 Mesuré le 2026-08-13 sur **1 014 091 observations** (700 jours de ticks or et

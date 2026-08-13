@@ -1,0 +1,54 @@
+﻿python : INFO:DUKASCRIPT:current timestamp :2026-07-28T21:00:00
+Au caractère Ligne:1 : 351
++ ... rading\bot; python outils_mesure\recoupe_dukascopy.py --csv 
+data/xauu ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (INFO:DUKASCRIPT...-07-28T21:0 
+   0:00:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+INFO:DUKASCRIPT:current timestamp :2026-07-28T21:00:00
+Dukascopy XAUUSD M1, 2026-06-27 → 2026-08-11
+  43,753 bougies bid, 43,753 bougies ask
+
+── Recoupement des prix — 41,929 minutes communes ──
+  écart de niveau médian   : 27 points
+  corrélation des rendements M1 : 0.9932
+  → proche de 1 : nos mesures portent sur le marché,
+    pas sur une particularité de cotation.
+
+── Profil de spread Dukascopy, heure par heure (UTC) ──
+heure          n   médian
+---------------------------
+  0 h      1,920     77.0
+  1 h      1,920     76.0
+  2 h      1,920     75.0
+  3 h      1,920     75.0
+  4 h      1,920     75.0
+  5 h      1,920     75.0
+  6 h      1,920     65.0
+  7 h      1,920     58.0
+  8 h      1,920     58.0
+  9 h      1,920     58.0
+ 10 h      1,920     58.0
+ 11 h      1,920     58.0
+ 12 h      1,918     59.0
+ 13 h      1,920     61.0
+ 14 h      1,920     62.0
+ 15 h      1,920     62.0
+ 16 h      1,919     62.0
+ 17 h      1,860     61.0
+ 18 h      1,814     64.0
+ 19 h      1,800     64.0
+ 20 h      1,792     70.0
+ 22 h      1,909     79.0
+ 23 h      1,880     79.0
+
+  moins cher : 07 h à 58.0 points
+  plus cher  : 22 h à 79.0 points, soit 1.4 fois plus
+
+  Chez Pepperstone : 11 points en séance, 16 à 17 hors séance,
+  rapport 1,5. Un rapport voisin signifie que la respiration du
+  spread est une propriété du marché de l'or, pas de notre courtier.
+  Le **niveau**, lui, reste propre à chaque courtier : ne jamais
+  substituer ces chiffres aux nôtres dans un seuil de rentabilité.
