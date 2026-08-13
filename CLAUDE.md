@@ -256,6 +256,65 @@ Conséquence de méthode : deux stratégies de même espérance en R n'ont pas l
 même espérance en euros si leurs stops diffèrent. **Comparer des stratégies en R
 sans regarder la distribution des stops est faux.**
 
+### Le seul rapport supérieur à 1 du projet — et pourquoi il ne se trade pas
+
+Mesuré le 2026-08-13 sur **1 014 091 observations** (700 jours de ticks or et
+argent). C'est allé plus loin que tout le reste, d'où le détail.
+
+**La queue du score combiné grandit avec la sélectivité, hors échantillon.**
+À 60 jours elle s'effondrait ; c'était un manque d'échantillon, pas une absence
+d'effet. Rapport avantage/coût sur le contrôle, spread réel de la queue :
+
+| sélectivité | n | excès | t | spread réel | rapport |
+|---|---|---|---|---|---|
+| 20 % | 81 127 | +1,7 p | 2,54 | 21 p | 0,08 |
+| 1 % | 4 056 | +14,0 p | 2,42 | 26 p | 0,54 |
+| 0,2 % | 811 | +24,7 p | 1,46 | 31 p | 0,79 |
+| 0,1 % | 405 | +61,4 p | 2,45 | 35 p | **1,75** |
+| 0,05 % | 202 | +130,0 p | 3,30 | 43 p | **3,05** |
+
+**Ce n'est pas une poignée de valeurs extrêmes.** Contrôlé : à 0,1 %, la médiane
+(+81,0) *dépasse* la moyenne (+61,4), 60,7 % des observations sont gagnantes,
+retirer les cinq plus gros mouvements laisse +40,0, et le tout se répartit sur
+142 journées distinctes. Aucun des symptômes habituels.
+
+**Test à l'aveugle.** Le seuil ci-dessus était choisi en regardant le contrôle —
+de la sélection déguisée en validation. Refait en fixant une **valeur de score
+absolue** sur l'étude, appliquée sans rien ajuster :
+
+| seuil (étude) | n contrôle | excès | t | spread | rapport |
+|---|---|---|---|---|---|
+| 0,1 % | 447 | +41,8 p | **1,68** | 35 p | 1,21 |
+| 0,05 % | 218 | +108,2 p | 2,79 | 42 p | 2,60 |
+
+Le rapport survit, mais t = 1,68 n'est pas significatif et 2,79 sur cinq seuils
+essayés est à la limite.
+
+**Ce qui ferme la piste : le régime de spread.** Même seuil, contrôle découpé :
+
+| régime | n | excès | spread | rapport |
+|---|---|---|---|---|
+| **≤ 15 pts** | 53 | **+2,2 p** | 12 p | **0,19** |
+| 16 à 25 pts | 148 | +41,6 p | 22 p | 1,88 |
+| 26 à 40 pts | 171 | +31,2 p | 31 p | 1,02 |
+| > 40 pts | 75 | +94,5 p | 85 p | 1,11 |
+
+**L'avantage n'existe qu'au-dessus de 16 points de spread.** Dans le régime
+praticable — celui d'aujourd'hui, à 11-12 points — le rapport retombe à 0,19,
+la valeur de tout le reste du projet.
+
+Or au-delà de 25 points, le spread affiché **cesse d'être une estimation
+crédible du coût** : ce sont les instants d'annonce, où le glissement dépasse
+l'écart coté, où les ordres passent mal, et où rien ne garantit d'être servi au
+prix mesuré. Le seau « > 40 pts » affiche 85 points de spread moyen — aucun
+ordre retail n'y est servi au prix affiché.
+
+**Limite assumée.** On ne prouve pas que cet avantage est inexploitable, on
+montre qu'il vit exactement là où notre modèle de coût ne vaut plus. Le
+trancher demanderait de modéliser le glissement dans ces instants, ce que des
+données de cotation seules ne permettent pas. Ne pas rouvrir cette piste sans
+une mesure de glissement réel.
+
 ### Combiner les signaux faibles : indépendants, et toujours insuffisants
 
 Mesuré le 2026-08-12. Chaque effet réel trouvé vaut 2 à 4 points quand le spread
@@ -699,6 +758,10 @@ décision qui en dépend.
 | `scan` | classer des instruments par coût de scalping | non |
 | `spread-profile` | spread réel heure par heure, depuis les ticks | non |
 | `outils_mesure/arrondi_lot.py` | ce que la troncature du volume retire au risque, et où sont les stops efficaces | non |
+| `outils_mesure/combinaison_signaux.py` | corrélation entre signaux faibles et score combiné ; `--cache` évite de recollecter | oui, en interne |
+| `outils_mesure/selectivite.py` | le rapport avantage/coût franchit-il 1 en resserrant la sélection | non |
+| `outils_mesure/robustesse_queue.py` | une moyenne de queue tient-elle à quelques mouvements | non |
+| `outils_mesure/seuil_aveugle.py` | seuil fixé sur l'étude, appliqué à l'aveugle au contrôle | non |
 | `outils_mesure/stabilite_cellule.py` | une cellule d'`edge-scan` tient-elle sur toutes les sous-périodes, ou par bouffées | non |
 | `outils_mesure/bougies_depuis_ticks.py` | reconstruit des bougies depuis les ticks, au-delà du plafond de 100 000 du courtier | non |
 | `outils_mesure/excursion_tick.py` | de combien l'or bouge en 1 à 120 s, et ce que le spread y coûte | non |

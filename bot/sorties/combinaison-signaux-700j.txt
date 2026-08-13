@@ -1,0 +1,43 @@
+﻿Collecte, 700 j, horizon 30 s.
+1,014,091 observations — étude 608,454, contrôle 405,637.
+
+── Corrélation entre prédicteurs (période d'étude) ──
+                            retour à la mo  avance de l'ar  côté qui se re
+retour à la moyenne                  1.000           0.438          -0.002
+avance de l'argent                   0.438           1.000           0.001
+côté qui se repositionne            -0.002           0.001           1.000
+
+Proche de 0 : sources indépendantes, les avantages peuvent s'additionner.
+Proche de ±1 : redondants, combiner n'apporte rien.
+
+── Avantage du meilleur quintile, en points ──
+signal                           étude   contrôle   frais
+----------------------------------------------------------
+retour à la moyenne              +1.8p      +1.9p      18
+avance de l'argent               +1.7p      +2.9p      18
+côté qui se repositionne         -0.7p      -0.4p      18
+SCORE COMBINÉ                    +1.5p      +1.7p      18
+
+Lecture : chaque ligne est l'avantage d'une position longue prise
+sur le cinquième le plus favorable, à comparer aux 18 points
+de spread qu'elle paierait. Le score combiné est la somme des trois
+prédicteurs normalisés, à poids égaux — jamais ajustés.
+
+── Queue du score combiné ──
+queue                  n   étude      t  │       n  contrôle      t  spread
+--------------------------------------------------------------------------
+20 % meilleurs   121,690   +1.5p   6.53  │  81,127     +1.7p   2.54      21
+5 % meilleurs     30,422   +4.6p   7.42  │  20,281     +5.3p   3.05      23
+1 % meilleurs      6,084   +9.1p   4.65  │   4,056    +14.0p   2.42      26
+
+Le « spread » de droite est celui **réellement observé dans la queue**,
+non la moyenne de la période : c'est lui qu'une position y paierait.
+
+── Queue à 1 % du contrôle, découpée par régime de spread ──
+régime               n    excès  spread moyen   couvre ?
+--------------------------------------------------------
+≤ 13 pts           443    +2.2p           11p        non
+14 à 19 pts        748   +10.9p           16p        non
+≥ 20 pts         2,865   +16.6p           31p        non
+
+Observations écrites dans data/combinaison_700j.csv — réanalysable sans recollecter.

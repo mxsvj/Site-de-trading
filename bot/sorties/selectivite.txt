@@ -1,0 +1,18 @@
+﻿1,014,091 observations, contrôle 405,637.
+Rendement inconditionnel du contrôle : +0.03 points.
+
+sélectivité          n    excès      t  spread réel  avantage/coût
+--------------------------------------------------------------------
+20.0000%        81,127    +1.7p   2.54          21p           0.08
+5.0000%         20,281    +5.3p   3.05          23p           0.23
+1.0000%          4,056   +14.0p   2.42          26p           0.54
+0.5000%          2,028   +19.1p   2.05          28p           0.68
+0.2000%            811   +24.7p   1.46          31p           0.79
+0.1000%            405   +61.4p   2.45          35p           1.75  ← couvre
+0.0500%            202  +130.0p   3.30          43p           3.05  ← couvre
+0.0200%             81  +114.5p   1.58          54p           2.12  ← couvre
+
+Le rapport doit dépasser 1 pour qu'une position couvre seulement son
+spread, avant le moindre gain — et il faudrait aller bien au-delà pour
+absorber le glissement et l'arrondi du lot. S'il sature sous 1 en
+perdant sa significativité, resserrer davantage ne mène nulle part.

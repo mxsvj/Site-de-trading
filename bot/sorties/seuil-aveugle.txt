@@ -1,0 +1,23 @@
+﻿Étude 608,454, contrôle 405,637.
+
+── Seuil fixé sur l'étude, appliqué tel quel au contrôle ──
+seuil (score)    n étude  rapport  │ n contrôle    excès      t  spread  rapport
+----------------------------------------------------------------------------------
+4.977              6,084     0.41  │      4,327   +13.8p   2.53     26p     0.54
+5.935              3,042     0.57  │      2,105   +16.6p   1.81     28p     0.59
+7.366              1,216     0.88  │        877   +23.0p   1.45     31p     0.74
+8.690                608     0.95  │        447   +41.8p   1.68     35p     1.21  ← couvre
+10.517               304     1.02  │        218  +108.2p   2.79     42p     2.60  ← couvre
+
+── Contrôle, seuil de l'étude à 0,1 %, découpé par spread ──
+régime                n    excès  spread  rapport
+--------------------------------------------------
+≤ 15 pts             53    +2.2p     12p     0.19
+16 à 25 pts         148   +41.6p     22p     1.88
+26 à 40 pts         171   +31.2p     31p     1.02
+> 40 pts             75   +94.5p     85p     1.11
+
+Un avantage qui n'existe qu'au-delà de 25 points de spread ne se
+trade pas : ces instants sont ceux des annonces, où le spread affiché
+sous-estime le glissement, où les ordres passent mal, et où rien ne
+garantit d'être servi au prix mesuré.

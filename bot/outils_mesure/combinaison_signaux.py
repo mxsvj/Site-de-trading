@@ -151,6 +151,10 @@ def main() -> int:
     ap.add_argument("--horizon", type=int, default=30)
     ap.add_argument("--memoire", type=int, default=30)
     ap.add_argument("--split", type=float, default=0.6)
+    ap.add_argument(
+        "--cache", help="écrire les observations, pour réanalyser sans "
+        "relancer des heures de collecte",
+    )
     args = ap.parse_args()
 
     print(f"Collecte, {args.days} j, horizon {args.horizon} s.")
@@ -221,25 +225,75 @@ def main() -> int:
     # chiffres flatteurs, comme la queue à 1 % de la mesure argent/or, qui
     # donnait +15,3 points en étude et +5,8 hors échantillon.
     print("\n── Queue du score combiné ──")
-    print(f"{'queue':<16}{'n étude':>9}{'étude':>9}  │{'n contrôle':>11}"
-          f"{'contrôle':>10}")
-    print("-" * 58)
+    print(
+        f"{'queue':<16}{'n':>8}{'étude':>8}{'t':>7}  │{'n':>8}"
+        f"{'contrôle':>10}{'t':>7}{'spread':>8}"
+    )
+    print("-" * 74)
     for part, nom in ((0.20, "20 % meilleurs"), (0.05, "5 % meilleurs"),
                       (0.01, "1 % meilleurs")):
         ligne = [nom]
         for cle_nom, ech in (("étude", etude), ("contrôle", controle)):
             tri = sorted(ech, key=score)
             k = max(30, int(len(tri) * part))
-            ligne += [k, statistics.fmean(o["r"] for o in tri[-k:])
-                      - globales[cle_nom]]
+            queue = tri[-k:]
+            r = [o["r"] for o in queue]
+            exces = statistics.fmean(r) - globales[cle_nom]
+            # Sans t, un excès ne dit pas s'il se distingue du hasard : une
+            # queue étroite a peu d'observations et beaucoup de variance.
+            t = exces / (statistics.stdev(r) / k**0.5) if k > 1 else 0.0
+            ligne += [k, exces, t, statistics.fmean(o["spread"] for o in queue)]
         print(
-            f"{ligne[0]:<16}{ligne[1]:>9,}{ligne[2]:>+8.1f}p  │"
-            f"{ligne[3]:>11,}{ligne[4]:>+9.1f}p"
+            f"{ligne[0]:<16}{ligne[1]:>8,}{ligne[2]:>+7.1f}p{ligne[3]:>7.2f}  │"
+            f"{ligne[5]:>8,}{ligne[6]:>+9.1f}p{ligne[7]:>7.2f}{ligne[8]:>8.0f}"
         )
     print(
-        f"\nIl faudrait dépasser {frais:.0f} points **sur le contrôle** pour "
-        "qu'une\nposition couvre seulement son spread, avant tout gain."
+        f"\nLe « spread » de droite est celui **réellement observé dans la "
+        f"queue**,\nnon la moyenne de la période : c'est lui qu'une position y "
+        "paierait."
     )
+
+    # ── L'avantage tient-il selon le régime de spread ? ──────────────────
+    # Le spread est passé de 24 à 12 points selon l'époque. Un avantage mesuré
+    # sur la moyenne pourrait n'exister que dans les régimes chers, où il serait
+    # inexploitable, et manquer là où il serait payable.
+    print("\n── Queue à 1 % du contrôle, découpée par régime de spread ──")
+    tri = sorted(controle, key=score)
+    queue = tri[-max(30, len(tri) // 100):]
+    par_regime = defaultdict(list)
+    for o in queue:
+        seau = "≤ 13 pts" if o["spread"] <= 13 else (
+            "14 à 19 pts" if o["spread"] <= 19 else "≥ 20 pts"
+        )
+        par_regime[seau].append(o)
+    print(f"{'régime':<14}{'n':>8}{'excès':>9}{'spread moyen':>14}{'couvre ?':>11}")
+    print("-" * 56)
+    for nom in ("≤ 13 pts", "14 à 19 pts", "≥ 20 pts"):
+        items = par_regime.get(nom, [])
+        if len(items) < 30:
+            print(f"{nom:<14}{len(items):>8,}   trop peu d'observations")
+            continue
+        exces = statistics.fmean(o["r"] for o in items) - globales["contrôle"]
+        sp = statistics.fmean(o["spread"] for o in items)
+        print(
+            f"{nom:<14}{len(items):>8,}{exces:>+8.1f}p{sp:>13.0f}p"
+            f"{('oui' if exces > sp else 'non'):>11}"
+        )
+
+    # ── Cache : permettre de réanalyser sans relancer des heures de collecte ──
+    if args.cache:
+        import csv
+
+        with open(args.cache, "w", newline="", encoding="utf-8") as fh:
+            w = csv.writer(fh)
+            w.writerow(["t", "r", "spread", *PREDICTEURS, "score"])
+            for o in obs:
+                w.writerow(
+                    [o["t"], f"{o['r']:.2f}", f"{o['spread']:.2f}",
+                     *[f"{o[p]:.6f}" for p in PREDICTEURS], f"{score(o):.6f}"]
+                )
+        print(f"\nObservations écrites dans {args.cache} — réanalysable sans "
+              "recollecter.")
     return 0
 
 
