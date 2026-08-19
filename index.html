@@ -691,6 +691,67 @@
   .tv-wrap{transition:background-color .25s,border-color .25s}
   @media(max-width:680px){.tv-chip{font-size:12px;padding:4px 11px 4px 4px}.tv-chip svg{width:38px;height:24px}}
 
+  /* Pastilles supprimables (palettes créées par l'utilisateur) */
+  .tv-chip-h{position:relative;display:inline-flex}
+  .tv-chip-x{
+    position:absolute;top:-6px;right:-6px;width:19px;height:19px;
+    display:flex;align-items:center;justify-content:center;
+    opacity:0;pointer-events:none;
+    border:1px solid var(--line);border-radius:50%;background:var(--panel-2);
+    color:var(--muted);font-family:var(--body);font-size:14px;line-height:1;
+    cursor:pointer;padding:0;transition:opacity .15s,color .15s,border-color .15s
+  }
+  .tv-chip-h:hover .tv-chip-x,.tv-chip-x:focus-visible{opacity:1;pointer-events:auto}
+  .tv-chip-x:hover{color:var(--text);border-color:var(--accent)}
+  .tv-chip-x:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+  /* Générateur de palette */
+  .tv-gen{
+    margin:0 0 18px;padding:16px 18px 15px;
+    border:1px solid var(--line);border-radius:16px;
+    background:linear-gradient(180deg,rgba(255,255,255,.02),transparent)
+  }
+  .tv-gen-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:11px}
+  .tv-gen-head .lbl{font-family:var(--mono);font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--accent-2)}
+  .tv-gen-hint{font-size:12.5px;color:var(--muted-2)}
+  .tv-gen-row{display:flex;gap:9px;flex-wrap:wrap;align-items:stretch}
+  .tv-gen-row input{
+    flex:1 1 320px;min-width:0;
+    background:#0A0A0A;border:1px solid var(--line);border-radius:11px;
+    color:var(--text);font-family:var(--body);font-size:15px;padding:11px 14px;
+    outline:none;transition:border-color .15s
+  }
+  .tv-gen-row input::placeholder{color:var(--muted-2)}
+  .tv-gen-row input:focus{border-color:var(--accent)}
+  .tv-gen-btn,.tv-gen-alt{
+    flex:none;font-family:var(--body);font-size:14px;font-weight:600;
+    border-radius:11px;padding:11px 20px;cursor:pointer;
+    transition:opacity .15s,border-color .15s,color .15s
+  }
+  .tv-gen-btn{border:0;background:var(--accent);color:#140A03}
+  .tv-gen-btn:hover{opacity:.88}
+  .tv-gen-alt{background:transparent;border:1px solid var(--line);color:var(--muted)}
+  .tv-gen-alt:hover{color:var(--text);border-color:var(--accent)}
+  .tv-gen-btn:focus-visible,.tv-gen-alt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .tv-gen-sugg{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+  .tv-sugg{
+    background:transparent;border:1px dashed var(--line);border-radius:999px;
+    color:var(--muted-2);font-family:var(--body);font-size:12.5px;
+    padding:5px 12px;cursor:pointer;transition:color .15s,border-color .15s
+  }
+  .tv-sugg:hover{color:var(--text);border-color:var(--accent);border-style:solid}
+  .tv-sugg:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .tv-gen-lu{margin-top:12px;font-size:12.5px;color:var(--muted);line-height:1.75}
+  .tv-gen-lu b{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;
+    color:var(--accent-2);margin-right:9px
+  }
+  @media(max-width:680px){
+    .tv-gen{padding:14px}
+    .tv-gen-row input{flex:1 1 100%}
+    .tv-gen-btn,.tv-gen-alt{flex:1}
+  }
+
   
   /* Mode large pour l'outil graphiques */
   .content.wide-tool{max-width:1180px;transition:max-width .3s ease}
@@ -1730,7 +1791,8 @@ var TV_PALETTES=[
 var TV_PAL_DEFAULT='ember';
 
 function tvPal(id){
-  for(var i=0;i<TV_PALETTES.length;i++){if(TV_PALETTES[i].id===id)return TV_PALETTES[i];}
+  var all=tvToutes();
+  for(var i=0;i<all.length;i++){if(all[i].id===id)return all[i];}
   return TV_PALETTES[0];
 }
 function tvAlpha(hex,a){
@@ -1800,6 +1862,305 @@ function tvEsc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 function tvPalLoad(){try{return localStorage.getItem('flux_tv_pal')||TV_PAL_DEFAULT;}catch(e){return TV_PAL_DEFAULT;}}
 function tvPalSave(id){try{localStorage.setItem('flux_tv_pal',id);}catch(e){}}
 
+/* ------------------------------------------------------------------
+   Générateur de palettes : une idée écrite en français donne un thème
+   complet. Tout se calcule en OKLCH — c'est ce qui garantit que la
+   couleur de hausse et celle de baisse ont exactement le même poids
+   visuel — puis on redescend en hex sRGB.
+   ------------------------------------------------------------------ */
+
+// OKLCH -> hex, en désaturant juste ce qu'il faut pour rentrer dans l'écran
+function tvOklch(L,C,H){
+  var rad=H*Math.PI/180, A=C*Math.cos(rad), B=C*Math.sin(rad);
+  function lin(a,b){
+    var l=L+0.3963377774*a+0.2158037573*b,
+        m=L-0.1055613458*a-0.0638541728*b,
+        s=L-0.0894841775*a-1.2914855480*b;
+    l=l*l*l; m=m*m*m; s=s*s*s;
+    return [ 4.0767416621*l-3.3077115913*m+0.2309699292*s,
+            -1.2684380046*l+2.6097574011*m-0.3413193965*s,
+            -0.0041960863*l-0.7034186147*m+1.7076147010*s ];
+  }
+  var dedans=function(v){return v.every(function(x){return x>=-0.0015&&x<=1.0015;});};
+  var rgb=lin(A,B);
+  if(!dedans(rgb)){
+    var lo=0,hi=1,mid;
+    for(var i=0;i<20;i++){
+      mid=(lo+hi)/2;
+      if(dedans(lin(A*mid,B*mid))) lo=mid; else hi=mid;
+    }
+    rgb=lin(A*lo,B*lo);
+  }
+  return '#'+rgb.map(function(v){
+    v=Math.max(0,Math.min(1,v));
+    v=v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055;
+    var h=Math.round(Math.max(0,Math.min(1,v))*255).toString(16);
+    return h.length<2?'0'+h:h;
+  }).join('').toUpperCase();
+}
+
+/* Vocabulaire : "nom:teinte[:force]" — la force baisse la saturation
+   pour les couleurs qui sont douces par nature (sable, crème, ivoire). */
+var TV_TEINTES={};
+('bordeaux:18 rouge:26 ecarlate:28 vermillon:32 brique:36 corail:24 saumon:32:.75 terracotta:42:.8 '
++'peche:48:.7 orange:55 mandarine:52 abricot:56:.75 ambre:70 miel:78:.8 or:85 dore:85 moutarde:92:.85 '
++'jaune:100 citron:110 olive:118:.7 lime:126 pistache:136:.7 '
++'vert:145 foret:148:.8 sauge:152:.5 emeraude:158 menthe:168:.85 jade:172 '
++'turquoise:185 teal:190 aqua:194 cyan:200 glacier:212:.75 '
++'ciel:232:.8 azur:238 bleu:250 ocean:246 cobalt:256 marine:264:.8 indigo:278 '
++'violet:296 lavande:300:.6 mauve:304:.75 lilas:308:.65 prune:322:.8 '
++'magenta:332 fuchsia:340 rose:350:.8 framboise:356 '
++'chocolat:44:.6 marron:48:.6 brun:50:.55 cafe:58:.5 sable:80:.45 beige:78:.35 creme:88:.28 ivoire:92:.2'
+).split(' ').forEach(function(t){
+  var p=t.split(':');
+  TV_TEINTES[p[0]]={h:+p[1], c:p[2]?+p[2]:1};
+});
+
+// Mots qui décrivent un fond sans couleur
+var TV_NEUTRES=['gris','argent','ardoise','charbon','anthracite','graphite','acier','beton','noir','blanc'];
+
+/* Ambiances : chacune pose d'un coup les deux teintes de bougies,
+   la saturation et le fond. */
+var TV_AMBIANCES={
+  neon:      {up:194,down:334,chroma:.205,bgH:285,bgC:.032},
+  cyber:     {up:194,down:334,chroma:.205,bgH:285,bgC:.032},
+  cyberpunk: {up:192,down:336,chroma:.215,bgH:290,bgC:.038},
+  synthwave: {up:190,down:330,chroma:.20,bgH:292,bgC:.04},
+  vaporwave: {up:196,down:326,chroma:.16,bgH:302,bgC:.035,candleL:.83},
+  terminal:  {up:150,down:70,chroma:.21,bgH:150,bgC:0,bgL:.06},
+  matrix:    {up:150,down:70,chroma:.21,bgH:150,bgC:0,bgL:.06},
+  hacker:    {up:150,down:70,chroma:.21,bgH:150,bgC:0,bgL:.06},
+  luxe:      {up:85,down:255,chroma:.135,bgH:60,bgC:.012},
+  premium:   {up:85,down:255,chroma:.135,bgH:60,bgC:.012},
+  elegant:   {up:85,down:255,chroma:.125,bgH:60,bgC:.012},
+  chic:      {up:85,down:255,chroma:.125,bgH:60,bgC:.012},
+  nature:    {up:150,down:45,chroma:.135,bgH:150,bgC:.018},
+  foret:     {up:152,down:45,chroma:.13,bgH:152,bgC:.02},
+  bois:      {up:140,down:45,chroma:.12,bgH:60,bgC:.022},
+  ocean:     {up:196,down:28,chroma:.15,bgH:242,bgC:.03},
+  mer:       {up:196,down:28,chroma:.15,bgH:242,bgC:.03},
+  marin:     {up:196,down:28,chroma:.15,bgH:242,bgC:.03},
+  lagon:     {up:190,down:30,chroma:.17,bgH:230,bgC:.035},
+  desert:    {up:72,down:350,chroma:.14,bgH:60,bgC:.026},
+  sunset:    {up:62,down:340,chroma:.165,bgH:35,bgC:.032},
+  coucher:   {up:62,down:340,chroma:.165,bgH:35,bgC:.032},
+  aurore:    {up:180,down:308,chroma:.16,bgH:255,bgC:.03},
+  hiver:     {up:212,down:65,chroma:.13,bgH:238,bgC:.02},
+  glace:     {up:212,down:60,chroma:.135,bgH:230,bgC:.022},
+  nordique:  {up:212,down:65,chroma:.125,bgH:238,bgC:.018},
+  scandinave:{up:212,down:65,chroma:.12,bgH:240,bgC:.015},
+  japonais:  {up:26,down:212,chroma:.15,bgH:30,bgC:.016},
+  sakura:    {up:350,down:198,chroma:.125,bgH:340,bgC:.016},
+  retro:     {up:105,down:30,chroma:.115,bgH:62,bgC:.024},
+  vintage:   {up:105,down:30,chroma:.11,bgH:62,bgC:.024},
+  bonbon:    {up:170,down:344,chroma:.135,bgH:300,bgC:.02,candleL:.85},
+  candy:     {up:170,down:344,chroma:.135,bgH:300,bgC:.02,candleL:.85},
+  volcan:    {up:75,down:26,chroma:.185,bgH:30,bgC:.03},
+  orage:     {up:214,down:60,chroma:.14,bgH:265,bgC:.022},
+  espace:    {up:200,down:310,chroma:.16,bgH:275,bgC:.028},
+  galaxie:   {up:200,down:310,chroma:.16,bgH:275,bgC:.028},
+  phosphore: {up:150,down:70,chroma:.21,bgH:150,bgC:0,bgL:.06},
+  papier:    {up:158,down:26,chroma:.13,bgH:76,bgC:.012},
+  carnet:    {up:158,down:26,chroma:.12,bgH:76,bgC:.014},
+  cuivre:    {up:52,down:200,chroma:.15,bgH:40,bgC:.024},
+  cerise:    {up:352,down:170,chroma:.16,bgH:350,bgC:.022}
+};
+
+// Mots-clés d'intention
+var TV_MOTS={
+  clair:  ['clair','light','papier','jour','lumineux','imprim','blanche'],
+  fort:   ['fort','forte','max','contraste','punchy','flashy','vif','vive','agress','intense','sature','pete','pop','criard'],
+  doux:   ['doux','douce','leger','legere','discret','discrete','calme','reposant','zen','subtil','soft','sobre','pastel','mat','pale'],
+  mono:   ['mono','monochrome','minimal','epure','noir et blanc','sans couleur','nuance de gris','sans vert','ni vert','sans rouge','ni rouge','neutre'],
+  dalt:   ['daltonien','daltonisme','colorblind','deuteranop','protanop','accessible'],
+  profond:['absolu','profond','tres sombre','encre','abysse','minuit']
+};
+
+// Le résumé « Compris » se lit en français : on rhabille les mots normalisés
+var TV_ACCENTS={foret:'forêt',ocean:'océan',elegant:'élégant',ecarlate:'écarlate',peche:'pêche',
+  dore:'doré',creme:'crème',cafe:'café',glace:'glacé',emeraude:'émeraude',pistache:'pistache',
+  desert:'désert',espace:'espace',galaxie:'galaxie',beton:'béton',neon:'néon',retro:'rétro'};
+function tvAccentue(m){return TV_ACCENTS[m]||m;}
+
+// Nom français le plus proche d'une teinte, pour expliquer ce qui a été compris
+function tvNomTeinte(h){
+  var best='', d=999;
+  Object.keys(TV_TEINTES).forEach(function(k){
+    var e=Math.abs(((TV_TEINTES[k].h-h+180)%360+360)%360-180);
+    if(e<d){d=e;best=k;}
+  });
+  return tvAccentue(best);
+}
+
+function tvNorm(t){
+  return String(t||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+// Lit une phrase et en tire une intention chiffrée
+function tvComprendre(txt){
+  var t=tvNorm(txt), mots=t.split(' '), tags=[], I={};
+  var contient=function(liste){
+    return liste.some(function(w){
+      if(w.indexOf(' ')>=0) return t.indexOf(w)>=0;
+      return mots.some(function(m){ return w.length<=3 ? m===w : m.indexOf(w)===0; });
+    });
+  };
+  // un mot compte s'il est présent tel quel, ou une fois le pluriel / féminin retiré
+  var racines=function(m){
+    var out=[m];
+    if(/es$/.test(m)) out.push(m.slice(0,-2));
+    if(/[es]$/.test(m)) out.push(m.slice(0,-1));
+    return out;
+  };
+
+  I.mode = contient(TV_MOTS.clair) ? 'light' : 'dark';
+  I.mono = contient(TV_MOTS.mono);
+  I.dalt = contient(TV_MOTS.dalt);
+  var fort=contient(TV_MOTS.fort), doux=contient(TV_MOTS.doux);
+
+  // ambiance (la première citée gagne)
+  var amb=null, ambNom='';
+  mots.forEach(function(m){
+    if(amb) return;
+    racines(m).some(function(r){
+      if(TV_AMBIANCES[r]){ amb=TV_AMBIANCES[r]; ambNom=r; return true; }
+      return false;
+    });
+  });
+
+  // couleurs citées ; celle qui suit « fond » ou « sur » habille l'arrière-plan
+  var cols=[], fondH=null, fondNeutre=false;
+  mots.forEach(function(m,i){
+    var avant=(mots[i-1]||'')+' '+(mots[i-2]||''), apres=mots[i+1]||'';
+    // « sur fond bleu » comme « bleu nuit » ou « vert foncé » décrivent l'arrière-plan
+    var estFond=/^(fond|fonds|sur|arriere|base)$/.test(mots[i-1]||'')
+             || /fond|arriere/.test(avant)
+             || /^(nuit|fonce|foncee)$/.test(apres);
+    if(TV_NEUTRES.indexOf(m)>=0){ fondNeutre=true; return; }
+    racines(m).some(function(r){
+      if(!TV_TEINTES[r]) return false;
+      if(estFond && fondH===null) fondH=TV_TEINTES[r].h;
+      else cols.push(TV_TEINTES[r]);
+      return true;
+    });
+  });
+
+  // teintes des bougies
+  var up, down;
+  if(I.dalt){ up=240; down=65; tags.push('daltonien : bleu / orange'); }
+  else if(cols.length>=2){ up=cols[0].h; down=cols[1].h; }
+  else if(cols.length===1){ up=cols[0].h; down=amb?amb.down:(cols[0].h+168)%360; }
+  else if(amb){ up=amb.up; down=amb.down; }
+  else { up=168; down=26; }
+  // deux teintes trop proches seraient illisibles : on écarte la baissière
+  if(Math.abs(((up-down+180)%360+360)%360-180) < 75){
+    down=(up+152)%360;
+    if(cols.length>=2) tags.push('teintes trop proches : la baissière a été écartée');
+  }
+  I.up=up; I.down=down;
+
+  // saturation
+  var chroma = amb ? amb.chroma : .155;
+  if(cols.length) chroma *= cols[0].c;
+  if(fort){ chroma+=.045; tags.push('contraste poussé'); }
+  if(doux){ chroma-=.05;  tags.push('teintes adoucies'); }
+  I.chroma=Math.max(.045,Math.min(.235,chroma));
+
+  // clarté des bougies
+  var cL = I.mode==='light' ? .56 : (amb&&amb.candleL ? amb.candleL : .78);
+  if(fort) cL += I.mode==='light' ? -.04 : .035;
+  if(doux) cL += I.mode==='light' ? .05 : -.04;
+  I.candleL=Math.max(.35,Math.min(.92,cL));
+
+  // fond
+  I.bgH = fondH!==null ? fondH : (amb ? amb.bgH : 265);
+  I.bgC = fondNeutre ? 0 : (fondH!==null ? .028 : (amb ? amb.bgC : .013));
+  I.bgL = I.mode==='light' ? .965 : (amb&&amb.bgL!=null ? amb.bgL : .163);
+  if(I.mode==='light') I.bgC*=.45;   // sur fond clair, une teinte se voit beaucoup plus
+  if(contient(TV_MOTS.profond) && I.mode==='dark'){ I.bgL=Math.max(.035,I.bgL-.05); I.bgC*=.75; tags.push('fond très sombre'); }
+
+  // ce qu'on affichera à l'utilisateur
+  I.tags=[I.mode==='light'?'thème clair':'thème sombre']
+    .concat(ambNom?['ambiance '+tvAccentue(ambNom)]:[])
+    .concat(fondH!==null?['fond '+tvNomTeinte(fondH)]:(fondNeutre?['fond neutre']:[]))
+    .concat(tags)
+    .concat(I.mono?['sans vert ni rouge']:['hausse '+tvNomTeinte(up),'baisse '+tvNomTeinte(down)]);
+  return I;
+}
+
+// Transforme l'intention en palette complète. La graine 0 colle à l'idée,
+// les suivantes en donnent des variations.
+function tvGenerer(txt, graine){
+  var I=tvComprendre(txt), g=graine||0;
+  var alea=function(n){ var x=Math.sin((g+1)*97.13+n*41.7)*43758.5453; return (x-Math.floor(x))-.5; };
+  var j = g>0 ? 1 : 0;
+  var upH=I.up+j*alea(1)*24, dnH=I.down+j*alea(2)*24;
+  var chroma=Math.max(.04,I.chroma+j*alea(3)*.045);
+  var bgL=Math.max(.035,I.bgL+j*alea(4)*.032);
+  var bgH=I.bgH+j*alea(5)*34;
+  var cL=Math.max(.32,Math.min(.94,I.candleL+j*alea(6)*.035));
+  var dir = I.mode==='light' ? -1 : 1;
+
+  var up,down,upB,dnB,upW,dnW;
+  if(I.mono){
+    if(I.mode==='light'){
+      up=tvOklch(.42,0,265); upB=tvOklch(.28,0,265); upW=upB;
+      down=tvOklch(.80,0,265); dnB=tvOklch(.62,0,265); dnW=dnB;
+    }else{
+      up=tvOklch(.95,0,265); upB=tvOklch(1,0,265); upW=tvOklch(.82,0,265);
+      down=tvOklch(.45,0,265); dnB=tvOklch(.57,0,265); dnW=dnB;
+    }
+  }else{
+    up=tvOklch(cL,chroma,upH);       down=tvOklch(cL,chroma,dnH);
+    upB=up;                          dnB=down;
+    upW=tvOklch(cL-.12,chroma*.92,upH); dnW=tvOklch(cL-.12,chroma*.92,dnH);
+  }
+
+  var nom=String(txt).trim().replace(/\s+/g,' ');
+  if(nom.length>24) nom=nom.slice(0,23).trim()+'…';
+  nom=nom.charAt(0).toUpperCase()+nom.slice(1);
+
+  return {
+    id:'c'+Date.now().toString(36)+Math.floor(Math.random()*46656).toString(36),
+    name:nom, mode:I.mode, custom:true, idee:tvNorm(txt),
+    desc:'« '+String(txt).trim()+' » · '+I.tags.join(' · '),
+    lu:I.tags.join(' · '),
+    bg:tvOklch(bgL,I.bgC,bgH),
+    grid:tvOklch(bgL+dir*.055,I.bgC*1.7,bgH),
+    axis:tvOklch(bgL+dir*.095,I.bgC*1.4,bgH),
+    cross:tvOklch(bgL+dir*.30,I.bgC*1.2,bgH),
+    text:tvOklch(bgL+dir*.45,I.bgC*.9,bgH),
+    frame:tvAlpha(up,.22),
+    up:up,down:down,upBorder:upB,downBorder:dnB,upWick:upW,downWick:dnW
+  };
+}
+
+/* ---------- palettes créées par l'utilisateur ---------- */
+function tvCustomLoad(){
+  try{ var l=JSON.parse(localStorage.getItem('flux_tv_custom')||'[]'); return Array.isArray(l)?l:[]; }
+  catch(e){ return []; }
+}
+function tvCustomSave(list){
+  try{ localStorage.setItem('flux_tv_custom',JSON.stringify(list.slice(-40))); }catch(e){}
+}
+function tvToutes(){ return TV_PALETTES.concat(tvCustomLoad()); }
+
+// La rangée de pastilles : palettes livrées + palettes créées (supprimables)
+function tvChips(actif){
+  return tvToutes().map(function(p){
+    return '<span class="tv-chip-h">'
+      +'<button type="button" class="tv-chip" data-pal="'+p.id+'" aria-pressed="'+(p.id===actif)+'" title="'+tvEsc(p.desc)+'">'
+      +tvSwatch(p)+'<span>'+tvEsc(p.name)+'</span></button>'
+      +(p.custom?'<button type="button" class="tv-chip-x" data-del="'+p.id+'" title="Supprimer cette palette" aria-label="Supprimer la palette '+tvEsc(p.name)+'">&times;</button>':'')
+      +'</span>';
+  }).join('');
+}
+var TV_EXEMPLES=['néon cyberpunk','or et ardoise','thème clair papier','daltonien',
+                 'forêt sombre','vaporwave pastel','terminal phosphore','océan profond',
+                 'bleu nuit et menthe','sans vert ni rouge'];
+
 function renderCharts(){
   state.view='charts';
   var PAIRS=[
@@ -1814,9 +2175,8 @@ function renderCharts(){
   var opts=PAIRS.map(function(p){return '<option value="'+p.s+'">'+p.l+'</option>';}).join('');
   state.tvPal=state.tvPal||tvPalLoad();
   var pal=tvPal(state.tvPal); state.tvPal=pal.id;
-  var chips=TV_PALETTES.map(function(p){
-    return '<button type="button" class="tv-chip" data-pal="'+p.id+'" aria-pressed="'+(p.id===pal.id)+'" title="'+tvEsc(p.desc)+'">'
-      +tvSwatch(p)+'<span>'+tvEsc(p.name)+'</span></button>';
+  var sugg=TV_EXEMPLES.map(function(e){
+    return '<button type="button" class="tv-sugg" data-ex="'+tvEsc(e)+'">'+tvEsc(e)+'</button>';
   }).join('');
   var html=''
     +'<div class="eyebrow">Bo&icirc;te &agrave; outils &middot; Graphiques</div>'
@@ -1826,9 +2186,20 @@ function renderCharts(){
     +'  <div class="tv-field"><label>March&eacute;</label><select id="tvSym">'+opts+'</select></div>'
     +'  <div class="tv-field"><label>Unit&eacute; de temps</label><select id="tvInt"><option value="15">15 min</option><option value="60" selected>1 heure</option><option value="240">4 heures</option><option value="D">1 jour</option><option value="W">1 semaine</option></select></div>'
     +'</div>'
+    +'<div class="tv-gen">'
+    +'  <div class="tv-gen-head"><span class="lbl">Cr&eacute;e ta palette</span>'
+    +'    <span class="tv-gen-hint">D&eacute;cris ton id&eacute;e &mdash; couleurs, ambiance, clair ou sombre. Elle est fabriqu&eacute;e et appliqu&eacute;e tout de suite.</span></div>'
+    +'  <div class="tv-gen-row">'
+    +'    <input id="tvIdee" type="text" autocomplete="off" maxlength="90" placeholder="ex : bleu nuit et menthe, contraste fort" aria-label="D&eacute;cris ta palette">'
+    +'    <button type="button" class="tv-gen-btn" id="tvGo">Cr&eacute;er</button>'
+    +'    <button type="button" class="tv-gen-alt" id="tvAgain" hidden>Autre version</button>'
+    +'  </div>'
+    +'  <div class="tv-gen-sugg">'+sugg+'</div>'
+    +'  <div class="tv-gen-lu" id="tvLu" hidden></div>'
+    +'</div>'
     +'<div class="tv-pal">'
     +'  <div class="tv-pal-head"><span class="lbl">Palette</span><span class="desc" id="tvPalDesc">'+tvEsc(pal.desc)+'</span></div>'
-    +'  <div class="tv-pal-row">'+chips+'</div>'
+    +'  <div class="tv-pal-row">'+tvChips(pal.id)+'</div>'
     +'</div>'
     +'<div class="tv-wrap"><div id="tvChart" style="height:100%;width:100%"></div></div>'
     +'<div class="callout" style="margin-top:18px"><b>Astuce SMC</b>Utilise l\'outil rectangle pour marquer tes Order Blocks et FVG, l\'outil ligne horizontale pour PDH/PDL et les niveaux de liquidit&eacute;. Le graphique est r&eacute;el &mdash; entra&icirc;ne-toi a rep&eacute;rer la structure (BOS, ChoCh) sur du concret.</div>';
@@ -1863,20 +2234,60 @@ function renderCharts(){
     s.onerror=function(){document.getElementById('tvChart').innerHTML='<div class="tv-err">Impossible de charger TradingView. V&eacute;rifie ta connexion (certains r&eacute;seaux le bloquent).</div>';};
     document.head.appendChild(s);
   }
+  function rafraichirChips(){
+    var row=$('#content .tv-pal-row'); if(row) row.innerHTML=tvChips(state.tvPal);
+  }
+  function appliquer(p){
+    state.tvPal=p.id; tvPalSave(p.id);
+    rafraichirChips();
+    var d=$('#tvPalDesc'); if(d)d.textContent=p.desc;
+    paintFrame(p);
+    loadTV();
+  }
+
+  // « Autre version » rejoue la même idée avec une graine différente et
+  // remplace la variation précédente, pour ne pas empiler dix quasi-jumelles.
+  var derniereIdee='', graine=0, dernierId='';
+  function creer(txt){
+    txt=String(txt||'').trim();
+    if(!txt){ $('#tvIdee').focus(); return; }
+    var norm=tvNorm(txt), liste=tvCustomLoad();
+    if(norm===derniereIdee && dernierId){
+      graine++;
+      liste=liste.filter(function(p){return p.id!==dernierId;});
+    }else{ derniereIdee=norm; graine=0; }
+    var p=tvGenerer(txt,graine);
+    dernierId=p.id;
+    liste.push(p); tvCustomSave(liste);
+    appliquer(p);
+    var lu=$('#tvLu'); if(lu){ lu.hidden=false; lu.innerHTML='<b>Compris</b>'+tvEsc(p.lu); }
+    var again=$('#tvAgain'); if(again) again.hidden=false;
+  }
+
   $('#tvSym').addEventListener('change',loadTV);
   $('#tvInt').addEventListener('change',loadTV);
-  document.querySelectorAll('#content .tv-chip').forEach(function(b){
+  $('#tvGo').addEventListener('click',function(){creer($('#tvIdee').value);});
+  $('#tvAgain').addEventListener('click',function(){creer($('#tvIdee').value);});
+  $('#tvIdee').addEventListener('keydown',function(e){
+    if(e.key==='Enter'){e.preventDefault();creer(this.value);}
+  });
+  document.querySelectorAll('#content .tv-sugg').forEach(function(b){
     b.addEventListener('click',function(){
-      var id=b.dataset.pal; if(id===state.tvPal)return;
-      state.tvPal=id; tvPalSave(id);
-      var p=tvPal(id);
-      document.querySelectorAll('#content .tv-chip').forEach(function(x){
-        x.setAttribute('aria-pressed', x.dataset.pal===id ? 'true' : 'false');
-      });
-      var d=$('#tvPalDesc'); if(d)d.textContent=p.desc;
-      paintFrame(p);
-      loadTV();
+      var ex=b.dataset.ex; $('#tvIdee').value=ex; creer(ex);
     });
+  });
+  $('#content .tv-pal-row').addEventListener('click',function(e){
+    var x=e.target.closest('.tv-chip-x');
+    if(x){
+      var id=x.dataset.del;
+      tvCustomSave(tvCustomLoad().filter(function(p){return p.id!==id;}));
+      if(dernierId===id){ dernierId=''; derniereIdee=''; }
+      if(state.tvPal===id) appliquer(tvPal(TV_PAL_DEFAULT)); else rafraichirChips();
+      return;
+    }
+    var b=e.target.closest('.tv-chip');
+    if(!b || b.dataset.pal===state.tvPal) return;
+    appliquer(tvPal(b.dataset.pal));
   });
   paintFrame(pal);
   ensureTV();
