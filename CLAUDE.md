@@ -616,6 +616,80 @@ et 60 secondes : le retour à la moyenne existe à toutes les échelles, il pès
 Ne pas y revenir en espérant plus de données : l'obstacle n'est pas la
 significativité, c'est l'ordre de grandeur.
 
+### Le modèle ATM : la première piste que le spread ne tue pas
+
+Décrit par le propriétaire le 2026-08-19, implémenté dans `smcbot/atm.py` :
+marquer le plus haut et le plus bas entre **13h et 15h25 heure de Paris**,
+attendre une prise de liquidité d'un bord, ne pas prendre le trade **si le
+dépassement excède 40 points**, confirmer par l'inversion d'un FVG laissé par
+cette poussée, entrer à contresens, stop juste au-delà de l'extrême balayé,
+breakeven à mi-range, 1 % de risque (2 % sur setup A+).
+
+**Le fuseau est bien Paris.** 15h25 tombe cinq minutes avant l'ouverture du
+cash de New York (15h30 Paris) : le range est celui de la pré-séance. Les CSV
+du courtier sont en heure serveur UTC+3 (dernière bougie du vendredi à 23:54,
+première du lundi à 01:01), donc `--tz-shift -1` en été.
+
+Mesuré sur les 100 000 bougies M1 disponibles ici, 74 jours de bourse
+(2026-04-28 → 2026-08-07).
+
+**Ce qui change tout par rapport à tout le reste du projet :**
+
+| | |
+|---|---|
+| Amplitude médiane du range 13h–15h25 | **3 017 points** |
+| Distance de stop médiane au signal | **735 points** |
+| Spread (12 pts) en part du risque | **1,6 %** |
+
+Toutes les pistes réfutées jusqu'ici mouraient du coût : effets de 2 à 3 points
+contre 9 à 24 points de spread. **Ici le spread pèse 1,6 % du risque.** Ce
+modèle ne peut pas être tué par les frais — il sera jugé sur son signal, ce qui
+n'était jamais arrivé.
+
+**Deux règles du modèle butent sur l'arithmétique du lot, pas sur le marché.**
+
+Le plafond de 578 points de stop (0,5 % de 1 000 €) est franchi par la médiane :
+seuls **23 signaux sur 67** sont exécutables à 0,5 %. À 1 % le plafond monte à
+1 155 points et 57 passent. **La règle « 1 %, 2 % sur A+ » du propriétaire n'est
+donc pas un confort, c'est ce qui rend le modèle exécutable à 1 000 €** — mais
+elle sort de la contrainte de risque du présent fichier, qui reste à 0,5 %.
+
+Le seuil de 40 points, lui, ne laisse presque rien passer : le dépassement
+médian au moment où l'IFVG confirme vaut **537 points**, et 65 jours sur 74 sont
+disqualifiés. Sur cet échantillon le filtre joue même à l'envers :
+
+| plafond de dépassement | trades | espérance (risque 1 %, TP 5 R) |
+|---|---|---|
+| 40 pts (règle décrite) | 2 | −1,000 R |
+| 200 pts | 16 | −0,250 R |
+| 578 pts | 28 | −0,179 R |
+| 2 000 pts (sans filtre) | **45** | **+0,044 R** |
+
+Plus le filtre est serré, plus le résultat est mauvais : ce qu'il retire vaut
+mieux que ce qu'il garde. À vérifier sur plus de données avant d'en conclure
+quoi que ce soit — 2 trades ne disent rien.
+
+**Le meilleur réglage trouvé, et pourquoi il ne conclut pas.** Sans plafond de
+dépassement, TP à 5 R, breakeven à mi-range : 47 trades, 21,3 % de réussite,
+**+0,404 R**, +11,3 % de capital, drawdown 8,2 %, 7 pertes consécutives.
+
+| | |
+|---|---|
+| Espérance | +0,404 R |
+| Erreur-type | **0,356 R** |
+| **t** | **1,14** |
+| 1re moitié / 2e moitié | +0,174 / +0,625 R |
+
+**t = 1,14 : c'est du bruit.** Le chiffre est lu sur l'échantillon complet, avec
+un TP choisi après l'avoir regardé, et l'écart-type de l'espérance vaut presque
+autant que l'espérance. Rien n'est démontré, ni dans un sens ni dans l'autre.
+
+**Ce qui manque est de la donnée, pas une idée.** Le modèle produit **un trade
+par jour au plus** ; 74 jours ne peuvent pas fournir les 30 trades de chaque
+côté d'une validation. Il faut reconstruire le M1 depuis les ticks
+(`outils_mesure/bougies_depuis_ticks.py`, 24 mois disponibles ≈ 500 jours) et
+rejuger là-dessus. C'est la seule suite qui a du sens.
+
 ### Les réfutations tiennent au coût corrigé
 
 Rejeu du 2026-08-11 sur le moteur corrigé, M5 sauf mention. Les verdicts avaient

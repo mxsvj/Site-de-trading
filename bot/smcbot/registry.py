@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from .atm import AtmStrategy
 from .config import BotConfig
 from .data import Candle
 from .scalping import (
@@ -38,6 +39,7 @@ STRATEGIES: dict[str, type] = {
     "fade": FadeStrategy,
     "vol-break": VolBreakStrategy,
     "lead-lag": LeadLagStrategy,
+    "atm": AtmStrategy,
 }
 
 

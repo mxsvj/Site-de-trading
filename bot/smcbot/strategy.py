@@ -41,6 +41,16 @@ class Signal:
     order_block: OrderBlock | None = None
     """Zone à l'origine du signal, quand la stratégie en expose une."""
 
+    breakeven_price: float | None = None
+    """Prix auquel remonter le stop à l'entrée, quand la stratégie en fixe un.
+
+    `risk.breakeven_at_r` exprime ce seuil en multiples du risque, ce qui suffit
+    tant que le déclencheur est proportionnel au stop. Certains modèles le
+    placent sur un **niveau du marché** — la moitié d'un range, par exemple —
+    dont la distance à l'entrée varie d'un trade à l'autre. Le convertir en R
+    reviendrait à recalculer un multiple différent à chaque fois, donc à ne plus
+    décrire la règle mais son effet."""
+
     @property
     def risk_distance(self) -> float:
         return abs(self.entry_level - self.stop)

@@ -37,6 +37,9 @@ class Position:
     open_time: datetime
     reason: str
     initial_stop: float
+    breakeven_price: float | None = None
+    """Niveau de marché déclenchant le passage à l'entrée, s'il y en a un."""
+
     breakeven_done: bool = False
 
     @property
@@ -181,6 +184,7 @@ class PaperBroker:
             open_time=candle.time,
             reason=signal.reason,
             initial_stop=stop,
+            breakeven_price=signal.breakeven_price,
         )
         self.positions.append(pos)
         self._day_trades += 1
@@ -362,18 +366,30 @@ class PaperBroker:
         bougie suivante, ce qui évite de supposer l'ordre des évènements intrabar.
         """
         trigger_r = self.cfg.risk.breakeven_at_r
-        if trigger_r <= 0:
-            return
 
         for pos in self.positions:
             if pos.breakeven_done:
                 continue
-            distance = pos.risk_distance
-            if pos.direction == BULLISH:
-                reached = candle.high >= pos.entry + trigger_r * distance
+
+            # Un niveau fixé par la stratégie prime sur le seuil en R : c'est
+            # une règle du modèle, pas un réglage de la configuration.
+            if pos.breakeven_price is not None:
+                if pos.direction == BULLISH:
+                    atteint = candle.high >= pos.breakeven_price
+                else:
+                    atteint = candle.low + self.spread <= pos.breakeven_price
+            elif trigger_r > 0:
+                distance = pos.risk_distance
+                if pos.direction == BULLISH:
+                    atteint = candle.high >= pos.entry + trigger_r * distance
+                else:
+                    atteint = (
+                        candle.low + self.spread <= pos.entry - trigger_r * distance
+                    )
             else:
-                reached = candle.low + self.spread <= pos.entry - trigger_r * distance
-            if reached:
+                continue
+
+            if atteint:
                 pos.stop = pos.entry
                 pos.breakeven_done = True
 
