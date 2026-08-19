@@ -677,6 +677,20 @@
   .tv-err{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:14px;padding:30px;text-align:center}
   @media(max-width:680px){.tv-wrap{height:55vh;min-height:400px;padding:4px}.tv-field{min-width:140px;flex:1}}
 
+  /* Palettes de couleurs du graphique */
+  .tv-pal{margin:0 0 16px}
+  .tv-pal-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px}
+  .tv-pal-head .lbl{font-size:12px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
+  .tv-pal-head .desc{font-size:12.5px;color:var(--muted-2)}
+  .tv-pal-row{display:flex;gap:9px;flex-wrap:wrap}
+  .tv-chip{display:flex;align-items:center;gap:9px;padding:5px 13px 5px 5px;border:1px solid var(--line);border-radius:13px;background:var(--panel);color:var(--muted);font-family:var(--body);font-size:13px;font-weight:500;line-height:1;cursor:pointer;transition:border-color .15s,color .15s,transform .15s,box-shadow .15s}
+  .tv-chip:hover{border-color:rgba(var(--accent-rgb),.45);color:var(--text);transform:translateY(-1px)}
+  .tv-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .tv-chip svg{display:block;width:46px;height:28px;border-radius:7px;flex-shrink:0}
+  .tv-chip[aria-pressed="true"]{border-color:var(--accent);color:var(--text);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.35),0 10px 24px -14px rgba(var(--accent-rgb),.9)}
+  .tv-wrap{transition:background-color .25s,border-color .25s}
+  @media(max-width:680px){.tv-chip{font-size:12px;padding:4px 11px 4px 4px}.tv-chip svg{width:38px;height:24px}}
+
   
   /* Mode large pour l'outil graphiques */
   .content.wide-tool{max-width:1180px;transition:max-width .3s ease}
@@ -1653,6 +1667,139 @@ function renderConnect(){
    +'</div>';
   renderNav();renderTabs();window.scrollTo(0,0);
 }
+/* ------------------------------------------------------------------
+   Palettes de couleurs du graphique TradingView
+   Ajouter un thème = ajouter un objet ici, tout le reste suit.
+   up/down = corps des bougies ; *Border / *Wick sont optionnels.
+   ------------------------------------------------------------------ */
+var TV_PALETTES=[
+  {id:'ember',name:'Flux Ember',mode:'dark',
+   desc:'La signature du site : charbon chaud, grille orange, bougies vert/rouge.',
+   bg:'#0d0a08',grid:'rgba(255,107,26,.07)',cross:'rgba(255,157,77,.5)',
+   axis:'rgba(255,107,26,.22)',text:'#A89F95',frame:'rgba(255,107,26,.18)',
+   up:'#34D399',down:'#F87171'},
+
+  {id:'classique',name:'Classique TV',mode:'dark',
+   desc:'Le thème d’origine de TradingView, pour ne pas perdre tes repères.',
+   bg:'#131722',grid:'rgba(240,243,250,.06)',cross:'rgba(178,181,190,.5)',
+   axis:'rgba(240,243,250,.16)',text:'#B2B5BE',frame:'rgba(178,181,190,.18)',
+   up:'#26A69A',down:'#EF5350'},
+
+  {id:'ivoire',name:'Mono Ivoire',mode:'dark',
+   desc:'Ni vert ni rouge : tu lis la structure, pas la couleur. Le mode des puristes SMC.',
+   bg:'#070707',grid:'rgba(255,255,255,.05)',cross:'rgba(255,255,255,.45)',
+   axis:'rgba(255,255,255,.16)',text:'#8F8B86',frame:'rgba(255,255,255,.14)',
+   up:'#F5F1EC',down:'#6E6862',upBorder:'#FFFFFF',downBorder:'#847D76'},
+
+  {id:'institut',name:'Bleu institutionnel',mode:'dark',
+   desc:'Bleu nuit des salles de marché : hausse bleue, baisse rose, zéro fatigue oculaire.',
+   bg:'#080D18',grid:'rgba(120,160,255,.07)',cross:'rgba(126,178,255,.5)',
+   axis:'rgba(120,160,255,.2)',text:'#8FA3C4',frame:'rgba(63,169,245,.2)',
+   up:'#3FA9F5',down:'#E0457B'},
+
+  {id:'charbon',name:'Or & Charbon',mode:'dark',
+   desc:'Or sur ardoise : la hausse brille, la baisse s’efface. Sobre et haut de gamme.',
+   bg:'#101010',grid:'rgba(255,255,255,.05)',cross:'rgba(242,169,59,.5)',
+   axis:'rgba(255,255,255,.16)',text:'#9A9186',frame:'rgba(242,169,59,.2)',
+   up:'#F2A93B',down:'#5B6472'},
+
+  {id:'daltonien',name:'Daltonien',mode:'dark',
+   desc:'Bleu / orange (palette Okabe–Ito) : reste lisible en deutéranopie et protanopie.',
+   bg:'#0B0B0E',grid:'rgba(255,255,255,.055)',cross:'rgba(255,255,255,.45)',
+   axis:'rgba(255,255,255,.18)',text:'#9AA0A6',frame:'rgba(86,180,233,.22)',
+   up:'#56B4E9',down:'#E69F00'},
+
+  {id:'neon',name:'Néon Cyber',mode:'dark',
+   desc:'Noir bleuté, aqua et magenta : contraste maximal pour le scalping en unités basses.',
+   bg:'#04050A',grid:'rgba(0,229,255,.08)',cross:'rgba(0,229,255,.55)',
+   axis:'rgba(0,229,255,.22)',text:'#7FD8E8',frame:'rgba(0,229,160,.22)',
+   up:'#00E5A0',down:'#FF2E88'},
+
+  {id:'terminal',name:'Terminal 87',mode:'dark',
+   desc:'Phosphore vert sur noir absolu, le look des terminaux de trading des années 80.',
+   bg:'#000000',grid:'rgba(0,255,140,.08)',cross:'rgba(0,255,140,.5)',
+   axis:'rgba(0,255,140,.2)',text:'#4ADE80',frame:'rgba(34,255,136,.2)',
+   up:'#22FF88',down:'#FF7A1A'},
+
+  {id:'papier',name:'Papier (clair)',mode:'light',
+   desc:'Thème clair façon carnet : parfait pour les captures et ton journal de trading.',
+   bg:'#FAF7F2',grid:'rgba(20,16,12,.07)',cross:'rgba(20,16,12,.45)',
+   axis:'rgba(20,16,12,.18)',text:'#6B6258',frame:'rgba(20,16,12,.16)',
+   up:'#12946A',down:'#D14343',upBorder:'#0B6B4C',downBorder:'#9E2B2B'}
+];
+var TV_PAL_DEFAULT='ember';
+
+function tvPal(id){
+  for(var i=0;i<TV_PALETTES.length;i++){if(TV_PALETTES[i].id===id)return TV_PALETTES[i];}
+  return TV_PALETTES[0];
+}
+function tvAlpha(hex,a){
+  var h=String(hex).replace('#','');
+  if(h.length===3)h=h.charAt(0)+h.charAt(0)+h.charAt(1)+h.charAt(1)+h.charAt(2)+h.charAt(2);
+  var n=parseInt(h,16);
+  return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';
+}
+function tvParts(p){
+  var upB=p.upBorder||p.up, dnB=p.downBorder||p.down;
+  return {upB:upB, dnB:dnB, upW:p.upWick||upB, dnW:p.downWick||dnB};
+}
+// Traduit une palette en overrides TradingView (bougies, grille, échelles, ligne, aire)
+function tvOverrides(p){
+  var c=tvParts(p);
+  return {
+    'paneProperties.background':p.bg,
+    'paneProperties.backgroundType':'solid',
+    'paneProperties.vertGridProperties.color':p.grid,
+    'paneProperties.horzGridProperties.color':p.grid,
+    'paneProperties.crossHairProperties.color':p.cross,
+    'scalesProperties.backgroundColor':p.bg,
+    'scalesProperties.lineColor':p.axis,
+    'scalesProperties.textColor':p.text,
+    'mainSeriesProperties.candleStyle.upColor':p.up,
+    'mainSeriesProperties.candleStyle.downColor':p.down,
+    'mainSeriesProperties.candleStyle.borderUpColor':c.upB,
+    'mainSeriesProperties.candleStyle.borderDownColor':c.dnB,
+    'mainSeriesProperties.candleStyle.wickUpColor':c.upW,
+    'mainSeriesProperties.candleStyle.wickDownColor':c.dnW,
+    'mainSeriesProperties.hollowCandleStyle.upColor':c.upB,
+    'mainSeriesProperties.hollowCandleStyle.downColor':p.down,
+    'mainSeriesProperties.hollowCandleStyle.borderUpColor':c.upB,
+    'mainSeriesProperties.hollowCandleStyle.borderDownColor':c.dnB,
+    'mainSeriesProperties.hollowCandleStyle.wickUpColor':c.upW,
+    'mainSeriesProperties.hollowCandleStyle.wickDownColor':c.dnW,
+    'mainSeriesProperties.barStyle.upColor':c.upB,
+    'mainSeriesProperties.barStyle.downColor':c.dnB,
+    'mainSeriesProperties.lineStyle.color':p.up,
+    'mainSeriesProperties.areaStyle.linecolor':p.up,
+    'mainSeriesProperties.areaStyle.color1':tvAlpha(p.up,.3),
+    'mainSeriesProperties.areaStyle.color2':tvAlpha(p.up,0)
+  };
+}
+// Le volume suit la palette lui aussi
+function tvStudiesOverrides(p){
+  var c=tvParts(p);
+  return {
+    'volume.volume.color.0':c.dnB,
+    'volume.volume.color.1':c.upB,
+    'volume.volume.transparency':62
+  };
+}
+// Mini aperçu de la palette : fond + grille + une bougie haussière + une baissière
+function tvSwatch(p){
+  var c=tvParts(p);
+  return '<svg viewBox="0 0 46 28" width="46" height="28" aria-hidden="true">'
+   +'<rect width="46" height="28" fill="'+p.bg+'"/>'
+   +'<path d="M0 9.5h46M0 19.5h46M16.5 0v28M31.5 0v28" stroke="'+p.grid+'" stroke-width="1"/>'
+   +'<path d="M16.5 4.5v19" stroke="'+c.upW+'" stroke-width="1.4"/>'
+   +'<rect x="13.5" y="9.5" width="6" height="10" rx="1" fill="'+p.up+'" stroke="'+c.upB+'"/>'
+   +'<path d="M31.5 6.5v17" stroke="'+c.dnW+'" stroke-width="1.4"/>'
+   +'<rect x="28.5" y="10.5" width="6" height="9" rx="1" fill="'+p.down+'" stroke="'+c.dnB+'"/>'
+   +'</svg>';
+}
+function tvEsc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function tvPalLoad(){try{return localStorage.getItem('flux_tv_pal')||TV_PAL_DEFAULT;}catch(e){return TV_PAL_DEFAULT;}}
+function tvPalSave(id){try{localStorage.setItem('flux_tv_pal',id);}catch(e){}}
+
 function renderCharts(){
   state.view='charts';
   var PAIRS=[
@@ -1665,6 +1812,12 @@ function renderCharts(){
     {s:'OANDA:US30USD',l:'Dow Jones'}
   ];
   var opts=PAIRS.map(function(p){return '<option value="'+p.s+'">'+p.l+'</option>';}).join('');
+  state.tvPal=state.tvPal||tvPalLoad();
+  var pal=tvPal(state.tvPal); state.tvPal=pal.id;
+  var chips=TV_PALETTES.map(function(p){
+    return '<button type="button" class="tv-chip" data-pal="'+p.id+'" aria-pressed="'+(p.id===pal.id)+'" title="'+tvEsc(p.desc)+'">'
+      +tvSwatch(p)+'<span>'+tvEsc(p.name)+'</span></button>';
+  }).join('');
   var html=''
     +'<div class="eyebrow">Bo&icirc;te &agrave; outils &middot; Graphiques</div>'
     +'<h1 class="lesson-title">Graphiques en direct</h1>'
@@ -1673,31 +1826,34 @@ function renderCharts(){
     +'  <div class="tv-field"><label>March&eacute;</label><select id="tvSym">'+opts+'</select></div>'
     +'  <div class="tv-field"><label>Unit&eacute; de temps</label><select id="tvInt"><option value="15">15 min</option><option value="60" selected>1 heure</option><option value="240">4 heures</option><option value="D">1 jour</option><option value="W">1 semaine</option></select></div>'
     +'</div>'
+    +'<div class="tv-pal">'
+    +'  <div class="tv-pal-head"><span class="lbl">Palette</span><span class="desc" id="tvPalDesc">'+tvEsc(pal.desc)+'</span></div>'
+    +'  <div class="tv-pal-row">'+chips+'</div>'
+    +'</div>'
     +'<div class="tv-wrap"><div id="tvChart" style="height:100%;width:100%"></div></div>'
     +'<div class="callout" style="margin-top:18px"><b>Astuce SMC</b>Utilise l\'outil rectangle pour marquer tes Order Blocks et FVG, l\'outil ligne horizontale pour PDH/PDL et les niveaux de liquidit&eacute;. Le graphique est r&eacute;el &mdash; entra&icirc;ne-toi a rep&eacute;rer la structure (BOS, ChoCh) sur du concret.</div>';
   $('#content').innerHTML=html;
   var _c=$('#content'); if(_c)_c.classList.add('wide-tool');
 
+  // habille le cadre autour du widget avec les couleurs de la palette
+  function paintFrame(p){
+    var w=document.querySelector('#content .tv-wrap'); if(!w)return;
+    w.style.background=p.bg;
+    w.style.borderColor=p.frame||tvAlpha(p.up,.25);
+  }
+
   function loadTV(){
-    var sym=$('#tvSym').value, intv=$('#tvInt').value;
+    var sym=$('#tvSym').value, intv=$('#tvInt').value, p=tvPal(state.tvPal);
     document.getElementById('tvChart').innerHTML='';
     new TradingView.widget({
       container_id:'tvChart', symbol:sym, interval:intv,
-      autosize:true, timezone:'Europe/Paris', theme:'dark', style:'1',
-      locale:'fr', toolbar_bg:'#0d0a18', enable_publishing:false,
+      autosize:true, timezone:'Europe/Paris', theme:p.mode, style:'1',
+      locale:'fr', toolbar_bg:p.bg, enable_publishing:false,
       hide_side_toolbar:false, allow_symbol_change:true, withdateranges:true,
-      studies:[], overrides:{
-        'paneProperties.background':'#0d0a08',
-        'paneProperties.backgroundType':'solid',
-        'paneProperties.vertGridProperties.color':'rgba(255,107,26,.06)',
-        'paneProperties.horzGridProperties.color':'rgba(255,107,26,.06)',
-        'mainSeriesProperties.candleStyle.upColor':'#34D399',
-        'mainSeriesProperties.candleStyle.downColor':'#F87171',
-        'mainSeriesProperties.candleStyle.borderUpColor':'#34D399',
-        'mainSeriesProperties.candleStyle.borderDownColor':'#F87171',
-        'mainSeriesProperties.candleStyle.wickUpColor':'#34D399',
-        'mainSeriesProperties.candleStyle.wickDownColor':'#F87171'
-      }
+      loading_screen:{backgroundColor:p.bg, foregroundColor:p.up},
+      studies:[],
+      overrides:tvOverrides(p),
+      studies_overrides:tvStudiesOverrides(p)
     });
   }
   function ensureTV(){
@@ -1709,6 +1865,20 @@ function renderCharts(){
   }
   $('#tvSym').addEventListener('change',loadTV);
   $('#tvInt').addEventListener('change',loadTV);
+  document.querySelectorAll('#content .tv-chip').forEach(function(b){
+    b.addEventListener('click',function(){
+      var id=b.dataset.pal; if(id===state.tvPal)return;
+      state.tvPal=id; tvPalSave(id);
+      var p=tvPal(id);
+      document.querySelectorAll('#content .tv-chip').forEach(function(x){
+        x.setAttribute('aria-pressed', x.dataset.pal===id ? 'true' : 'false');
+      });
+      var d=$('#tvPalDesc'); if(d)d.textContent=p.desc;
+      paintFrame(p);
+      loadTV();
+    });
+  });
+  paintFrame(pal);
   ensureTV();
 
   renderNav();renderTabs();window.scrollTo(0,0);
