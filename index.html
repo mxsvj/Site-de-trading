@@ -741,6 +741,98 @@
   
   
 
+
+  /* ---------- Stratégie : le playbook ---------- */
+  .st-meta{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 4px}
+  .st-meta span{font-family:var(--mono);font-size:11px;letter-spacing:.3px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;color:var(--muted);background:rgba(255,255,255,.02)}
+  .st-meta span b{color:var(--gold-bright);font-weight:600}
+
+  .st-seq{display:flex;flex-direction:column;gap:10px;margin:26px 0}
+  .st-seq-it{display:flex;gap:14px;align-items:flex-start;border:1px solid var(--line);border-radius:13px;background:var(--panel);padding:15px 17px}
+  .st-seq-n{flex:0 0 26px;height:26px;border-radius:8px;display:grid;place-items:center;font-family:var(--mono);font-size:12px;font-weight:700;color:#0a0a0a;background:linear-gradient(135deg,var(--accent),var(--accent-2))}
+  .st-seq-b{font-size:14.5px;color:#C2C6D0}
+  .st-seq-b b{color:var(--text);display:block;margin-bottom:2px;font-size:14.5px}
+
+  .st-ind{border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,var(--panel),#0c0906);padding:20px 22px;margin:22px 0}
+  .st-ind-h{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .st-ind-h svg{width:17px;height:17px;stroke:var(--gold-bright);fill:none;stroke-width:1.9;flex:0 0 17px}
+  .st-ind-h b{font-family:var(--display);font-size:15px;letter-spacing:-.3px}
+  .st-ind-tag{font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted-2);border:1px solid var(--line);border-radius:999px;padding:3px 9px;margin-left:auto;white-space:nowrap}
+  .st-ind-rows{display:flex;flex-direction:column;gap:9px;margin-top:13px}
+  .st-ind-row{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:start;font-size:14px;color:#C2C6D0}
+  .st-ind-row .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--gold);padding-top:3px}
+  .st-ind-row.no .k{color:var(--bear);color:#8a8078}
+  .st-ind-row b{color:var(--text);font-weight:600}
+  @media(max-width:640px){.st-ind-row{grid-template-columns:1fr;gap:2px}.st-ind-row .k{padding-top:0}}
+
+  /* — Score de confluence — */
+  .st-score{border:1px solid var(--line);border-radius:18px;background:var(--panel);overflow:hidden;margin:26px 0}
+  .st-blk{padding:20px 22px;border-bottom:1px solid var(--line)}
+  .st-blk:last-of-type{border-bottom:0}
+  .st-blk-h{font-family:var(--mono);font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--gold);margin-bottom:3px}
+  .st-blk-s{font-size:13px;color:var(--muted);margin-bottom:14px}
+  .st-chk{display:flex;gap:11px;align-items:flex-start;padding:10px 12px;border:1px solid transparent;border-radius:11px;cursor:pointer;transition:.15s}
+  .st-chk:hover{background:rgba(255,255,255,.03)}
+  .st-chk input{appearance:none;width:17px;height:17px;flex:0 0 17px;margin-top:2px;border:1.5px solid var(--muted-2);border-radius:5px;cursor:pointer;position:relative;transition:.15s}
+  .st-chk input:checked{background:linear-gradient(135deg,var(--accent),var(--accent-2));border-color:transparent}
+  .st-chk input:checked::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;color:#0a0a0a;font-size:11px;font-weight:800}
+  .st-chk.kill input:checked{background:#8a3a1a;border-color:#8a3a1a}
+  .st-chk.kill input:checked::after{content:"✕";color:#fff}
+  .st-chk-t{font-size:14px;color:#C2C6D0;line-height:1.5}
+  .st-chk-t b{color:var(--text);font-weight:600}
+  .st-chk.on .st-chk-t b{color:var(--gold-bright)}
+  .st-chk-w{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);margin-left:auto;flex:0 0 auto;padding-top:3px;white-space:nowrap}
+  .st-chk-why{display:block;font-size:12.5px;color:var(--muted);margin-top:3px}
+
+  .st-verdict{padding:22px;background:linear-gradient(180deg,#0c0906,var(--panel));text-align:center}
+  .st-gauge{height:7px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden;margin:0 0 16px}
+  .st-gauge i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .45s cubic-bezier(.4,0,.2,1)}
+  .st-vnum{font-family:var(--display);font-size:40px;font-weight:800;letter-spacing:-1.6px;line-height:1}
+  .st-vnum #stNum{color:var(--text)}
+  .st-vnum .d{font-size:17px;color:var(--muted-2);font-weight:400}
+  .st-vtag{font-family:var(--mono);font-size:11.5px;letter-spacing:1.6px;text-transform:uppercase;margin:10px 0 8px;display:inline-block;padding:6px 14px;border-radius:999px;border:1px solid var(--line)}
+  .st-vtag.ok{color:#FF9D4D;border-color:rgba(255,157,77,.45);background:rgba(255,107,26,.1)}
+  .st-vtag.mid{color:#D8CFC4;border-color:var(--line)}
+  .st-vtag.no{color:#F87171;border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.08)}
+  .st-vmsg{font-size:14.5px;color:#C2C6D0;max-width:520px;margin:0 auto}
+  .st-vmsg b{color:var(--text)}
+  .st-vact{margin-top:16px}
+
+  /* — Cas pratiques — */
+  .st-case{border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:20px 22px;margin:16px 0}
+  .st-case-n{font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+  .st-case p{font-size:14.5px;color:#C2C6D0;margin-bottom:14px}
+  .st-case-btns{display:flex;gap:9px;flex-wrap:wrap}
+  .st-case-btns button{font-family:var(--mono);font-size:12px;padding:9px 17px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer;transition:.15s}
+  .st-case-btns button:hover:not(:disabled){border-color:var(--muted-2);color:var(--text)}
+  .st-case-btns button.good{border-color:rgba(255,157,77,.6);color:var(--gold-bright);background:rgba(255,107,26,.1)}
+  .st-case-btns button.bad{border-color:rgba(248,113,113,.45);color:#F87171;background:rgba(248,113,113,.08)}
+  .st-case-btns button:disabled{cursor:default;opacity:.85}
+  .st-case-btns button.picked::after{content:" \2190 ton choix";opacity:.7;font-size:11px}
+  .st-case-ans{display:none;margin-top:14px;padding:14px 16px;border-left:3px solid var(--gold);border-radius:0 11px 11px 0;background:linear-gradient(90deg,rgba(255,255,255,.05),transparent);font-size:14px;color:#CDD0D9}
+  .st-case-ans.show{display:block}
+  .st-case-ans b{color:var(--gold-bright)}
+
+  /* — Fiche récap — */
+  .st-recap{border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,var(--panel),#0c0906);padding:24px 26px;margin:30px 0}
+  .st-recap-h{font-family:var(--mono);font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:var(--gold);margin-bottom:16px}
+  .st-rrow{display:grid;grid-template-columns:132px 1fr;gap:14px;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;color:#C2C6D0}
+  .st-rrow:last-child{border-bottom:0}
+  .st-rrow .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);padding-top:2px}
+  .st-rrow b{color:var(--text);font-weight:600}
+  @media(max-width:640px){.st-rrow{grid-template-columns:1fr;gap:3px}}
+
+  /* le sélecteur Leçons / Indicateurs / Stratégie doit tenir sur un écran de téléphone */
+  .learn-toggle{flex-wrap:wrap;max-width:100%}
+  @media(max-width:680px){
+    .learn-toggle button{padding:9px 12px;font-size:11.5px;gap:6px;letter-spacing:.2px}
+    .learn-toggle button svg{width:14px;height:14px}
+  }
+  @media(max-width:480px){
+    .learn-toggle button{padding:8px 10px;font-size:11px}
+    .learn-toggle button svg{display:none}
+  }
+
   </style>
 </head>
 <body>
@@ -992,12 +1084,14 @@ const ISTEPS=[[{"reveal": {"c": 4, "cu": []}, "t": "Le prix avance ; on veut d'a
 const LCHARTS={"bos": [{"cfg": {"candles": [{"o": 20, "h": 26, "l": 19, "c": 25}, {"o": 25, "h": 30, "l": 24, "c": 29}, {"o": 29, "h": 31, "l": 26, "c": 27}, {"o": 27, "h": 29, "l": 24, "c": 28}, {"o": 28, "h": 38, "l": 27, "c": 37}, {"o": 37, "h": 40, "l": 35, "c": 39}, {"o": 39, "h": 42, "l": 37, "c": 41}], "lines": [{"price": 31, "color": "gold", "dashed": true, "label": "sommet a casser", "x0": 1, "x1": 6}], "markers": [{"i": 4, "dir": "up", "label": "BOS", "color": "bull"}]}, "cap": "BOS haussier : la cloture passe au-dessus du dernier sommet = continuation de la tendance."}], "choch": [{"cfg": {"candles": [{"o": 20, "h": 26, "l": 19, "c": 25}, {"o": 25, "h": 32, "l": 24, "c": 31}, {"o": 31, "h": 34, "l": 29, "c": 30}, {"o": 30, "h": 33, "l": 28, "c": 29}, {"o": 29, "h": 31, "l": 23, "c": 24}, {"o": 24, "h": 26, "l": 20, "c": 21}, {"o": 21, "h": 24, "l": 19, "c": 23}], "lines": [{"price": 28, "color": "bear", "dashed": true, "label": "dernier creux (HL)", "x0": 2, "x1": 6}], "markers": [{"i": 4, "dir": "down", "label": "CHoCH", "color": "bear"}]}, "cap": "CHoCH : premiere cassure d'un point structurel CONTRE la tendance = signal de retournement."}], "ob": [{"cfg": {"candles": [{"o": 34, "h": 36, "l": 31, "c": 32}, {"o": 32, "h": 33, "l": 28, "c": 29}, {"o": 29, "h": 37, "l": 28, "c": 36}, {"o": 36, "h": 43, "l": 35, "c": 42}, {"o": 42, "h": 45, "l": 40, "c": 44}, {"o": 44, "h": 46, "l": 38, "c": 39}, {"o": 39, "h": 41, "l": 36, "c": 40}, {"o": 40, "h": 48, "l": 38, "c": 47}], "zones": [{"from": 28, "to": 32, "type": "bull", "label": "Order Block", "x0": 1, "x1": 1}], "markers": [{"i": 3, "dir": "up", "label": "impulsion", "color": "bull"}, {"i": 5, "dir": "down", "label": "retest", "color": "gold"}]}, "cap": "La derniere bougie baissiere avant l'impulsion = order block haussier ; le prix revient le tester."}], "fvg": [{"cfg": {"candles": [{"o": 24, "h": 27, "l": 23, "c": 26}, {"o": 26, "h": 36, "l": 25, "c": 35}, {"o": 35, "h": 40, "l": 31, "c": 39}, {"o": 39, "h": 42, "l": 34, "c": 35}, {"o": 35, "h": 38, "l": 30, "c": 31}, {"o": 31, "h": 34, "l": 29, "c": 33}, {"o": 33, "h": 44, "l": 32, "c": 43}], "zones": [{"from": 27, "to": 31, "type": "gold", "label": "FVG", "x0": 1, "x1": 3}], "markers": [{"i": 4, "dir": "up", "label": "comble", "color": "gold"}]}, "cap": "FVG haussier : le vide entre la meche de la bougie 1 et celle de la bougie 3, que le prix revient combler."}], "liq": [{"cfg": {"candles": [{"o": 30, "h": 39, "l": 29, "c": 38}, {"o": 38, "h": 40, "l": 35, "c": 36}, {"o": 36, "h": 40, "l": 33, "c": 39}, {"o": 39, "h": 40, "l": 36, "c": 37}, {"o": 37, "h": 45, "l": 36, "c": 38}, {"o": 38, "h": 39, "l": 31, "c": 32}, {"o": 32, "h": 34, "l": 27, "c": 28}], "lines": [{"price": 40, "color": "gold", "dashed": true, "label": "equal highs (liquidite)", "x0": 0, "x1": 6}], "markers": [{"i": 4, "dir": "down", "label": "sweep", "color": "bear"}]}, "cap": "Sweep de liquidite : le prix perce les equal highs, prend les stops, puis se retourne."}], "pd": [{"cfg": {"candles": [{"o": 22, "h": 24, "l": 20, "c": 23}, {"o": 23, "h": 30, "l": 22, "c": 29}, {"o": 29, "h": 38, "l": 28, "c": 37}, {"o": 37, "h": 44, "l": 36, "c": 43}, {"o": 43, "h": 45, "l": 38, "c": 39}, {"o": 39, "h": 41, "l": 33, "c": 34}, {"o": 34, "h": 36, "l": 31, "c": 35}, {"o": 35, "h": 46, "l": 34, "c": 45}], "zones": [{"from": 33, "to": 45, "type": "bear", "label": "PREMIUM (vente)"}, {"from": 20, "to": 33, "type": "bull", "label": "DISCOUNT (achat)"}], "lines": [{"price": 33, "color": "gold", "label": "0.5 - equilibre"}]}, "cap": "Au-dessus du 0.5 (Fibonacci) = premium (cher, zone de vente). En dessous = discount (bon marche, zone d'achat)."}], "of": [{"cfg": {"candles": [{"o": 30, "h": 33, "l": 28, "c": 32}, {"o": 32, "h": 42, "l": 31, "c": 41}, {"o": 41, "h": 43, "l": 38, "c": 39}, {"o": 39, "h": 44, "l": 37, "c": 38}, {"o": 38, "h": 46, "l": 37, "c": 40}, {"o": 40, "h": 41, "l": 33, "c": 34}, {"o": 34, "h": 36, "l": 31, "c": 35}, {"o": 35, "h": 48, "l": 34, "c": 47}, {"o": 47, "h": 52, "l": 45, "c": 51}], "lines": [{"price": 46, "color": "gold", "dashed": true, "label": "liquidite", "x0": 1, "x1": 4}], "zones": [{"from": 31, "to": 35, "type": "bull", "label": "OB / FVG", "x0": 6, "x1": 6}], "markers": [{"i": 4, "dir": "down", "label": "sweep", "color": "bear"}, {"i": 5, "dir": "down", "label": "absorption", "color": "bear"}, {"i": 7, "dir": "up", "label": "entree", "color": "bull"}]}, "cap": "Lecture orderflow : sweep de liquidite + absorption (delta), puis reaction sur la zone OB/FVG = entree."}], "sr": [{"cfg": {"candles": [{"o": 30, "h": 34, "l": 29, "c": 33}, {"o": 33, "h": 38, "l": 32, "c": 36}, {"o": 36, "h": 38, "l": 33, "c": 34}, {"o": 34, "h": 36, "l": 31, "c": 32}, {"o": 32, "h": 38, "l": 31, "c": 37}, {"o": 37, "h": 43, "l": 36, "c": 42}, {"o": 42, "h": 44, "l": 38, "c": 39}, {"o": 39, "h": 46, "l": 38, "c": 45}], "lines": [{"price": 38, "color": "gold", "dashed": true, "label": "résistance", "x0": 0, "x1": 6}], "markers": [{"i": 2, "dir": "down", "label": "rejet", "color": "bear"}, {"i": 5, "dir": "up", "label": "cassure", "color": "bull"}, {"i": 6, "dir": "down", "label": "retest = support", "color": "gold"}]}, "cap": "Le prix rejette une résistance, finit par la casser, puis revient la tester par-dessus : elle devient un support."}], "struct": [{"cfg": {"candles": [{"o": 20, "h": 25, "l": 19, "c": 24}, {"o": 24, "h": 27, "l": 22, "c": 23}, {"o": 23, "h": 32, "l": 22, "c": 31}, {"o": 31, "h": 34, "l": 28, "c": 29}, {"o": 29, "h": 39, "l": 28, "c": 38}, {"o": 38, "h": 41, "l": 35, "c": 36}, {"o": 36, "h": 46, "l": 35, "c": 45}], "markers": [{"i": 1, "dir": "down", "label": "HL", "color": "bull", "below": true}, {"i": 2, "dir": "up", "label": "HH", "color": "bull"}, {"i": 3, "dir": "down", "label": "HL", "color": "bull", "below": true}, {"i": 4, "dir": "up", "label": "HH", "color": "bull"}, {"i": 5, "dir": "down", "label": "HL", "color": "bull", "below": true}, {"i": 6, "dir": "up", "label": "HH", "color": "bull"}]}, "cap": "Tendance haussière : chaque creux (HL) et chaque sommet (HH) sont plus hauts que les précédents."}], "breaker": [{"cfg": {"candles": [{"o": 30, "h": 33, "l": 29, "c": 32}, {"o": 32, "h": 36, "l": 31, "c": 35}, {"o": 35, "h": 37, "l": 33, "c": 34}, {"o": 34, "h": 35, "l": 31, "c": 32}, {"o": 32, "h": 34, "l": 30, "c": 33}, {"o": 33, "h": 41, "l": 32, "c": 40}, {"o": 40, "h": 43, "l": 37, "c": 38}, {"o": 38, "h": 46, "l": 37, "c": 45}], "zones": [{"from": 33, "to": 37, "type": "bear", "label": "OB (échoue)", "x0": 2, "x1": 4}], "markers": [{"i": 5, "dir": "up", "label": "cassure de l'OB", "color": "bull"}, {"i": 6, "dir": "down", "label": "breaker = support", "color": "gold"}]}, "cap": "L'order block de vente est cassé (il échoue) : en revenant dessus, il devient un support — c'est le breaker block."}], "induce": [{"cfg": {"candles": [{"o": 24, "h": 28, "l": 23, "c": 27}, {"o": 27, "h": 32, "l": 26, "c": 31}, {"o": 31, "h": 33, "l": 29, "c": 30}, {"o": 30, "h": 31, "l": 28, "c": 29}, {"o": 29, "h": 30, "l": 25, "c": 26}, {"o": 26, "h": 34, "l": 25, "c": 33}, {"o": 33, "h": 38, "l": 32, "c": 37}], "lines": [{"price": 28, "color": "gold", "dashed": true, "label": "inducement", "x0": 2, "x1": 4}], "zones": [{"from": 24, "to": 26, "type": "bull", "label": "vrai OB", "x0": 4, "x1": 4}], "markers": [{"i": 4, "dir": "down", "label": "sweep (piège)", "color": "bear"}, {"i": 5, "dir": "up", "label": "vraie entrée", "color": "bull"}]}, "cap": "Le petit creux (inducement) attire les acheteurs ; le prix vient le balayer puis repart du vrai order block, plus bas."}], "mtf": [{"cfg": {"candles": [{"o": 40, "h": 41, "l": 36, "c": 37}, {"o": 37, "h": 38, "l": 32, "c": 33}, {"o": 33, "h": 35, "l": 30, "c": 31}, {"o": 31, "h": 33, "l": 29, "c": 30}, {"o": 30, "h": 34, "l": 29, "c": 33}, {"o": 33, "h": 39, "l": 32, "c": 38}, {"o": 38, "h": 44, "l": 37, "c": 43}], "zones": [{"from": 29, "to": 33, "type": "bull", "label": "zone HTF (H4)", "x0": 2, "x1": 4}], "markers": [{"i": 4, "dir": "up", "label": "ChoCh (LTF)", "color": "bull"}, {"i": 5, "dir": "up", "label": "entrée", "color": "bull"}]}, "cap": "Le HTF donne la zone et le biais ; on attend dedans une confirmation LTF (ChoCh) pour entrer."}], "sessions": [{"cfg": {"candles": [{"o": 30, "h": 31, "l": 29, "c": 30}, {"o": 30, "h": 31, "l": 29, "c": 30}, {"o": 30, "h": 30, "l": 29, "c": 29}, {"o": 29, "h": 31, "l": 29, "c": 30}, {"o": 30, "h": 36, "l": 29, "c": 35}, {"o": 35, "h": 39, "l": 34, "c": 38}, {"o": 38, "h": 41, "l": 36, "c": 40}], "zones": [{"from": 29, "to": 31, "type": "bear", "label": "heures creuses", "x0": 0, "x1": 3}], "markers": [{"i": 4, "dir": "up", "label": "Open NY", "color": "bull"}]}, "cap": "En heures creuses, le prix stagne ; à l'ouverture de New York, la volatilité explose : c'est la killzone."}]};
 const LBODY={"bos": "<p><strong>Le Break of Structure (BOS) indique la continuation d'une tendance.</strong> Il se produit quand le prix casse un plus haut (en uptrend) ou un plus bas (en downtrend).</p>\n<div class=\"cardgrid g2\">\n  <div class=\"modcard\"><div class=\"mc-n\">UPTREND</div><h3>BOS haussier</h3><p>Le prix enchaîne des plus hauts (HH) et plus bas (HL) croissants. Quand il casse le dernier plus haut, la structure haussière est confirmée : les acheteurs gardent le contrôle.</p></div>\n  <div class=\"modcard\"><div class=\"mc-n\">DOWNTREND</div><h3>BOS baissier</h3><p>Le prix enchaîne des plus hauts (LH) et plus bas (LL) décroissants. Quand il casse le dernier plus bas, la structure baissière est confirmée : les vendeurs gardent le contrôle.</p></div>\n</div>\n<h2>Règles à retenir</h2>\n<ul>\n  <li>BOS = cassure d'un plus haut en uptrend, ou d'un plus bas en downtrend.</li>\n  <li>Un BOS valide se produit souvent après un <em>CHoCH</em> (premier signe de changement).</li>\n  <li>Le BOS confirme la <strong>continuation</strong> de la tendance.</li>\n  <li>Idéalement, le prix revient tester la zone cassée (<em>retest</em>) avant de continuer.</li>\n</ul>\n<h2>Checklist BOS</h2>\n<ul>\n  <li>Tendance bien définie et CHoCH identifié.</li>\n  <li>Cassure du dernier HH (uptrend) ou LL (downtrend).</li>\n  <li>BOS confirmé + retest si possible.</li>\n  <li>Entrée alignée avec la tendance, gestion du risque (SL / TP).</li>\n</ul>\n<div class=\"callout\"><b>À retenir</b>Le BOS est l'un des concepts les plus importants en Smart Money. Le maîtriser permet d'entrer dans le sens de la tendance et d'augmenter ses probabilités de succès.</div>", "choch": "<p><strong>Le ChoCh (Change of Character) signale un changement de direction du marché.</strong> C'est le premier signe qu'une tendance en place est en train de se retourner.</p>\n<div class=\"cardgrid g2\">\n  <div class=\"modcard\"><div class=\"mc-n\">AVANT</div><h3>BOS dans la tendance</h3><p>Tant que la tendance est intacte, le prix casse ses points dans le même sens : ce sont des BOS (ex. cassures de plus bas en tendance baissière).</p></div>\n  <div class=\"modcard\"><div class=\"mc-n\">BASCULE</div><h3>ChoCh</h3><p>Le prix casse un point structurel <strong>contre</strong> la tendance (ex. un plus haut au-dessus du dernier sommet en tendance baissière). La structure change.</p></div>\n</div>\n<h2>Règle clé</h2>\n<ul>\n  <li>En tendance <strong>baissière</strong> → on cherche un ChoCh <em>haussier</em> (cassure d'un plus haut).</li>\n  <li>En tendance <strong>haussière</strong> → on cherche un ChoCh <em>baissier</em> (cassure d'un plus bas).</li>\n  <li>Après un ChoCh haussier, chaque nouvelle cassure dans le sens haussier devient un <em>BOS haussier</em>.</li>\n</ul>\n<h2>Pourquoi le ChoCh est important</h2>\n<ul>\n  <li>Il signale un potentiel renversement de tendance.</li>\n  <li>Il permet de se placer du bon côté du marché.</li>\n  <li>Il aide à confirmer les entrées et à éviter les faux signaux.</li>\n  <li>À utiliser en confluence (zones clés, order blocks, FVG, liquidité...).</li>\n</ul>\n<div class=\"callout\"><b>BOS vs ChoCh</b>Le BOS confirme la tendance en cours ; le ChoCh est le <strong>premier</strong> signe qu'elle change.</div>", "ob": "<p><strong>Un Order Block est la dernière bougie opposée avant une impulsion forte.</strong> Ce sont des zones où les institutions ont passé de gros ordres avant de provoquer le mouvement.</p>\n<div class=\"cardgrid g2\">\n  <div class=\"modcard\"><div class=\"mc-n\">ACHAT</div><h3>Order Block haussier</h3><p>1. Tendance baissière → 2. dernière bougie baissière avant l'impulsion → 3. impulsion haussière → 4. retour (retest) sur l'OB = zone d'achat.</p></div>\n  <div class=\"modcard\"><div class=\"mc-n\">VENTE</div><h3>Order Block baissier</h3><p>1. Tendance haussière → 2. dernière bougie haussière avant l'impulsion → 3. impulsion baissière → 4. retour (retest) sur l'OB = zone de vente.</p></div>\n</div>\n<h2>Règles clés</h2>\n<ul>\n  <li>Toujours se positionner dans le sens de la tendance (suivre le smart money).</li>\n  <li>Attendre le <em>retest</em> de l'Order Block pour entrer.</li>\n  <li>Placer le stop-loss <strong>derrière</strong> l'Order Block.</li>\n  <li>Prendre ses bénéfices sur les prochaines zones de liquidité ou supports/résistances.</li>\n</ul>\n<h2>Conditions idéales</h2>\n<ul>\n  <li>Structure de marché claire (BOS / ChoCH).</li>\n  <li>Déséquilibre / imbalance présent.</li>\n  <li>Liquidité prise avant l'impulsion.</li>\n  <li>Confluence avec d'autres outils (FVG, Fibonacci, HTF...).</li>\n</ul>\n<div class=\"callout\"><b>Objectif</b>Trader comme les institutions en identifiant leurs zones d'accumulation (achat) ou de distribution (vente). Les Order Blocks agissent comme supports/résistances dynamiques.</div>", "fvg": "<p><strong>Un FVG (Fair Value Gap) est un déséquilibre entre l'offre et la demande créé par un mouvement impulsif.</strong> Le prix a quitté une zone trop vite, laissant un « vide » qu'il a tendance à combler plus tard.</p>\n<h2>Comment le repérer</h2>\n<ul>\n  <li><strong>FVG haussier</strong> : le plus bas de la bougie 3 est au-dessus du plus haut de la bougie 1.</li>\n  <li><strong>FVG baissier</strong> : le plus haut de la bougie 3 est en dessous du plus bas de la bougie 1.</li>\n  <li>Le FVG représente une <em>inefficacité</em> du marché que le prix cherche à combler.</li>\n</ul>\n<h2>Caractéristiques clés</h2>\n<ul>\n  <li>Créé par un mouvement impulsif fort.</li>\n  <li>Agit comme une zone de liquidité / inefficacité.</li>\n  <li>Le prix a tendance à revenir le combler ; peut servir de support ou de résistance.</li>\n  <li>Plus le FVG est grand, plus il est significatif.</li>\n</ul>\n<div class=\"cardgrid g2\">\n  <div class=\"modcard\"><div class=\"mc-n\">MINOR</div><h3>FVG intrabar</h3><p>Formé sur petites unités de temps (M1, M5). Moins fort mais plus fréquent.</p></div>\n  <div class=\"modcard\"><div class=\"mc-n\">MAJOR</div><h3>FVG interbar</h3><p>Formé sur unités de temps élevées (H1, H4, D1). Plus fort et plus fiable.</p></div>\n</div>\n<h2>Comment l'utiliser</h2>\n<ul>\n  <li>Identifier le FVG lors d'un mouvement impulsif.</li>\n  <li>Analyser le contexte (structure, liquidité, tendance).</li>\n  <li>Attendre le retour du prix dans la zone, puis entrer sur confirmation (ChoCh, BOS, rejet).</li>\n  <li>Gérer : stop sous/au-dessus du FVG, viser les prochains niveaux de liquidité.</li>\n</ul>\n<div class=\"callout\"><b>À retenir</b>Tous les FVG ne seront pas comblés : reste sélectif et privilégie les unités de temps élevées, alignées avec la tendance principale.</div>", "liq": "<p><strong>La liquidité est composée des ordres en attente des opérateurs du marché.</strong> Objectif : identifier où elle se trouve pour anticiper les mouvements, car les institutions la chassent avant d'engendrer un mouvement fort.</p>\n<h2>Zones de liquidité clés</h2>\n<ul>\n  <li><strong>Sommets / plus hauts (sell side liquidity)</strong> : ordres vendeurs et stop loss des acheteurs au-dessus des plus hauts.</li>\n  <li><strong>Creux / plus bas (buy side liquidity)</strong> : ordres acheteurs et stop loss des vendeurs en dessous des plus bas.</li>\n  <li><strong>Liquidité intermédiaire (EQH / EQL)</strong> : les égalités de sommets et de creux attirent le prix avant une continuation.</li>\n  <li><strong>Gaps &amp; imbalances</strong> (liquidité cachée) : souvent comblés pour prendre la liquidité.</li>\n</ul>\n<h2>Processus stratégique</h2>\n<ul>\n  <li><strong>Identifier</strong> les zones de liquidité clés.</li>\n  <li><strong>Planifier</strong> le scénario et les niveaux d'intérêt.</li>\n  <li><strong>Attendre la confirmation</strong> : le prix doit prendre la liquidité et donner un signal clair.</li>\n  <li><strong>Exécuter</strong> dans le sens du mouvement institutionnel.</li>\n  <li><strong>Gérer le risque</strong> : stop au-delà de la zone visée, RR favorable.</li>\n</ul>\n<h2>Principes clés</h2>\n<ul>\n  <li>La liquidité attire le prix comme un aimant.</li>\n  <li>Les institutions prennent la liquidité avant de provoquer un mouvement.</li>\n  <li>Ne jamais anticiper : toujours attendre la prise de liquidité.</li>\n  <li>Travailler en confluence avec la tendance et la structure.</li>\n</ul>\n<div class=\"callout\"><b>Discipline · Patience · Précision</b>Maîtriser la liquidité, c'est opérer comme les professionnels. Le risque maîtrisé assure la survie, la stratégie assure la performance.</div>", "pd": "<p><strong>Premium &amp; Discount</strong> permet de savoir si le prix est dans la partie haute (cher) ou basse (bon marché) d'un range de référence. On utilise le <em>50% (Fibonacci)</em> comme ligne d'équilibre.</p>\n<div class=\"cardgrid g2\">\n  <div class=\"modcard\"><div class=\"mc-n\">AU-DESSUS DU 50%</div><h3>Premium (cher)</h3><p>Le prix est considéré comme cher. Zone de vente privilégiée : on cherche des opportunités <strong>SELL</strong>.</p></div>\n  <div class=\"modcard\"><div class=\"mc-n\">EN DESSOUS DU 50%</div><h3>Discount (bon marché)</h3><p>Le prix est considéré comme bon marché. Zone d'achat privilégiée : on cherche des opportunités <strong>BUY</strong>.</p></div>\n</div>\n<p>Le <strong>50%</strong> est la zone d'équilibre : le prix peut réagir des deux côtés, donc on attend une confirmation (structure, order block, ChoCH...).</p>\n<h2>Règles clés</h2>\n<ul>\n  <li>Définir un range clair : dernier swing high (0%) et swing low (100%).</li>\n  <li>Tracer les niveaux de Fibonacci ; le 50% est la ligne clé.</li>\n  <li>Chercher des confluences (structure, order blocks, liquidité, FVG...).</li>\n  <li>Ne pas acheter en premium ni vendre en discount <strong>sans confirmation</strong>.</li>\n</ul>\n<h2>Timeframes</h2>\n<ul>\n  <li>D1 / 4H : vue macro (définir le range).</li>\n  <li>1H / 15M : exécution.</li>\n</ul>\n<div class=\"callout\"><b>Objectif</b>Acheter bas (discount) et vendre haut (premium), avec confluence et gestion du risque. Le marché tend à revenir vers la moyenne (50%).</div>", "of": "<p><strong>L'orderflow consiste à lire les ordres exécutés en temps réel</strong> pour comprendre l'agressivité des acheteurs et des vendeurs.</p>\n<h2>Les 3 outils de base</h2>\n<div class=\"cardgrid g3\">\n  <div class=\"modcard\"><div class=\"mc-n\">01</div><h3>Carnet d'ordres</h3><p>Les volumes <strong>BID</strong> = ordres d'achat en attente. Les volumes <strong>ASK</strong> = ordres de vente en attente.</p></div>\n  <div class=\"modcard\"><div class=\"mc-n\">02</div><h3>Footprint</h3><p>Volume exécuté à chaque prix. On distingue les achats agressifs (market buy) des ventes agressives (market sell).</p></div>\n  <div class=\"modcard\"><div class=\"mc-n\">03</div><h3>Delta</h3><p>Achats − ventes. Delta positif = plus d'achats agressifs ; delta négatif = plus de ventes agressives.</p></div>\n</div>\n<h2>Exemples d'interprétation</h2>\n<ul>\n  <li><strong>Absorption (achat)</strong> : un gros volume d'achats agressifs absorbe les ventes au même prix → signal haussier.</li>\n  <li><strong>Absorption (vente)</strong> : un gros volume de ventes agressives absorbe les achats → signal baissier.</li>\n  <li><strong>Breakout avec delta</strong> : le prix casse la résistance avec un delta fortement positif → signal haussier fort.</li>\n  <li><strong>Divergence</strong> : le prix fait des plus hauts mais le delta fait des plus bas → faiblesse cachée, risque de retournement.</li>\n</ul>\n<div class=\"callout\"><b>À retenir</b>L'orderflow montre QUI est agressif (acheteurs ou vendeurs) et aide à repérer absorptions, breakouts fiables et divergences. À combiner avec le contexte (support/résistance, structure de marché).</div>", "sr": "<div class=\"callout\"><b>Définition</b> Un <strong>support</strong> est une zone où les acheteurs reprennent le contrôle et stoppent la baisse. Une <strong>résistance</strong> est une zone où les vendeurs reprennent le contrôle et stoppent la hausse.</div>\n<h2>Comment le prix réagit</h2>\n<ul>\n<li><strong>Rebond</strong> : le prix touche la zone et repart dans l'autre sens.</li>\n<li><strong>Cassure</strong> : le prix traverse la zone avec force → le niveau est invalidé.</li>\n</ul>\n<h2>Le changement de rôle (flip)</h2>\n<p>Quand une <strong>résistance est cassée</strong>, elle se transforme souvent en <strong>support</strong> (et inversement). C'est l'une des zones de retour les plus fiables du marché.</p>\n<h2>Les types de niveaux</h2>\n<ul>\n<li><strong>Horizontaux</strong> : basés sur d'anciens sommets/creux. Les plus simples et les plus suivis.</li>\n<li><strong>Dynamiques</strong> : une moyenne mobile ou une oblique qui suit le prix.</li>\n<li><strong>Zones</strong> plutôt que lignes exactes : le marché réagit sur une fourchette de prix, pas au pip près.</li>\n</ul>\n<div class=\"takeaways\"><div class=\"th\">À retenir</div><ul><li>Plus un niveau est testé, plus il compte. Et la confluence (S/R + Fibonacci + order block) augmente fortement la fiabilité.</li></ul></div>", "struct": "<div class=\"callout\"><b>Définition</b> La <strong>structure de marché</strong>, c'est la façon dont le prix s'organise en une succession de sommets et de creux. La lire, c'est savoir dans quel sens va le marché — la base de toute analyse.</div>\n<h2>Le vocabulaire</h2>\n<ul>\n<li><strong>HH</strong> (Higher High) : un plus haut, plus haut que le précédent.</li>\n<li><strong>HL</strong> (Higher Low) : un plus bas, plus haut que le précédent.</li>\n<li><strong>LH / LL</strong> (Lower High / Lower Low) : l'inverse, en tendance baissière.</li>\n</ul>\n<h2>Les trois états du marché</h2>\n<ul>\n<li><strong>Tendance haussière</strong> : enchaînement de HH et HL (sommets et creux ascendants).</li>\n<li><strong>Tendance baissière</strong> : enchaînement de LH et LL (sommets et creux descendants).</li>\n<li><strong>Range</strong> : ni HH ni LL clairs, le prix oscille entre un support et une résistance.</li>\n</ul>\n<div class=\"takeaways\"><div class=\"th\">À retenir</div><ul><li>Toujours déterminer la structure AVANT de chercher une entrée. La cassure de ces points (HH/HL) donnera les BOS et ChoCh des leçons suivantes.</li></ul></div>", "breaker": "<div class=\"callout\"><b>Définition</b> La <strong>mitigation</strong> est le retour du prix sur une zone pour « équilibrer » des positions institutionnelles. Un <strong>breaker block</strong> est un order block qui a échoué (été cassé) et qui, une fois reconquis, change de rôle.</div>\n<h2>Comment se forme un breaker</h2>\n<ul>\n<li>Un order block se forme, mais le prix le <strong>casse</strong> (la zone échoue).</li>\n<li>Le prix revient ensuite sur cette zone cassée.</li>\n<li>Elle joue alors le rôle inverse : un OB de vente cassé devient un <strong>support</strong> (breaker haussier), et inversement.</li>\n</ul>\n<h2>Comment l'utiliser</h2>\n<ul>\n<li>Attendre le <strong>retest</strong> du breaker pour entrer dans le sens de la cassure.</li>\n<li>Le combiner avec la structure (BOS/ChoCh) et une prise de liquidité.</li>\n<li>Stop de l'autre côté du breaker, comme pour un order block classique.</li>\n</ul>\n<div class=\"takeaways\"><div class=\"th\">À retenir</div><ul><li>Un niveau qui « échoue » n'est pas inutile : reconquis, il devient une zone d'entrée fiable. Le breaker, c'est le flip version order block.</li></ul></div>", "induce": "<div class=\"callout\"><b>Définition</b> L'<strong>inducement</strong> est une liquidité « appât » : un petit creux ou sommet évident qui pousse les traders à entrer trop tôt, juste avant la vraie zone d'intérêt.</div>\n<h2>Pourquoi ça existe</h2>\n<p>Le smart money a besoin de liquidité pour remplir ses ordres. L'inducement crée une zone « évidente » où la foule se positionne… pour mieux venir prendre ses stops avant de partir.</p>\n<h2>Comment le repérer & l'éviter</h2>\n<ul>\n<li>Méfie-toi du niveau « trop évident » placé juste avant un order block ou une zone clé.</li>\n<li>Attends que cet inducement soit <strong>pris</strong> (balayé) avant d'entrer sur la vraie zone, plus profonde.</li>\n<li>Entrer sur l'inducement = se faire piéger ; entrer après = suivre le smart money.</li>\n</ul>\n<div class=\"takeaways\"><div class=\"th\">À retenir</div><ul><li>Si une entrée paraît trop facile et évidente, c'est souvent un inducement. La patience (attendre la prise) fait la différence.</li></ul></div>", "mtf": "<div class=\"callout\"><b>Définition</b> L'<strong>analyse multi-timeframe</strong> consiste à utiliser une grande unité de temps (HTF) pour le <strong>biais</strong> et une petite (LTF) pour <strong>l'entrée</strong>.</div>\n<h2>Le principe</h2>\n<ul>\n<li><strong>HTF (D1 / H4)</strong> : où va le marché ? Quelles zones clés (OB, S/R, premium/discount) ?</li>\n<li><strong>LTF (M15 / M5)</strong> : quand entrer ? On affine le timing dans la zone HTF.</li>\n</ul>\n<h2>La règle d'or</h2>\n<p>On ne trade le LTF que <strong>dans le sens du HTF</strong>. Un signal LTF contre la tendance HTF est un piège.</p>\n<h2>L'enchaînement type</h2>\n<ul>\n<li>HTF : repérer la zone et le biais.</li>\n<li>Attendre que le prix atteigne la zone.</li>\n<li>LTF : sweep + ChoCh → entrée précise, stop serré, gros R:R.</li>\n</ul>\n<div class=\"takeaways\"><div class=\"th\">À retenir</div><ul><li>Le HTF donne la direction, le LTF donne le timing. Les deux alignés = les meilleurs trades.</li></ul></div>", "sessions": "<div class=\"callout\"><b>Définition</b> Les <strong>sessions</strong> (Asie, Londres, New York) rythment la journée. Les <strong>killzones</strong> sont les fenêtres à forte activité, surtout autour des ouvertures de Londres et de New York.</div>\n<h2>Les sessions</h2>\n<ul>\n<li><strong>Asie</strong> : souvent calme, ranges étroits (accumule la liquidité).</li>\n<li><strong>Londres</strong> : forte volatilité, souvent le vrai départ de la journée.</li>\n<li><strong>New York</strong> : très liquide ; l'overlap Londres/NY est explosif.</li>\n</ul>\n<h2>Pourquoi ça compte</h2>\n<ul>\n<li>La volatilité et la liquidité ne sont pas réparties également : trader au bon moment augmente la fiabilité.</li>\n<li>Les killzones offrent les mouvements les plus nets (sweeps, BOS, retournements).</li>\n<li>En heures creuses, mieux vaut s'abstenir : faux signaux, faible volume.</li>\n</ul>\n<div class=\"takeaways\"><div class=\"th\">À retenir</div><ul><li>Adapte tes horaires à ton fuseau et à ton instrument (NQ/Gold aiment l'open de New York). Les heures exactes varient — repère TES killzones.</li></ul></div>"};
 function learnToggle(active){
-  // active: 'lessons' ou 'indic'
+  // active: 'lessons', 'indic' ou 'strat'
   var lessonsIc='<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/>';
   var indicIc='<path d="M4 19V5"/><path d="M4 19h16"/><polyline points="7 14 11 10 14 13 19 7"/>';
+  var stratIc='<path d="M4 18L9 12l3.5 3.5L20 6"/><polyline points="20 11 20 6 15 6"/>';
   return '<div class="learn-toggle" id="learnToggle">'+
     '<button data-lt="lessons" class="'+(active==='lessons'?'on':'')+'"><svg viewBox="0 0 24 24">'+lessonsIc+'</svg>Leçons</button>'+
     '<button data-lt="indic" class="'+(active==='indic'?'on':'')+'"><svg viewBox="0 0 24 24">'+indicIc+'</svg>Indicateurs</button>'+
+    '<button data-lt="strat" class="'+(active==='strat'?'on':'')+'"><svg viewBox="0 0 24 24">'+stratIc+'</svg>Stratégie</button>'+
   '</div>';
 }
 function bindLearnToggle(){
@@ -1006,6 +1100,7 @@ function bindLearnToggle(){
     b.addEventListener('click',function(){
       var t=b.dataset.lt;
       if(t==='indic' && state.view!=='indic') renderIndicators();
+      else if(t==='strat' && state.view!=='strat') renderStrategy();
       else if(t==='lessons' && state.view!=='lesson'){ var i=(typeof state.current==='number'?state.current:0); goTo(isUnlocked(i)?i:0); }
     });
   });
@@ -1282,6 +1377,7 @@ var hero=''
    +'    <div class="lp-tg">'
    +'      <button class="lp-tcard reveal" data-act="risk"><div class="lp-ic"><svg viewBox="0 0 24 24"><path d="M12 3.5l6.5 2.8v4.7c0 4-2.8 7-6.5 8.5-3.7-1.5-6.5-4.5-6.5-8.5V6.3L12 3.5z"/><path d="M9.3 12l1.9 1.9 3.6-3.8"/></svg></div><h4>Gestion du risque</h4><p>Calcule ta taille de position selon ton capital et ton stop.</p></button>'
    +'      <button class="lp-tcard reveal d1" data-act="charts"><div class="lp-ic"><svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><rect x="7" y="11" width="3" height="5"/><rect x="13" y="8" width="3" height="8"/></svg></div><h4>Graphiques live</h4><p>Le vrai graphique TradingView en temps réel.</p></button>'
+   +'      <button class="lp-tcard reveal d2" data-act="strat"><div class="lp-ic"><svg viewBox="0 0 24 24"><path d="M4 18L9 12l3.5 3.5L20 6"/><polyline points="20 11 20 6 15 6"/></svg></div><h4>La stratégie</h4><p>Une stratégie complète, ses indicateurs et ses confirmations.</p></button>'
    +'      <button class="lp-tcard reveal d2" data-act="indic"><div class="lp-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 12V6.5"/><path d="M12 12l4 2.5"/></svg></div><h4>Indicateurs</h4><p>Les 6 indicateurs essentiels, pas à pas.</p></button>'
    +'    </div>'
    +'  </div>'
@@ -1305,7 +1401,7 @@ var hero=''
   $('#content').innerHTML=hero;
 
   // navigation : cartes + bouton -> sections
-  var ACTS={charts:renderCharts,risk:renderRisk,signal:renderSignals,indic:renderIndicators};
+  var ACTS={charts:renderCharts,risk:renderRisk,signal:renderSignals,indic:renderIndicators,strat:renderStrategy};
   document.querySelectorAll('[data-act]').forEach(function(b){
     b.addEventListener('click',function(){var a=ACTS[b.dataset.act];if(a)a();});
   });
@@ -1617,6 +1713,502 @@ function renderIndicators(){
   selectInd(0);
   bindLearnToggle();
   renderNav(); renderTabs(); window.scrollTo(0,0);
+}
+
+/* ==========================================================================
+   LA STRATÉGIE — playbook complet : biais, zone, déclencheur, confirmations,
+   exécution. Les indicateurs y sont expliqués dans leur rôle exact au sein
+   de la stratégie (réglage, lecture, piège), pas comme des outils isolés.
+   ========================================================================== */
+
+/* --- graphiques --- */
+const SCH_BIAIS={
+  alt:"Biais haussier en H1 : structure ascendante, EMA 200 sous le prix, zones premium et discount",
+  candles:[
+    {o:90,h:93,l:89,c:92},{o:92,h:96,l:91,c:95},{o:95,h:97,l:93,c:94},
+    {o:94,h:95,l:91.5,c:92},{o:92,h:99,l:91.8,c:98},{o:98,h:102,l:97,c:101},
+    {o:101,h:102,l:97,c:97.5},{o:97.5,h:98.5,l:95.5,c:96},{o:96,h:101,l:95.8,c:100.5},
+    {o:100.5,h:105,l:100,c:104}
+  ],
+  zones:[
+    {from:91.5,to:96.75,type:'bull',label:"DISCOUNT — on achète ici"},
+    {from:96.75,to:102,type:'bear',label:"PREMIUM — on ne poursuit pas"}
+  ],
+  lines:[{price:96.75,color:'gold',dashed:true,label:"50% — l'équilibre"}],
+  curves:[{color:'gold',dashed:true,label:'EMA 200',pts:[
+    {i:0,p:88.5},{i:1,p:89},{i:2,p:89.7},{i:3,p:90.3},{i:4,p:91},
+    {i:5,p:91.9},{i:6,p:92.7},{i:7,p:93.4},{i:8,p:94.3},{i:9,p:95.4}
+  ]}],
+  markers:[
+    {i:3,label:'HL',color:'bull',below:true},{i:5,label:'HH',color:'bull'},
+    {i:7,label:'HL',color:'bull',below:true}
+  ]
+};
+
+const SCH_ZONE={
+  alt:"Zone d'intérêt : liquidité sous des creux égaux, order block et fair value gap superposés",
+  candles:[
+    {o:80,h:82,l:79.5,c:81.5},{o:81.5,h:82,l:79,c:79.6},{o:79.6,h:81,l:78.9,c:80.8},
+    {o:80.8,h:84,l:80.5,c:83.6},{o:83.6,h:88,l:83.4,c:87.5},{o:87.5,h:90,l:87,c:89.5},
+    {o:89.5,h:90.2,l:86,c:86.5},{o:86.5,h:87,l:83,c:83.5},{o:83.5,h:84,l:81.3,c:81.8},
+    {o:81.8,h:86,l:81.5,c:85.5}
+  ],
+  zones:[
+    {from:79.6,to:81.5,type:'bull',x0:1,x1:9},
+    {from:81,to:83.4,type:'bull',label:'FVG',x0:2,x1:9}
+  ],
+  lines:[{price:78.9,color:'bear',dashed:true,label:'EQL — la liquidité',x1:7}],
+  markers:[
+    {i:1,label:'OB',color:'bull'},
+    {i:8,dir:'up',color:'bull',label:'Réaction',below:true}
+  ]
+};
+
+const SCH_TRIG={
+  alt:"Déclencheur : sweep de liquidité, displacement, change of character, retest du FVG",
+  candles:[
+    {o:118,h:119,l:115,c:115.5},{o:115.5,h:116,l:111,c:111.5},{o:111.5,h:113.5,l:110.8,c:113},
+    {o:113,h:113.4,l:108,c:108.5},{o:108.5,h:109,l:107,c:107.4},{o:107.4,h:110,l:107.2,c:109.6},
+    {o:109.6,h:110,l:107.6,c:108},{o:108,h:108.3,l:105.8,c:107.6},{o:107.6,h:111.6,l:107.4,c:111.4},
+    {o:111.4,h:115.2,l:111.2,c:114.8},{o:114.8,h:115,l:109.5,c:110.2},{o:110.2,h:113,l:110,c:112.8},
+    {o:112.8,h:117,l:112.5,c:116.6},{o:116.6,h:120.5,l:116.2,c:120}
+  ],
+  zones:[{from:108.3,to:111.2,type:'bull',label:'FVG',x0:9,x1:12}],
+  lines:[
+    {price:107,color:'gold',dashed:true,label:'Creux = les stops'},
+    {price:113.5,color:'gold',dashed:true,label:'Sommet à casser',x1:8},
+    {price:105.3,color:'bear',dashed:true,label:'SL'},
+    {price:119.5,color:'bull',dashed:true,label:'TP — liquidité',x1:11}
+  ],
+  markers:[
+    {i:7,dir:'up',color:'gold',label:'SWEEP',below:true},
+    {i:9,label:'ChoCh',color:'bull'},
+    {i:10,dir:'up',color:'bull',label:'ENTRÉE',below:true},
+    {i:13,label:'TP',color:'bull'}
+  ]
+};
+
+const SCH_TRIG_STEPS=[
+  {reveal:{c:5,l:[0]},t:"Le prix descend et laisse un creux évident. Juste en dessous dorment les stops de tous ceux qui ont acheté : <b>c'est ça, la liquidité</b>. Le marché sait exactement où elle est."},
+  {reveal:{c:8,l:[0],m:[0]},t:"<b>Le sweep.</b> La mèche perce le creux, ramasse les stops… et la bougie <b>referme au-dessus du niveau</b>. Une clôture sous le niveau aurait voulu dire l'inverse : une vraie cassure, et on ne fait rien."},
+  {reveal:{c:10,l:[0,1],m:[0,1]},t:"<b>Le displacement.</b> Deux bougies impulsives repartent et cassent le dernier sommet mineur : c'est le ChoCh, la main a changé. En passant, elles laissent un vide derrière elles — le FVG."},
+  {reveal:{c:11,l:[0,1,2],z:[0],m:[0,1,2]},t:"<b>Le retest.</b> Le prix revient combler le FVG : c'est là qu'on entre, et nulle part ailleurs. Le stop se place sous la mèche du sweep — si elle est reprise, l'idée est morte."},
+  {reveal:{c:14,l:[0,1,2,3],z:[0],m:[0,1,2,3]},t:"Le prix repart chercher la liquidité opposée. On risquait 1 pour aller chercher 2. <b>C'est ce rapport, pas le taux de réussite, qui rend la stratégie rentable.</b>"}
+];
+
+const SCH_EXEC={
+  alt:"Exécution : entrée dans le FVG, stop sous le sweep, TP1 à 1R et TP2 sur la liquidité",
+  candles:SCH_TRIG.candles,
+  zones:[{from:108.3,to:111.2,type:'bull',label:'FVG',x0:9,x1:12}],
+  lines:[
+    {price:109.9,color:'gold',label:'ENTRÉE 109,9',x1:7},
+    {price:105.3,color:'bear',dashed:true,label:'SL 105,3 — risque 1R'},
+    {price:114.5,color:'bull',dashed:true,label:'TP1 — 1R',x1:11},
+    {price:119.5,color:'bull',dashed:true,label:'TP2 — 2,1R',x1:12}
+  ],
+  markers:[{i:10,dir:'up',color:'bull',label:'ENTRÉE',below:true}]
+};
+
+/* --- la grille de confirmations --- */
+const STRAT_CONF={
+  must:[
+    {id:'m1',t:"Le biais H1 est respecté",why:"Je n'achète que si le prix est au-dessus de son EMA 200 H1 et en structure haussière (et l'inverse en vente)."},
+    {id:'m2',t:"Il y a eu un sweep de liquidité",why:"La mèche a percé un creux (ou un sommet) évident et la bougie a refermé du bon côté du niveau."},
+    {id:'m3',t:"Un ChoCh a été validé en M5/M1",why:"Le prix a cassé le dernier point structurel opposé : le changement de main est confirmé, je ne l'anticipe pas."},
+    {id:'m4',t:"Le ratio risque/récompense est ≥ 2",why:"Stop placé, cible identifiée sur une vraie liquidité : le calcul donne au moins 2 pour 1. Sinon la stratégie ne peut pas être rentable."}
+  ],
+  plus:[
+    {id:'p1',w:20,t:"Displacement avec FVG laissé derrière",why:"Le mouvement de retournement est impulsif et laisse un déséquilibre : signature d'un vrai flux, pas d'un rebond mou."},
+    {id:'p2',w:15,t:"La zone est fraîche, jamais retestée",why:"Un order block ou un FVG déjà visité a perdu l'essentiel de ses ordres en attente."},
+    {id:'p3',w:15,t:"J'entre en discount (achat) ou en premium (vente)",why:"L'entrée est dans la zone 0,62–0,79 du dernier swing : je paie le prix bas plutôt que de courir après le mouvement."},
+    {id:'p4',w:12,t:"Order block ET FVG au même endroit",why:"Deux raisons de réagir superposées : la zone devient nettement plus fiable qu'un signal seul."},
+    {id:'p5',w:12,t:"On est dans la killzone",why:"Londres 9h–11h ou New York 15h30–17h30 (heure de Paris) : c'est là que le volume institutionnel arrive."},
+    {id:'p6',w:10,t:"Volume nettement supérieur sur le sweep",why:"Le pic de volume prouve que des ordres importants sont passés à ce moment précis."},
+    {id:'p7',w:8,t:"Le prix est du bon côté du VWAP de session",why:"Achat sous le VWAP : je paie moins cher que la moyenne payée par le marché depuis l'ouverture."},
+    {id:'p8',w:8,t:"Divergence RSI sur le point extrême",why:"Le prix fait un plus bas mais pas le RSI : la pression vendeuse s'épuise pendant que le prix, lui, continue."}
+  ],
+  kill:[
+    {id:'k1',t:"Une news à fort impact tombe dans moins de 15 minutes",why:"La volatilité de l'annonce ignore la structure et va chercher les stops dans les deux sens."},
+    {id:'k2',t:"Le marché est en range serré, sans direction",why:"Sans impulsion préalable il n'y a pas de displacement possible : le setup n'existe pas."},
+    {id:'k3',t:"La zone a déjà été retestée et cassée",why:"Le prix l'a traversée sans réagir : elle ne contient plus d'ordres, elle n'est plus qu'un trait sur l'écran."},
+    {id:'k4',t:"J'ai déjà pris 2 pertes aujourd'hui",why:"Règle de survie, pas d'analyse : au-delà, c'est l'envie de se refaire qui trade à ta place."},
+    {id:'k5',t:"J'entre sans attendre le retest, de peur de rater",why:"Entrer en pleine impulsion double le stop et divise le RR par deux. Rater un trade ne coûte rien."}
+  ]
+};
+
+/* --- cas pratiques --- */
+const STRAT_CASES=[
+  {
+    q:"H1 haussier, prix au-dessus de l'EMA 200, revenu en discount. Sur M5 le prix perce le creux de la matinée, la bougie referme au-dessus, deux bougies impulsives cassent le dernier sommet mineur et laissent un FVG. Il est 15h50. Jusqu'au sommet de la veille, le ratio est de 2,6.",
+    good:'take',
+    ans:"<b>On prend.</b> Les quatre non-négociables sont réunis (biais, sweep avec clôture du bon côté, ChoCh, RR ≥ 2) et deux confirmations fortes s'ajoutent : le displacement avec FVG et la killzone de New York. C'est exactement le setup que la stratégie cherche — il faut juste attendre le retour dans le FVG pour entrer."
+  },
+  {
+    q:"Le setup est parfait : sweep, ChoCh, FVG, biais respecté. Mais le retest ne vient jamais, le prix repart sans toi. Tu entres au marché 40 points plus haut. Ton stop reste sous le sweep, donc le ratio tombe à 1,3.",
+    good:'skip',
+    ans:"<b>On passe.</b> Le setup était bon, ton entrée ne l'est plus. Un RR de 1,3 est un non-négociable manquant : avec un taux de réussite réaliste de 45 %, ce ratio te fait perdre de l'argent sur la durée, même en ayant raison sur la direction. Le marché repassera. Ta plus grosse perte, c'est le trade que tu prends parce que tu as raté le premier."
+  },
+  {
+    q:"Le prix casse un creux majeur et clôture franchement en dessous, sans jamais y revenir. Puis il rebondit sur une zone plus bas. Le biais H1 est baissier. Tu penses acheter ce rebond.",
+    good:'skip',
+    ans:"<b>On passe.</b> Deux erreurs empilées. D'abord ce n'est pas un sweep mais une vraie cassure : le sweep referme <b>au-dessus</b> du niveau, ici la bougie clôture dessous. Ensuite l'achat va contre le biais H1, ce qui est éliminatoire. Le bon trade, ici, c'est de guetter une <b>vente</b> sur le retest de la zone cassée par le haut."
+  }
+];
+
+/* --- les 7 phases du playbook --- */
+function stIndCard(icon,name,tag,rows){
+  return '<div class="st-ind"><div class="st-ind-h"><svg viewBox="0 0 24 24">'+icon+'</svg><b>'+name+'</b>'+
+    '<span class="st-ind-tag">'+tag+'</span></div><div class="st-ind-rows">'+
+    rows.map(function(r){return '<div class="st-ind-row'+(r[0]==='Le piège'?' no':'')+'"><span class="k">'+r[0]+'</span><span>'+r[1]+'</span></div>';}).join('')+
+    '</div></div>';
+}
+var STIC={
+  ema:'<path d="M3 17c4 0 5-9 9-9s5 6 9 6"/>',
+  fibo:'<path d="M4 6h16M4 11h16M4 16h16M4 20h16"/>',
+  vwap:'<path d="M3 16h18"/><path d="M6 16V9M10 16V6M14 16v-5M18 16V8"/>',
+  vol:'<rect x="4" y="13" width="3" height="7"/><rect x="10" y="8" width="3" height="12"/><rect x="16" y="4" width="3" height="16"/>',
+  rsi:'<path d="M3 12h3l3-6 3 12 3-8 3 4h3"/>',
+  atr:'<path d="M7 4v16M17 4v16"/><path d="M7 12h10"/><polyline points="9 10 7 12 9 14"/><polyline points="15 10 17 12 15 14"/>'
+};
+
+function stratPhases(){
+  var P=[];
+
+  /* 0 — le principe */
+  P.push({tab:'Le principe',kicker:'La stratégie',heading:"Le piège, puis le vrai mouvement",body:
+    '<p><strong>Une seule idée tient toute la stratégie :</strong> avant de partir dans sa vraie direction, le marché va d\'abord chercher les ordres des autres. Il perce un creux évident, déclenche les stops qui dorment en dessous, se sert de cette liquidité pour se remplir… puis repart dans l\'autre sens.</p>'+
+    '<p>On ne cherche donc pas à deviner le point bas. <em>On attend que le piège se referme</em>, et on entre seulement après, quand le marché a montré sa main.</p>'+
+    '<div class="st-seq">'+
+      '<div class="st-seq-it"><span class="st-seq-n">1</span><span class="st-seq-b"><b>Il piège</b>Le prix perce un creux (ou un sommet) et ramasse les stops : le sweep.</span></div>'+
+      '<div class="st-seq-it"><span class="st-seq-n">2</span><span class="st-seq-b"><b>Il se retourne</b>Une impulsion violente casse la structure dans l\'autre sens : displacement + ChoCh.</span></div>'+
+      '<div class="st-seq-it"><span class="st-seq-n">3</span><span class="st-seq-b"><b>Il respire</b>Le prix revient sur la zone qu\'il vient de créer : c\'est le retest, et c\'est notre entrée.</span></div>'+
+      '<div class="st-seq-it"><span class="st-seq-n">4</span><span class="st-seq-b"><b>Il repart</b>Direction la liquidité opposée : c\'est là qu\'on prend nos profits.</span></div>'+
+    '</div>'+
+    '<h3>Le cadre</h3>'+
+    '<ul>'+
+      '<li><strong>Marchés :</strong> uniquement des actifs très liquides — indices (NQ, ES), or, forex majeur, BTC. Sur un actif illiquide, les mèches ne veulent rien dire.</li>'+
+      '<li><strong>Unités de temps :</strong> le biais se lit en H4/H1, la zone se prépare en M15, l\'entrée se déclenche en M5/M1.</li>'+
+      '<li><strong>Fréquence :</strong> 0 à 2 trades par jour. Les journées sans trade font partie de la stratégie.</li>'+
+      '<li><strong>Ce qu\'on vise :</strong> un ratio d\'au moins 2 pour 1, avec un taux de réussite réaliste de 40 à 55 %.</li>'+
+    '</ul>'+
+    '<div class="callout"><b>Le calcul qui compte</b>Avec 45 % de réussite et un ratio de 2:1, 100 trades donnent 45 × 2R − 55 × 1R = <strong>+35R</strong>. Avec le même taux de réussite mais un ratio de 1:1, ils donnent <strong>−10R</strong>. La rentabilité vient du ratio, jamais du fait d\'avoir souvent raison.</div>'+
+    '<div class="callout"><b>Ce que la stratégie ne fait pas</b>Elle ne fonctionne pas dans un range mou, ni pendant les annonces économiques majeures, ni en dehors des heures de forte activité. Trois quarts du travail consistent à reconnaître ces moments et à ne rien faire.</div>'
+  });
+
+  /* 1 — le biais */
+  P.push({tab:'1 · Le biais',kicker:'Phase 1 — H4 / H1',heading:"Choisir son camp avant d'ouvrir le M5",body:
+    '<p><strong>Tant que le sens n\'est pas fixé, aucun signal ne compte.</strong> Cette première phase se fait une fois, en début de session, et elle décide de tout le reste : on ne prendra <em>que</em> des achats, ou <em>que</em> des ventes.</p>'+
+    '<h3>Ce qu\'on lit, dans l\'ordre</h3>'+
+    '<ul>'+
+      '<li><strong>La structure H1 :</strong> sommets et creux ascendants (HH/HL) → on ne cherche que des achats. Descendants (LH/LL) → que des ventes. Ni l\'un ni l\'autre → on ne trade pas.</li>'+
+      '<li><strong>La position dans le range :</strong> au-dessus du 50 % du dernier grand mouvement, le prix est cher (premium) ; en dessous, il est bon marché (discount).</li>'+
+      '<li><strong>Les niveaux du jour :</strong> plus haut et plus bas de la veille (PDH/PDL), extrêmes de la session asiatique, creux et sommets égaux. Ce sont les réservoirs de liquidité que le marché ira chercher.</li>'+
+    '</ul>'+
+    '<figure class="figure">'+chart(SCH_BIAIS)+'<div class="cap"><b>Biais haussier.</b> Structure ascendante, prix au-dessus de l\'EMA 200 : on attend un retour en discount pour acheter — jamais l\'inverse.</div></figure>'+
+    '<h3>Les indicateurs de cette phase</h3>'+
+    stIndCard(STIC.ema,'EMA 200','Filtre de biais',[
+      ['Réglage',"Moyenne mobile exponentielle, période <b>200</b>, sur la clôture, en <b>H1</b>. Une seule courbe, rien d'autre."],
+      ['Lecture',"C'est un interrupteur, pas un signal : prix <b>au-dessus</b> → seuls les achats sont autorisés ; <b>en dessous</b> → seules les ventes. Sa pente indique la force du courant."],
+      ['Dans la strat',"Elle sert à jeter la moitié des setups avant même de les regarder. Un sweep parfait sous l'EMA 200 en achat : on ne le prend pas."],
+      ['Le piège',"Elle ne donne <b>jamais</b> l'entrée. Un simple contact de l'EMA n'est pas un signal — beaucoup de traders perdent en achetant « le rebond sur l'EMA » sans aucune confirmation de structure."]
+    ])+
+    stIndCard(STIC.fibo,'Retracement de Fibonacci','Zone de prix',[
+      ['Réglage',"Tracé sur le dernier mouvement impulsif complet : du creux au sommet pour un biais haussier. Niveaux affichés : <b>0,5 — 0,62 — 0,79</b>."],
+      ['Lecture',"Le <b>0,5</b> coupe le range en deux : au-dessus c'est premium, en dessous c'est discount. La bande <b>0,62–0,79</b> est la zone d'entrée recherchée (OTE)."],
+      ['Dans la strat',"Elle répond à une seule question : « est-ce que ce prix est intéressant ? ». Un signal valide mais en premium sur un achat, c'est un signal qu'on laisse passer."],
+      ['Le piège',"Le Fibonacci ne prédit rien tout seul. Il ne vaut que s'il tombe sur une zone déjà identifiée (order block, FVG) — sinon ce ne sont que des lignes."]
+    ])+
+    '<div class="takeaways"><div class="th">Sortie de la phase 1</div><ul>'+
+      '<li>Une direction unique pour la journée : achat ou vente.</li>'+
+      '<li>Le 50 % tracé, pour savoir si le prix est cher ou bon marché.</li>'+
+      '<li>2 à 4 niveaux de liquidité marqués sur le graphique.</li>'+
+    '</ul></div>'
+  });
+
+  /* 2 — la zone */
+  P.push({tab:'2 · La zone',kicker:'Phase 2 — M15',heading:"Où l'on attend le prix (et nulle part ailleurs)",body:
+    '<p>Le biais dit <em>dans quel sens</em>. La zone dit <em>à quel endroit</em>. Une zone valable pour cette stratégie a besoin de <strong>deux ingrédients superposés</strong>, et dans cet ordre précis.</p>'+
+    '<div class="st-seq">'+
+      '<div class="st-seq-it"><span class="st-seq-n">1</span><span class="st-seq-b"><b>De la liquidité à prendre</b>Un creux évident, des creux quasi égaux (EQL), le plus bas de la veille. Quelque chose que tout le monde voit et sous quoi tout le monde a mis son stop.</span></div>'+
+      '<div class="st-seq-it"><span class="st-seq-n">2</span><span class="st-seq-b"><b>Une zone d\'origine juste en dessous</b>L\'order block ou le FVG d\'où est parti le dernier mouvement haussier. C\'est là que le prix ira réagir <em>après</em> avoir ramassé les stops.</span></div>'+
+    '</div>'+
+    '<p><strong>L\'ordre n\'est pas négociable.</strong> Le prix vient chercher la liquidité, <em>puis</em> réagit sur la zone. Une zone sans liquidité en dessous n\'a aucune raison d\'être visitée ; une liquidité sans zone en dessous n\'a aucune raison de provoquer un retournement.</p>'+
+    '<figure class="figure">'+chart(SCH_ZONE)+'<div class="cap"><b>Zone d\'intérêt.</b> Deux creux quasi égaux (la liquidité), et juste en dessous l\'order block et le FVG empilés : la réaction se produit là.</div></figure>'+
+    '<h3>Les filtres à appliquer</h3>'+
+    '<ul>'+
+      '<li><strong>Fraîche :</strong> la zone n\'a jamais été retouchée depuis sa création. Une zone déjà visitée a été vidée de ses ordres.</li>'+
+      '<li><strong>Du bon côté du 50 % :</strong> en discount pour un achat, en premium pour une vente. Sinon on n\'a aucun avantage sur le prix.</li>'+
+      '<li><strong>Née d\'une impulsion :</strong> la zone doit avoir déclenché un mouvement franc, pas une dérive molle de trois bougies.</li>'+
+      '<li><strong>Empilée :</strong> order block + FVG + zone 0,62–0,79 au même endroit → c\'est un setup A+. Un seul élément → c\'est un setup ordinaire.</li>'+
+    '</ul>'+
+    '<h3>L\'indicateur de cette phase</h3>'+
+    stIndCard(STIC.vwap,'VWAP de session','Référence de prix',[
+      ['Réglage',"VWAP ancré à l'ouverture de la session tradée (Londres ou New York), remis à zéro chaque jour. Pas de VWAP hebdomadaire ici."],
+      ['Lecture',"C'est le prix moyen réellement payé depuis l'ouverture. Acheter <b>sous</b> le VWAP, c'est payer moins cher que la moyenne du marché ; vendre au-dessus, c'est vendre plus cher."],
+      ['Dans la strat',"Il ne sélectionne pas la zone, il la <b>note</b>. Une zone d'achat située sous le VWAP vaut mieux qu'une zone identique située au-dessus. C'est une confirmation, pas une condition."],
+      ['Le piège',"Un simple contact du VWAP n'est pas un signal d'entrée. Et en tendance très forte, le prix peut rester des heures d'un seul côté : ne rien attendre du VWAP dans ces moments-là."]
+    ])+
+    '<div class="callout"><b>Le test à se poser</b>Si le prix arrive dans ta zone, es-tu capable de dire <strong>où exactement</strong> tu aurais tort ? Si la réponse est floue, la zone est trop large : resserre-la ou passe ton chemin.</div>'
+  });
+
+  /* 3 — le déclencheur */
+  P.push({tab:'3 · Le déclencheur',kicker:'Phase 3 — M5 / M1',heading:"Les quatre temps du retournement",body:
+    '<p>Le prix est arrivé dans la zone. <strong>Ce n\'est pas encore un trade.</strong> On descend en M5 (ou M1) et on attend quatre événements, dans l\'ordre. S\'il en manque un seul, il n\'y a pas de trade.</p>'+
+    '<figure class="figure">'+vchart(SCH_TRIG,SCH_TRIG_STEPS)+'</figure>'+
+    '<div class="st-seq">'+
+      '<div class="st-seq-it"><span class="st-seq-n">1</span><span class="st-seq-b"><b>Le sweep</b>Une mèche perce le creux et la bougie <em>referme au-dessus du niveau</em>. Si elle clôture en dessous, ce n\'est pas un piège, c\'est une vraie cassure : on annule tout.</span></div>'+
+      '<div class="st-seq-it"><span class="st-seq-n">2</span><span class="st-seq-b"><b>Le displacement</b>Une ou deux bougies impulsives repartent, bien plus grandes que les précédentes, et laissent un FVG derrière elles. Pas de FVG = pas d\'intention derrière le mouvement.</span></div>'+
+      '<div class="st-seq-it"><span class="st-seq-n">3</span><span class="st-seq-b"><b>Le ChoCh</b>Cette impulsion casse le dernier sommet mineur du mouvement baissier. C\'est la signature du changement de main — et c\'est ce qui transforme une hypothèse en setup.</span></div>'+
+      '<div class="st-seq-it"><span class="st-seq-n">4</span><span class="st-seq-b"><b>Le retest</b>Le prix revient dans le FVG (ou sur l\'order block) créé par l\'impulsion. <em>C\'est le seul endroit où l\'on entre.</em></span></div>'+
+    '</div>'+
+    '<h3>Les indicateurs de cette phase</h3>'+
+    stIndCard(STIC.vol,'Volume','Preuve du mouvement',[
+      ['Réglage',"Histogramme de volume standard sous le graphique, avec une moyenne mobile 20 périodes en surimpression."],
+      ['Lecture',"On ne regarde que deux bougies : celle du <b>sweep</b> et celle du <b>displacement</b>. Leur volume doit dépasser nettement la moyenne — idéalement le double."],
+      ['Dans la strat',"Il répond à : « est-ce que quelqu'un d'important est passé ici ? ». Un retournement sur volume plat est un retournement que personne n'a financé, et il ne tient pas."],
+      ['Le piège',"Le volume seul ne dit pas la direction. Un pic de volume peut aussi bien marquer un départ qu'un épuisement : il ne se lit qu'avec la structure sous les yeux."]
+    ])+
+    stIndCard(STIC.rsi,'RSI (14)','Divergence uniquement',[
+      ['Réglage',"Période 14, sur la même unité de temps que l'exécution. Les lignes 30 et 70 peuvent être masquées — on ne s'en sert pas ici."],
+      ['Lecture',"Une seule chose est recherchée : la <b>divergence</b>. Le prix fait un plus bas (pendant le sweep) mais le RSI fait un plus haut → la pression vendeuse s'épuise alors même que le prix descend encore."],
+      ['Dans la strat',"C'est un bonus qui renforce le sweep. Une divergence pile sur la mèche du sweep est l'une des confirmations les plus fiables de la grille."],
+      ['Le piège',"« RSI en survente donc j'achète » est l'une des façons les plus rapides de perdre de l'argent : en tendance, le RSI reste collé sous 30 pendant des heures. <b>Ici, surachat et survente ne sont jamais des signaux.</b>"]
+    ])+
+    '<div class="callout"><b>La règle de patience</b>Le retest est l\'étape où l\'on perd le plus de traders : le prix repart parfois sans revenir. <strong>Tant pis.</strong> Entrer en pleine impulsion double la distance au stop et divise le ratio par deux — c\'est exactement ce qui rend une bonne stratégie perdante.</div>'
+  });
+
+  /* 4 — les confirmations */
+  P.push({tab:'4 · Les confirmations',kicker:'Phase 4 — la grille',heading:"Empiler les preuves, puis compter",body:
+    '<p><strong>Aucune confirmation ne suffit à elle seule.</strong> La stratégie ne fonctionne pas parce qu\'un signal apparaît, mais parce que plusieurs raisons indépendantes pointent au même endroit, au même moment. C\'est ça, la confluence — et ça se compte.</p>'+
+    '<p>La grille est en trois blocs. Les <em>non-négociables</em> doivent tous être cochés, sinon il n\'y a pas de setup du tout. Les <em>confirmations</em> donnent un score sur 100, qui décide si l\'on prend le trade et à quel risque. Les <em>éliminatoires</em> annulent tout, quel que soit le score.</p>'+
+    '<div class="st-score" id="stScore">'+
+
+      '<div class="st-blk"><div class="st-blk-h">Bloc A · Les 4 non-négociables</div>'+
+      '<div class="st-blk-s">S\'il en manque un seul, il n\'y a pas de trade. Pas de score, pas de discussion.</div>'+
+      STRAT_CONF.must.map(function(c){
+        return '<label class="st-chk" data-g="must" data-id="'+c.id+'"><input type="checkbox"><span class="st-chk-t"><b>'+c.t+'</b><span class="st-chk-why">'+c.why+'</span></span></label>';
+      }).join('')+'</div>'+
+
+      '<div class="st-blk"><div class="st-blk-h">Bloc B · Les confirmations</div>'+
+      '<div class="st-blk-s">Chacune vaut des points. Elles répondent à une seule question : combien de raisons différentes ai-je d\'être ici ?</div>'+
+      STRAT_CONF.plus.map(function(c){
+        return '<label class="st-chk" data-g="plus" data-id="'+c.id+'" data-w="'+c.w+'"><input type="checkbox"><span class="st-chk-t"><b>'+c.t+'</b><span class="st-chk-why">'+c.why+'</span></span><span class="st-chk-w">+'+c.w+'</span></label>';
+      }).join('')+'</div>'+
+
+      '<div class="st-blk"><div class="st-blk-h">Bloc C · Les éliminatoires</div>'+
+      '<div class="st-blk-s">Une seule case cochée ici et le trade est annulé, même avec 100 sur 100.</div>'+
+      STRAT_CONF.kill.map(function(c){
+        return '<label class="st-chk kill" data-g="kill" data-id="'+c.id+'"><input type="checkbox"><span class="st-chk-t"><b>'+c.t+'</b><span class="st-chk-why">'+c.why+'</span></span></label>';
+      }).join('')+'</div>'+
+
+      '<div class="st-verdict">'+
+        '<div class="st-gauge"><i id="stGauge"></i></div>'+
+        '<div class="st-vnum"><span id="stNum">0</span><span class="d"> / 100</span></div>'+
+        '<div class="st-vtag no" id="stTag">Setup incomplet</div>'+
+        '<div class="st-vmsg" id="stMsg">Coche ce que tu observes réellement sur ton graphique.</div>'+
+        '<div class="st-vact"><button class="btn btn-ghost" id="stReset">Vider la grille</button></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="takeaways"><div class="th">Comment lire le score</div><ul>'+
+      '<li><strong>75 et plus — setup A+ :</strong> risque plein (1 % du capital). Ce sont les trades qui portent l\'année, et ils sont rares.</li>'+
+      '<li><strong>55 à 74 — setup valable :</strong> risque réduit de moitié (0,5 %). Correct, sans plus.</li>'+
+      '<li><strong>Moins de 55 — trop léger :</strong> on note le setup dans son journal et on ne le prend pas. Observer un trade qu\'on n\'a pas pris coûte zéro euro.</li>'+
+    '</ul></div>'
+  });
+
+  /* 5 — l'exécution */
+  P.push({tab:"5 · L'exécution",kicker:'Phase 5 — passer l\'ordre',heading:"Entrée, stop, cibles : tout est décidé avant",body:
+    '<p><strong>Les quatre niveaux se fixent avant de cliquer</strong>, jamais pendant que la position vit. Une fois l\'ordre passé, la seule chose qui reste à faire est d\'appliquer ce qui a été écrit.</p>'+
+    '<figure class="figure">'+chart(SCH_EXEC)+'<div class="cap"><b>Le même trade, chiffré.</b> Entrée 109,9 · stop 105,3 (risque 4,6) · TP1 114,5 (1R) · TP2 119,5 (2,1R).</div></figure>'+
+    '<div class="st-recap">'+
+      '<div class="st-recap-h">Les 4 niveaux</div>'+
+      '<div class="st-rrow"><span class="k">Entrée</span><span>Ordre limite au <b>milieu du FVG</b> (ou sur l\'order block). Si tu débutes, un ordre au marché à la clôture de la bougie de retest est plus simple à exécuter — au prix d\'un stop légèrement plus large.</span></div>'+
+      '<div class="st-rrow"><span class="k">Stop</span><span>Sous la mèche du sweep, plus un tampon de <b>0,5 × ATR(14)</b>. Jamais au pip près : un stop collé au plus bas se fait sortir par le bruit, sur un trade par ailleurs correct.</span></div>'+
+      '<div class="st-rrow"><span class="k">TP1</span><span>À <b>1R</b>, ou sur la première poche de liquidité intermédiaire. On y clôture <b>50 %</b> de la position et on remonte le stop au point d\'entrée : le trade ne peut plus rien coûter.</span></div>'+
+      '<div class="st-rrow"><span class="k">TP2</span><span>Sur la <b>liquidité opposée</b> : sommet de la veille, sommets égaux, extrême de session. C\'est cette moitié de position qui fait la performance du mois.</span></div>'+
+    '</div>'+
+    '<h3>L\'indicateur de cette phase</h3>'+
+    stIndCard(STIC.atr,'ATR (14)','Distances réalistes',[
+      ['Réglage',"Average True Range période 14, sur l'unité de temps d'exécution (M5). Affiché en valeur, pas en pourcentage."],
+      ['Lecture',"C'est la distance que l'actif parcourt normalement en une bougie. Elle donne l'échelle du marché du jour, calme ou nerveux."],
+      ['Dans la strat',"Deux usages précis. <b>Le tampon du stop</b> : 0,5 × ATR sous la mèche. <b>Le test de réalisme</b> : si le TP2 est à plus de 3 × ATR de l'entrée dans une séance calme, la cible ne sera pas atteinte dans la journée — il faut viser plus près ou renoncer."],
+      ['Le piège',"L'ATR ne donne aucune direction et ne remplace pas le point d'invalidation structurel. Le stop se place là où l'idée est morte ; l'ATR ne fait qu'ajouter la marge de bruit."]
+    ])+
+    '<h3>Les règles de risque, non négociables</h3>'+
+    '<ul>'+
+      '<li><strong>0,5 à 1 % du capital par trade</strong>, calculé avec le gestionnaire de risque — jamais « à la louche ».</li>'+
+      '<li><strong>Ratio minimum 2:1.</strong> En dessous, le trade n\'existe pas, même si tout le reste est parfait.</li>'+
+      '<li><strong>2 pertes dans la journée = journée terminée.</strong> Cette règle a sauvé plus de comptes que n\'importe quel indicateur.</li>'+
+      '<li><strong>Jamais de stop élargi</strong> une fois la position ouverte. Le déplacer, c\'est transformer une petite perte prévue en grosse perte subie.</li>'+
+    '</ul>'+
+    '<div class="callout"><b>Après le trade</b>Capture le graphique, note le score de confluence obtenu et le résultat. Au bout de 30 trades, tu sauras lesquelles de tes confirmations valent vraiment des points — et tu pourras ajuster la grille avec des données plutôt qu\'avec une impression.</div>'
+  });
+
+  /* 6 — invalidations + cas pratiques */
+  P.push({tab:'6 · Savoir renoncer',kicker:'Phase 6 — les invalidations',heading:"Les moments où l'on ne fait rien",body:
+    '<p>Une stratégie ne se juge pas aux trades qu\'elle prend, mais à ceux qu\'elle refuse. Voici les situations où le setup <strong>ressemble</strong> au bon sans en être un.</p>'+
+    '<ul>'+
+      '<li><strong>La bougie clôture au-delà du niveau.</strong> Ce n\'est plus un sweep mais une vraie cassure : le mouvement continue au lieu de se retourner. C\'est l\'erreur la plus fréquente.</li>'+
+      '<li><strong>Le ChoCh manque.</strong> Le prix réagit sur la zone mais ne casse aucun point structurel : c\'est un rebond technique, pas un changement de main.</li>'+
+      '<li><strong>Pas de FVG derrière l\'impulsion.</strong> Le retournement est mou : personne d\'important n\'est derrière.</li>'+
+      '<li><strong>La zone a déjà été visitée.</strong> Ses ordres sont partis ; il n\'en reste qu\'un rectangle sur ton écran.</li>'+
+      '<li><strong>Le RR tombe sous 2 pendant que tu attends.</strong> Le prix a bougé, le trade n\'est plus le même. Il faut le laisser.</li>'+
+      '<li><strong>Tu ne sais pas dire où tu as tort.</strong> Pas de point d\'invalidation clair = pas de position.</li>'+
+    '</ul>'+
+    '<h3>Et une fois en position ?</h3>'+
+    '<p>Deux signaux imposent une sortie manuelle avant le stop : <strong>le prix reprend la mèche du sweep</strong> (l\'hypothèse est morte), et <strong>le prix stagne dans la zone sans repartir pendant plus de dix bougies</strong> (le flux attendu n\'est pas là — mieux vaut sortir petit que d\'attendre le stop complet).</p>'+
+    '<h2>Trois cas à trancher</h2>'+
+    '<p>Lis la situation, décide, puis regarde la réponse.</p>'+
+    STRAT_CASES.map(function(c,i){
+      return '<div class="st-case" data-case="'+i+'">'+
+        '<div class="st-case-n">Cas '+(i+1)+'</div><p>'+c.q+'</p>'+
+        '<div class="st-case-btns"><button data-ch="take">Je prends</button><button data-ch="skip">Je passe</button></div>'+
+        '<div class="st-case-ans">'+c.ans+'</div></div>';
+    }).join('')+
+    '<div class="takeaways"><div class="th">La stratégie en une phrase</div><ul>'+
+      '<li>Le biais H1 donne le sens, la zone donne l\'endroit, le sweep donne le moment, le ChoCh donne la permission, le retest donne le prix, et la grille de confirmations donne la taille.</li>'+
+      '<li>Tout ce qui ne rentre pas dans cette phrase ne se trade pas.</li>'+
+    '</ul></div>'
+  });
+
+  return P;
+}
+
+function renderStrategy(){
+  (function(){var c=document.getElementById('content'); if(c)c.classList.remove('wide-tool');})();
+  state.view='strat';
+  var P=stratPhases(), total=P.length;
+
+  var tabs=P.map(function(p,i){return '<button data-st="'+i+'">'+p.tab+'</button>';}).join('');
+  var dots=P.map(function(_,k){return '<div class="lstep-dot'+(k===0?' active':'')+'" data-k="'+k+'"><div class="fill"></div></div>';}).join('');
+  var stages=P.map(function(p,k){
+    return '<div class="lstage'+(k===0?' active':'')+'" data-step="'+k+'">'+
+      '<div class="s-kicker">'+p.kicker+'</div><h2 class="s-h">'+p.heading+'</h2>'+
+      '<div class="lbody">'+p.body+'</div></div>';
+  }).join('');
+
+  $('#content').innerHTML=
+    learnToggle('strat')+
+    '<div class="eyebrow">Apprendre &middot; Stratégie</div>'+
+    '<h1 class="lesson-title">Le setup A+ : sweep, ChoCh, retest</h1>'+
+    '<p class="lesson-lede">Une stratégie complète, de bout en bout : comment lire le marché, quels indicateurs utiliser à chaque étape et exactement quoi, et comment compter ses confirmations avant d\'appuyer sur le bouton.</p>'+
+    '<div class="st-meta"><span>Biais <b>H4 / H1</b></span><span>Exécution <b>M5 / M1</b></span><span>Ratio visé <b>≥ 2:1</b></span><span>Risque <b>0,5 – 1 %</b></span><span><b>0–2</b> trades / jour</span></div>'+
+    '<div class="indic-sel" id="stSel">'+tabs+'<span class="indic-count">'+total+' phases</span></div>'+
+    '<div class="lstepper" id="stStepper">'+dots+'</div>'+
+    '<div class="lstep-lbl" id="stStepLbl">Phase 1 sur '+total+'</div>'+
+    stages+
+    '<div class="lpager">'+
+      '<button class="btn btn-ghost" id="stPrev" disabled>← Précédent</button>'+
+      '<span class="pcount" id="stPcount">1 / '+total+'</span>'+
+      '<button class="btn btn-primary" id="stNext">Suivant →</button>'+
+    '</div>'+
+    '<div class="lesson-nav"><button class="btn btn-ghost" id="stToPlan">Ouvrir le plan de trading →</button>'+
+    '<button class="btn btn-ghost" id="stToRisk">Calculer ma taille de position →</button></div>';
+
+  var cur=0;
+  function showStep(n){
+    cur=Math.max(0,Math.min(total-1,n));
+    document.querySelectorAll('#content .lstage').forEach(function(st){st.classList.toggle('active',+st.dataset.step===cur);});
+    document.querySelectorAll('#stStepper .lstep-dot').forEach(function(d,i){d.classList.toggle('active',i===cur);d.classList.toggle('done',i<cur);});
+    document.querySelectorAll('#stSel button').forEach(function(b){b.classList.toggle('on',+b.dataset.st===cur);});
+    $('#stStepLbl').textContent='Phase '+(cur+1)+' sur '+total;
+    $('#stPcount').textContent=(cur+1)+' / '+total;
+    $('#stPrev').disabled=(cur===0);
+    var nx=$('#stNext');
+    if(cur===total-1){nx.style.display='none';}
+    else{nx.style.display='inline-block';nx.textContent='Suivant →';}
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  $('#stNext').addEventListener('click',function(){showStep(cur+1);});
+  $('#stPrev').addEventListener('click',function(){showStep(cur-1);});
+  document.querySelectorAll('#stStepper .lstep-dot').forEach(function(d){d.addEventListener('click',function(){showStep(+d.dataset.k);});});
+  document.querySelectorAll('#stSel button').forEach(function(b){b.addEventListener('click',function(){showStep(+b.dataset.st);});});
+  var tp=$('#stToPlan'); if(tp)tp.addEventListener('click',renderPlan);
+  var tr=$('#stToRisk'); if(tr)tr.addEventListener('click',renderRisk);
+
+  bootStratScore();
+  bootStratCases();
+  bootVCharts();
+  bindLearnToggle();
+  showStep(0);
+  renderNav(); renderTabs(); window.scrollTo(0,0);
+}
+
+/* --- la grille de confirmations, interactive et sauvegardée --- */
+function bootStratScore(){
+  var root=document.getElementById('stScore'); if(!root)return;
+  var saved={};
+  try{saved=JSON.parse(localStorage.getItem('flux_confluence')||'{}')||{};}catch(e){saved={};}
+
+  var boxes=[].slice.call(root.querySelectorAll('.st-chk'));
+  boxes.forEach(function(b){
+    var inp=b.querySelector('input');
+    if(saved[b.dataset.id]){inp.checked=true;b.classList.add('on');}
+    inp.addEventListener('change',function(){b.classList.toggle('on',inp.checked);persist();update();});
+  });
+
+  function persist(){
+    var o={};
+    boxes.forEach(function(b){if(b.querySelector('input').checked)o[b.dataset.id]=1;});
+    try{localStorage.setItem('flux_confluence',JSON.stringify(o));}catch(e){}
+  }
+
+  function update(){
+    var score=0,mustOn=0,killOn=0;
+    boxes.forEach(function(b){
+      if(!b.querySelector('input').checked)return;
+      if(b.dataset.g==='plus')score+=+b.dataset.w;
+      else if(b.dataset.g==='must')mustOn++;
+      else killOn++;
+    });
+    var mustTotal=STRAT_CONF.must.length;
+    var tag=$('#stTag'), msg=$('#stMsg');
+    $('#stNum').textContent=score;
+    $('#stGauge').style.width=score+'%';
+    tag.className='st-vtag';
+
+    if(killOn>0){
+      tag.classList.add('no'); tag.textContent='Trade annulé';
+      msg.innerHTML='Tu as coché '+(killOn>1?'<b>'+killOn+' éliminatoires</b>':'<b>un éliminatoire</b>')+'. Le score ne compte plus : <b>on ne prend pas ce trade</b>, même à 100 sur 100.';
+    } else if(mustOn<mustTotal){
+      tag.classList.add('no'); tag.textContent='Setup incomplet';
+      msg.innerHTML='Il manque <b>'+(mustTotal-mustOn)+'</b> non-négociable'+(mustTotal-mustOn>1?'s':'')+' sur '+mustTotal+'. Sans eux le setup n\'existe pas, quel que soit le nombre de confirmations.';
+    } else if(score>=75){
+      tag.classList.add('ok'); tag.textContent='Setup A+';
+      msg.innerHTML='Les quatre bases sont là et les confirmations s\'empilent. <b>Risque plein : 1 % du capital.</b> Entre sur le retest, pas avant — et laisse courir la moitié de la position jusqu\'à la liquidité opposée.';
+    } else if(score>=55){
+      tag.classList.add('mid'); tag.textContent='Setup valable';
+      msg.innerHTML='Le setup tient debout mais les confirmations sont légères. <b>Risque réduit : 0,5 % du capital</b>, et sortie complète à TP1 si le mouvement hésite.';
+    } else {
+      tag.classList.add('no'); tag.textContent='Trop léger';
+      msg.innerHTML='Les bases sont là, mais rien ne les renforce. <b>On note le setup dans le journal et on ne le prend pas.</b> Regarder un trade qu\'on n\'a pas pris ne coûte rien.';
+    }
+  }
+
+  var rs=$('#stReset');
+  if(rs)rs.addEventListener('click',function(){
+    boxes.forEach(function(b){b.querySelector('input').checked=false;b.classList.remove('on');});
+    persist();update();
+  });
+  update();
+}
+
+/* --- les cas pratiques --- */
+function bootStratCases(){
+  document.querySelectorAll('.st-case').forEach(function(box){
+    var idx=+box.dataset.case, data=STRAT_CASES[idx];
+    var btns=[].slice.call(box.querySelectorAll('.st-case-btns button'));
+    btns.forEach(function(b){
+      b.addEventListener('click',function(){
+        btns.forEach(function(o){
+          o.disabled=true;
+          o.classList.add(o.dataset.ch===data.good?'good':'bad');
+        });
+        b.classList.add('picked');
+        box.querySelector('.st-case-ans').classList.add('show');
+      });
+    });
+  });
 }
 
 var __EXAM={};
@@ -2074,7 +2666,8 @@ function renderHub(){
     plan:'<rect x="5.5" y="3.5" width="13" height="17" rx="2"/><path d="M9 8.5l1.2 1.2L12.5 7"/><path d="M14.5 8.2h2.5M9 13h8M9 16.5h5"/>',
     exam:'<path d="M8.5 3.5h7a1.5 1.5 0 0 1 1.5 1.5v15l-5-2.4-5 2.4V5a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M9.7 9.5l1.6 1.6 3.2-3.2"/>',
     profile:'<circle cx="12" cy="8.5" r="3.5"/><path d="M5.5 19.5c0-3.4 2.9-5.8 6.5-5.8s6.5 2.4 6.5 5.8"/>',
-    connect:'<rect x="3" y="9" width="7" height="6" rx="2"/><rect x="14" y="9" width="7" height="6" rx="2"/><path d="M10 12h4"/>'
+    connect:'<rect x="3" y="9" width="7" height="6" rx="2"/><rect x="14" y="9" width="7" height="6" rx="2"/><path d="M10 12h4"/>',
+    strat:'<path d="M4 18L9 12l3.5 3.5L20 6"/><polyline points="20 11 20 6 15 6"/>'
   };
   var families=[
     {fam:"Calcul & exécution", cards:[
@@ -2083,6 +2676,7 @@ function renderHub(){
       {v:"charts",t:"Graphiques en direct",d:"Le vrai graphique TradingView en temps réel pour t'entraîner à lire la structure.",ic:"charts"}
     ]},
     {fam:"Apprendre & réviser", cards:[
+      {v:"strat",t:"La stratégie",d:"Le setup A+ de bout en bout : les indicateurs de chaque phase et la grille de confirmations.",ic:"strat"},
       {v:"indic",t:"Indicateurs",d:"Les 6 indicateurs essentiels, expliqués étape par étape.",ic:"indic"},
       {v:"lexique",t:"Lexique",d:"Tous les termes du trading SMC, définis simplement.",ic:"lex"},
       {v:"plan",t:"Plan de trading",d:"La checklist complète, de la préparation à la gestion.",ic:"plan"}
@@ -2103,7 +2697,7 @@ function renderHub(){
   });
   html+='<div style="margin-top:34px;text-align:center"><button class="btn btn-ghost" id="hubReset">Réinitialiser ma progression</button></div>';
   $('#content').innerHTML=html;
-  document.querySelectorAll('.hubcard').forEach(function(b){b.addEventListener('click',function(){var v=b.dataset.go;if(v==='risk')renderRisk();else if(v==='indic')renderIndicators();else if(v==='lexique')renderLexique();else if(v==='plan')renderPlan();else if(v==='exam')renderExam();else if(v==='profile')renderProfile();else if(v==='connect')renderConnect();else if(v==='backtest')renderBacktest();else if(v==='charts')renderCharts();else if(v==='signals')renderSignals();});});
+  document.querySelectorAll('.hubcard').forEach(function(b){b.addEventListener('click',function(){var v=b.dataset.go;if(v==='risk')renderRisk();else if(v==='strat')renderStrategy();else if(v==='indic')renderIndicators();else if(v==='lexique')renderLexique();else if(v==='plan')renderPlan();else if(v==='exam')renderExam();else if(v==='profile')renderProfile();else if(v==='connect')renderConnect();else if(v==='backtest')renderBacktest();else if(v==='charts')renderCharts();else if(v==='signals')renderSignals();});});
   var hr=document.getElementById('hubReset');if(hr)hr.addEventListener('click',function(){resetProgress();hr.textContent='Progression réinitialisée \u2713';});
   renderNav();renderTabs();window.scrollTo(0,0);
 }
