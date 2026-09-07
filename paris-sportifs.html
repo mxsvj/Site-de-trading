@@ -445,6 +445,7 @@ var DEFAULTS = {
   minEdge:4,                      // % d'écart minimum pour signaler un value bet
   devig:'shin',
   useOddsApi:false,
+  useInjuries:true,           // blessés et suspendus (football, 1 requête/date)
   demo:true,
   expMinutes:75                   // minutes attendues pour un titulaire
 };
@@ -701,6 +702,22 @@ var AS = {
                  }).filter(function(r){ return r.id; }),
                  paging:j.paging || { current:1, total:1 },
                  diag:diag };
+      });
+  },
+  /* Blessés et suspendus. Groupés par date, comme les cotes : une requête
+     couvre toute une journée de championnat. Le football seul — l'API basket
+     ne publie pas ces données. */
+  injuries: function(sp, league, season, date){
+    return this.req(sp.host, '/injuries', { league:league, season:season, date:date }, 180, 1,
+      function(j){
+        return (j.response || []).map(function(r){
+          return { fixtureId: r.fixture ? r.fixture.id : null,
+                   playerId: r.player ? r.player.id : null,
+                   name: r.player ? r.player.name : '',
+                   teamId: r.team ? r.team.id : null,
+                   type: (r.player && r.player.type) || '',
+                   reason: (r.player && r.player.reason) || '' };
+        }).filter(function(a){ return a.fixtureId && a.teamId && a.name; });
       });
   },
   oddsForGame: function(sp, id){
@@ -1107,9 +1124,10 @@ function expected(homeId, awayId, R){
 }
 
 /* --- Football : les buts sont rares et discrets → Poisson corrigé --- */
-function goalsModel(homeId, awayId, R){
+function goalsModel(homeId, awayId, R, adj){
   var e = expected(homeId, awayId, R);
-  var lh = clamp(e.lh, .15, 5.5), la = clamp(e.la, .15, 5.5);
+  var lh = clamp(e.lh * (adj ? adj.home : 1), .15, 5.5);
+  var la = clamp(e.la * (adj ? adj.away : 1), .15, 5.5);
   var mat = scoreMatrix(lh, la);
   return { kind:'goals', lh:lh, la:la, matrix:mat, m:marketsFromMatrix(mat),
            sample:e.sample, strengths:e.strengths };
@@ -1146,9 +1164,10 @@ function calibrate(R){
   };
 }
 
-function pointsModel(homeId, awayId, R){
+function pointsModel(homeId, awayId, R, adj){
   var e = expected(homeId, awayId, R);
-  var lh = clamp(e.lh, 30, 160), la = clamp(e.la, 30, 160);
+  var lh = clamp(e.lh * (adj ? adj.home : 1), 30, 160);
+  var la = clamp(e.la * (adj ? adj.away : 1), 30, 160);
   var s = R.sig || { sigMargin:12, sigTotal:16 };
   var margin = lh - la, total = lh + la;
   var pHome = normCdf(margin / s.sigMargin);
@@ -1160,10 +1179,10 @@ function pointsModel(homeId, awayId, R){
   };
 }
 
-function buildModel(sp, homeId, awayId, R){
+function buildModel(sp, homeId, awayId, R, adj){
   if(!R || !R.teams[homeId] || !R.teams[awayId]) return null;
-  if(sp.kind === 'goals')  return goalsModel(homeId, awayId, R);
-  if(sp.kind === 'points') return pointsModel(homeId, awayId, R);
+  if(sp.kind === 'goals')  return goalsModel(homeId, awayId, R, adj);
+  if(sp.kind === 'points') return pointsModel(homeId, awayId, R, adj);
   return null;
 }
 
@@ -1231,6 +1250,33 @@ function formOf(team, beforeDate){
     cleanSheets: last.filter(function(m){ return m.ga === 0; }).length,
     scored: last.filter(function(m){ return m.gf > 0; }).length
   };
+}
+
+/* Un absent ne fait pas disparaître sa production : un remplaçant joue à sa
+   place. On ne retire donc que ce que le joueur apportait AU-DESSUS d'un
+   remplaçant ordinaire — la moitié, faute de mieux. Et on ne chiffre que les
+   buteurs : un défenseur ou un gardien absent est signalé, jamais chiffré,
+   parce qu'aucune donnée gratuite ne dit ce qu'il valait. */
+var REPLACEMENT = 0.5;          // part de la production reprise par le remplaçant
+var DOUBTFUL = 0.5;             // un joueur incertain compte pour moitié
+
+function absenceImpact(absents, scorers, teamId, teamGoals){
+  var out = { att:1, chiffres:[], autres:[], n:0 };
+  (absents || []).filter(function(a){ return a.teamId === teamId; }).forEach(function(a){
+    out.n++;
+    var p = (scorers || []).filter(function(x){ return x.id === a.playerId; })[0];
+    var doubtful = /questionable|doubt/i.test(a.type);
+    if(!p || !teamGoals || teamGoals <= 0){
+      out.autres.push(Object.assign({ doubtful:doubtful }, a));
+      return;
+    }
+    var share = clamp(p.goals / teamGoals, 0, .6);
+    var loss = share * (1 - REPLACEMENT) * (doubtful ? DOUBTFUL : 1);
+    out.att -= loss;
+    out.chiffres.push(Object.assign({ doubtful:doubtful, goals:p.goals, share:share, loss:loss }, a));
+  });
+  out.att = clamp(out.att, .55, 1);
+  return out;
 }
 
 function playerScorers(scorers, teamId, lambdaTeam, teamAvgGoals, expMin){
@@ -1323,9 +1369,21 @@ function analyzeMarket(mkey, mk, mp, cfg, match){
   };
 }
 
-function analyzeMatch(match, R, odds, scorers, cfg, sp){
+function analyzeMatch(match, R, odds, scorers, cfg, sp, absents){
   sp = sp || sport();
-  var mp = buildModel(sp, match.homeId, match.awayId, R);
+
+  // Les absents se calculent avant le modèle, puisqu'ils le corrigent.
+  var hF0 = R ? formOf(R.teams[match.homeId], match.date) : null;
+  var aF0 = R ? formOf(R.teams[match.awayId], match.date) : null;
+  var abs = null;
+  if(absents && sp.players){
+    abs = {
+      home: absenceImpact(absents, scorers, match.homeId, hF0 ? hF0.gfAvg * hF0.played : 0),
+      away: absenceImpact(absents, scorers, match.awayId, aF0 ? aF0.gfAvg * aF0.played : 0)
+    };
+  }
+  var mp = buildModel(sp, match.homeId, match.awayId, R,
+    abs ? { home:abs.home.att, away:abs.away.att } : null);
 
   var markets = {};
   sp.markets.forEach(function(k){
@@ -1350,11 +1408,11 @@ function analyzeMatch(match, R, odds, scorers, cfg, sp){
     verdict = { type:'value', edge:valBest.edge, market:valBest.market, data:valBest };
   else verdict = { type:'pass', edge: valBest ? valBest.edge : 0, market: valBest ? valBest.market : null, data:valBest };
 
-  var hForm = R ? formOf(R.teams[match.homeId], match.date) : null;
-  var aForm = R ? formOf(R.teams[match.awayId], match.date) : null;
+  var hForm = hF0, aForm = aF0;
 
   return {
     sport:sp.id, match:match, model:mp, markets:markets, verdict:verdict,
+    absences:abs,
     form:{ home:hForm, away:aForm },
     scorers: (sp.players && mp) ? {
       home: playerScorers(scorers, match.homeId, mp.lh, hForm ? hForm.gfAvg : 1.3, cfg.expMinutes),
@@ -1516,10 +1574,13 @@ function demoFoot(){
     oddsMap[fid] = o;
   }
 
-  var FIRST = ['Kylian','Ousmane','Bradley','Mason','Jonathan','Arnaud','Georges','Amine','Rayan','Emanuel',
-               'Folarin','Alexandre','Elye','Wilfried','Andy','Gaëtan','Téji','Ludovic','Esteban','Malick'];
-  var LAST  = ['Doumbia','Sarr','Kalimuendo','Bamba','Diarra','Lemaire','Ferreira','Okou','Rossi','Vergnes',
-               'Thiam','Perrin','Bakayoko','Nordin','Cissé','Lefort','Delaunay','Mendes','Barreau','Guilbert'];
+  // Prénoms courants, patronymes inventés : aucun de ces joueurs n'existe.
+  // Attacher des statistiques — et surtout une blessure — au nom d'un joueur
+  // réel serait indéfendable, même dans une démonstration.
+  var FIRST = ['Théo','Nathan','Lucas','Adrien','Maxime','Enzo','Yanis','Tom','Noé','Élias',
+               'Baptiste','Corentin','Mathis','Ilan','Sacha','Antoine','Rémi','Julien','Paul','Gabin'];
+  var LAST  = ['Vasnier','Delcourt','Marbeau','Lestrade','Bonnevie','Chauvel','Aubertin','Vialat','Serpaud','Mauvoisin',
+               'Brunelle','Gastaldi','Quintin','Rebeyrol','Fauveau','Tissier','Nougaret','Peyrard','Combelles','Vaugelas'];
   var scorers = [];
   DEMO_FOOT.forEach(function(t, ti){
     for(var p = 0; p < 3; p++){
@@ -1533,8 +1594,23 @@ function demoFoot(){
     }
   });
 
+  // Quelques absents, pour que la fonctionnalité soit visible en démo.
+  var absences = {};
+  [0, 1, 4].forEach(function(k, i){
+    var m = upcoming[k], list = [];
+    var top = scorers.filter(function(p){ return p.teamId === m.homeId; })
+                     .sort(function(a,b){ return b.goals - a.goals; })[0];
+    if(top) list.push({ fixtureId:m.id, playerId:top.id, name:top.name, teamId:m.homeId,
+                        type: i === 2 ? 'Questionable' : 'Missing Fixture',
+                        reason: i === 1 ? 'Suspendu' : 'Blessure' });
+    if(i === 0) list.push({ fixtureId:m.id, playerId:-1, name:'Théo Vasnier', teamId:m.awayId,
+                            type:'Missing Fixture', reason:'Blessure' });
+    absences[m.id] = list;
+  });
+
   return { demo:true, sport:'foot', comp:{ name:DEMO_COMP.goals, country:'données simulées' }, season:2026,
-           ratings:buildRatings(games, 1), upcoming:upcoming, odds:oddsMap, scorers:scorers };
+           ratings:buildRatings(games, 1), upcoming:upcoming, odds:oddsMap, scorers:scorers,
+           absences:absences, absencesChecked:true };
 }
 
 function demoBasket(){
@@ -1585,7 +1661,7 @@ function demoBasket(){
   }
 
   return { demo:true, sport:'basket', comp:{ name:DEMO_COMP.points, country:'données simulées' }, season:'2026-2027',
-           ratings:R, upcoming:upcoming, odds:oddsMap, scorers:[] };
+           ratings:R, upcoming:upcoming, odds:oddsMap, scorers:[], absences:{} };
 }
 
 function demoTennis(){
@@ -1600,7 +1676,7 @@ function demoTennis(){
     oddsMap[id] = o;
   });
   return { demo:true, sport:'tennis', comp:{ name:DEMO_COMP.none, country:'données simulées' }, season:2026,
-           ratings:null, upcoming:upcoming, odds:oddsMap, scorers:[] };
+           ratings:null, upcoming:upcoming, odds:oddsMap, scorers:[], absences:{} };
 }
 
 /* ==========================================================================
@@ -1645,7 +1721,7 @@ function loadMarketOnly(sp, step){
     });
     upcoming.sort(function(a,b){ return new Date(a.date) - new Date(b.date); });
     return { demo:false, sport:sp.id, comp:comp, season:null,
-             ratings:null, upcoming:upcoming, odds:oddsMap, scorers:[] };
+             ratings:null, upcoming:upcoming, odds:oddsMap, scorers:[], absences:{} };
   });
 }
 
@@ -1713,7 +1789,27 @@ function loadWithModel(sp, step){
       if(CFG.useOddsApi && CFG.oaKey && comp.oa)
         oddJobs.push(OA.odds(comp.oa, sp.kind === 'points' ? 'h2h,totals,spreads' : 'h2h,totals').catch(function(){ return null; }));
 
-      return Promise.all(oddJobs).then(function(all){
+      // Absents : une requête par date, en parallèle. Uniquement là où
+      // l'API les publie, et seulement s'il reste du quota pour les cotes.
+      var injJobs = (sp.players && CFG.useInjuries && Quota.left('af') > dates.length + 2)
+        ? dates.map(function(d){ return AS.injuries(sp, comp.id, season, d).catch(function(){ return []; }); })
+        : [];
+
+      return Promise.all(oddJobs.concat(injJobs)).then(function(everything){
+        var all = everything.slice(0, oddJobs.length);
+        var injAll = everything.slice(oddJobs.length);
+        // Un même joueur peut revenir dans plusieurs réponses ; le compter
+        // deux fois retirerait deux fois sa contribution à l'équipe.
+        var absences = {}, absChecked = injJobs.length > 0;
+        injAll.forEach(function(list){
+          list.forEach(function(a){
+            var arr = (absences[a.fixtureId] = absences[a.fixtureId] || []);
+            var vu = arr.some(function(x){
+              return (a.playerId && x.playerId === a.playerId) || x.name === a.name;
+            });
+            if(!vu) arr.push(a);
+          });
+        });
         var oaEvents = (CFG.useOddsApi && CFG.oaKey && comp.oa) ? all.pop() : null;
         var oddsMap = {};
         all.forEach(function(rows){ rows.forEach(function(row){ if(row.id) oddsMap[row.id] = row.odds; }); });
@@ -1740,7 +1836,8 @@ function loadWithModel(sp, step){
 
         function done(){
           return { demo:false, sport:sp.id, comp:comp, season:season,
-                   ratings:ratings, upcoming:upcoming, odds:oddsMap, scorers:scorers };
+                   ratings:ratings, upcoming:upcoming, odds:oddsMap, scorers:scorers,
+                   absences:absences, absencesChecked:absChecked };
         }
       });
     });
@@ -1934,7 +2031,7 @@ function sourceNote(sp){
     ? 'Coût : 2 crédits The Odds API sur tes 500 mensuels. Résultat mis en cache 15 minutes.'
     : 'Le tennis a besoin d\'une clé The Odds API (gratuite) — va dans Réglages.';
   return CFG.afKey
-    ? 'Coût estimé : environ 5 requêtes sur tes 100 quotidiennes. Les résultats sont mis en cache.'
+    ? 'Coût estimé : 5 à 8 requêtes sur tes 100 quotidiennes (les absents en ajoutent une par journée). Les résultats sont mis en cache.'
     : 'Il te faut une clé API-Sports gratuite — va dans Réglages, c\'est expliqué en trois lignes.';
 }
 
@@ -1978,7 +2075,8 @@ function analyzeAll(B, sp){
       var t0 = (window.performance || Date).now();
       while(i < n && ((window.performance || Date).now() - t0) < 22){
         var m = B.upcoming[i++];
-        out.push(analyzeMatch(m, B.ratings, B.odds[m.id] || {}, B.scorers, CFG, sp));
+        out.push(analyzeMatch(m, B.ratings, B.odds[m.id] || {}, B.scorers, CFG, sp,
+          B.absencesChecked ? ((B.absences || {})[m.id] || []) : null));
       }
       setProgress(0.1 + 0.9 * (i/n));
       if(i < n) requestAnimationFrame(tick); else resolve(out);
@@ -2033,6 +2131,9 @@ function paintResults(){
       + '  <div class="meta"><span>' + dtf(a.match.date) + '</span><span>' + a.nBooks + ' bookmakers</span>'
       + '<span>' + esc(modelSummary(a)) + '</span>'
       + (a.model ? '<span>' + sampleLabel(a.model) + '</span>' : '')
+      + (a.absences && (a.absences.home.n + a.absences.away.n)
+          ? '<span style="color:var(--warn)">' + (a.absences.home.n + a.absences.away.n) + ' absent'
+            + ((a.absences.home.n + a.absences.away.n) > 1 ? 's' : '') + '</span>' : '')
       + '</div></div>'
       + '<div class="mrow-r">' + right + '<span style="color:var(--muted-2);font-family:var(--mono);font-size:16px">›</span></div>'
       + '</button>';
@@ -2144,6 +2245,43 @@ function formCol(title, f, model, side, sp){
     + '</div></div>';
 }
 
+function absenceBlock(title, imp){
+  if(!imp || !imp.n) return '<div class="panel"><div class="panel-h"><div class="t">' + esc(title) + '</div>'
+    + '<div class="s">aucun absent signalé</div></div>'
+    + '<div class="srcline">L\'API ne signale ni blessure ni suspension pour cette équipe. '
+    + 'Une absence peut malgré tout être annoncée à la dernière minute.</div></div>';
+
+  var pctLoss = (1 - imp.att) * 100;
+  return '<div class="panel"><div class="panel-h"><div class="t">' + esc(title) + '</div>'
+    + '<div class="s">' + imp.n + ' absent' + (imp.n>1?'s':'')
+    + (pctLoss > .5 ? ' · attaque ×' + imp.att.toFixed(2) : '') + '</div></div>'
+    + '<div class="plist">'
+    + imp.chiffres.map(function(a){
+        return '<div class="prow" style="grid-template-columns:minmax(0,1fr) 96px"><div class="nm">'
+          + esc(a.name) + (a.doubtful ? ' <i>incertain</i>' : '')
+          + ' <i>' + esc(a.reason || 'absent') + ' · ' + a.goals + ' buts</i></div>'
+          + '<div class="p" style="color:var(--bad)">−' + (a.loss*100).toFixed(1) + '%</div></div>';
+      }).join('')
+    + imp.autres.map(function(a){
+        return '<div class="prow" style="grid-template-columns:minmax(0,1fr) 96px"><div class="nm">'
+          + esc(a.name) + (a.doubtful ? ' <i>incertain</i>' : '')
+          + ' <i>' + esc(a.reason || 'absent') + '</i></div>'
+          + '<div class="p" style="color:var(--muted-2)">non chiffré</div></div>';
+      }).join('')
+    + '</div>'
+    + '<div class="srcline">'
+    + (imp.chiffres.length
+        ? 'Le pourcentage est la baisse d\'attaque retenue : la part des buts de l\'équipe que le joueur assurait, '
+          + 'dont on ne retire que la moitié — un remplaçant joue à sa place.'
+        : '')
+    + (imp.autres.length
+        ? (imp.chiffres.length ? ' ' : '')
+          + 'Les autres ne sont pas chiffrés : aucune donnée gratuite ne dit ce que valait un défenseur ou un gardien. '
+          + 'À toi d\'en tenir compte.'
+        : '')
+    + '</div></div>';
+}
+
 function scorerBlock(title, list, lam){
   if(!list || !list.length) return '';
   return '<div class="panel"><div class="panel-h"><div class="t">' + esc(title) + '</div>'
@@ -2176,7 +2314,9 @@ function modelPanel(a){
     var g = a.model.m;
     return '<h2 class="sec">Ce que dit le modèle</h2>'
       + '<div class="panel"><div class="panel-h"><div class="t">Probabilités</div>'
-      + '<div class="s">' + a.model.lh.toFixed(2) + ' – ' + a.model.la.toFixed(2) + ' buts attendus · ' + sampleLabel(a.model) + '</div></div>'
+      + '<div class="s">' + a.model.lh.toFixed(2) + ' – ' + a.model.la.toFixed(2) + ' buts attendus · ' + sampleLabel(a.model)
+      + (a.absences && (a.absences.home.att < 1 || a.absences.away.att < 1)
+          ? ' · corrigé des absents' : '') + '</div></div>'
       + '<div class="pbars">'
       + bar('Victoire ' + m.home, g.home, mktP('1x2',0))
       + bar('Match nul', g.draw, mktP('1x2',1))
@@ -2271,6 +2411,12 @@ function renderMatch(i){
         + formCol(m.away + ' — extérieur', a.form.away, a.model, 'away', sp)
         + '</div>'
       : '')
+    + (a.absences
+      ? '<h2 class="sec">Absents</h2><div class="grid g2">'
+        + absenceBlock(m.home, a.absences.home)
+        + absenceBlock(m.away, a.absences.away)
+        + '</div>'
+      : '')
     + ((a.scorers.home.length || a.scorers.away.length)
       ? '<h2 class="sec">Buteurs probables</h2><div class="grid g2">'
         + scorerBlock(m.home, a.scorers.home, a.model ? a.model.lh : 0)
@@ -2321,6 +2467,11 @@ function renderSettings(){
     + '500 crédits par mois, une analyse en consomme 2 à 6.</div></div>'
     + '</div>'
     + '<div class="grid g2" style="margin-top:14px">'
+    + '<div class="field"><label>Tenir compte des blessés et suspendus</label><select id="useInj">'
+    + '<option value="1"' + (CFG.useInjuries?' selected':'') + '>Oui — 1 requête par journée</option>'
+    + '<option value="0"' + (!CFG.useInjuries?' selected':'') + '>Non — économise le quota</option></select>'
+    + '<div class="hint">Football uniquement : l\'API basket ne publie pas ces données. '
+    + 'Seule l\'absence d\'un buteur connu peut être chiffrée ; les autres sont signalées sans corriger le modèle.</div></div>'
     + '<div class="field"><label>Utiliser The Odds API en plus</label><select id="useOa">'
     + '<option value="0"' + (!CFG.useOddsApi?' selected':'') + '>Non — économise les crédits</option>'
     + '<option value="1"' + (CFG.useOddsApi?' selected':'') + '>Oui — plus de bookmakers</option></select>'
@@ -2380,6 +2531,7 @@ function renderSettings(){
     CFG.afKey = $('#afKey').value.trim();
     CFG.oaKey = $('#oaKey').value.trim();
     CFG.useOddsApi = $('#useOa').value === '1';
+    CFG.useInjuries = $('#useInj').value === '1';
     var sn = $('#season');
     if(sn) CFG.season = sn.value || 0;
     CFG.bankroll = Math.max(10, +$('#bankroll').value || 500);
@@ -2480,7 +2632,7 @@ function renderHelp(){
 
     + '<h2 class="sec">Rester gratuit</h2>'
     + '<p class="lede">L\'outil est conçu pour ne jamais coûter un centime. Au lieu d\'appeler une API par match, il télécharge '
-    + '<b>une compétition entière en environ 5 requêtes</b> — calendrier complet, marqueurs, cotes de tous les bookmakers — '
+    + '<b>une compétition entière en 5 à 8 requêtes</b> — calendrier complet, marqueurs, cotes de tous les bookmakers, blessés et suspendus — '
     + 'puis analyse les 10 à 12 matchs à venir en local, simultanément. Avec les 100 requêtes quotidiennes gratuites d\'API-Sports, '
     + 'cela fait une vingtaine d\'analyses complètes par jour. Les réponses sont mises en cache dans ton navigateur '
     + '(calendrier 8 h, marqueurs 24 h, cotes 15 min, liste des compétitions 30 jours) : relancer une analyse ne consomme rien. '
@@ -2603,8 +2755,24 @@ function diagTeam(sp, comp, season, add, timed, step){
 
     if(!first){ add(check('Cotes', 'warn', 'Aucun match à venir : rien à coter pour l\'instant.')); return; }
 
-    step('Cotes du ' + first.date.slice(0,10) + '…');
-    return timed(AS.oddsForDate(sp, comp.id, season, first.date.slice(0,10), 1)).then(function(y){
+    var inj = Promise.resolve(null);
+    if(sp.players && CFG.useInjuries){
+      inj = timed(AS.injuries(sp, comp.id, season, first.date.slice(0,10))).then(function(z){
+        var list = z.r || [];
+        var mine = list.filter(function(a){ return a.fixtureId === first.id; });
+        add(check('Blessés et suspendus', 'ok',
+          list.length + ' absences sur la journée en ' + z.ms + ' ms · ' + mine.length + ' sur ' + first.home + ' – ' + first.away
+          + (mine.length ? ' : ' + mine.slice(0,4).map(function(a){ return a.name + (a.reason ? ' (' + a.reason + ')' : ''); }).join(', ') : '')
+          + (list.length && !list[0].playerId ? ' — attention, les identifiants de joueurs sont absents, aucune absence ne pourra être chiffrée.' : '')));
+      }, function(e){
+        add(check('Blessés et suspendus', 'warn', redact(e.message)
+          + ' — l\'analyse fonctionnera sans, mais sans tenir compte des absents.'));
+      });
+    }
+    return inj.then(function(){
+
+      step('Cotes du ' + first.date.slice(0,10) + '…');
+      return timed(AS.oddsForDate(sp, comp.id, season, first.date.slice(0,10), 1)).then(function(y){
       var rows = y.r.rows, diag = y.r.diag || blankDiag();
       var books = Object.keys(diag.books);
 
@@ -2637,7 +2805,8 @@ function diagTeam(sp, comp, season, add, timed, step){
             + unk.slice(0, 8).join(' · ') + (unk.length > 8 ? '…' : '')
             + (diag.samples.length ? '\nForme de ces paris : ' + diag.samples.join(' | ') : '')
           : 'Tous les paris de la réponse ont été compris.'));
-    }, function(e){ add(check('Cotes', 'ko', redact(e.message))); });
+      }, function(e){ add(check('Cotes', 'ko', redact(e.message))); });
+    });
   });
 }
 
@@ -2698,7 +2867,7 @@ function renderDiag(){
     + '<p class="lede">Ce test appelle les mêmes adresses que le scanner et vérifie, ligne par ligne, que chaque chose '
     + 'se trouve là où le code va la chercher : les équipes, les scores, les bookmakers, chaque marché. '
     + 'Il dit aussi quels paris il n\'a <b>pas</b> su lire — c\'est cette liste qui permet de corriger.</p>'
-    + '<div class="callout"><b>Coût</b>Jusqu\'à 3 requêtes sur ton quota, et <b>zéro</b> si les données sont déjà en cache. '
+    + '<div class="callout"><b>Coût</b>Jusqu\'à 4 requêtes sur ton quota, et <b>zéro</b> si les données sont déjà en cache. '
     + 'Ta clé n\'apparaît jamais dans le rapport : elle est remplacée par « clé masquée » avant l\'affichage.</div>'
     + '<div class="scanbar" style="margin-bottom:10px">'
     + '  <button class="btn btn-primary" id="diagRun">Lancer le diagnostic — ' + esc(sp.label) + '</button>'

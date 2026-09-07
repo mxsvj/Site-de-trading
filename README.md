@@ -26,7 +26,7 @@ sur des lignes différentes n'a aucun sens.
 
 | | Modèle | Marchés | Joueurs |
 |---|---|---|---|
-| **Football** | Poisson corrigé Dixon-Coles sur les buts | 1X2, plus/moins, les deux marquent | oui — probabilité de marquer par joueur |
+| **Football** | Poisson corrigé Dixon-Coles sur les buts | 1X2, plus/moins, les deux marquent | oui — probabilité de marquer, et blessés/suspendus |
 | **Basket** | Loi normale sur l'écart et le total, écart-type mesuré sur les matchs joués | vainqueur, total, handicap | non ([pourquoi](#limites)) |
 | **Tennis** | aucun ([pourquoi](#limites)) | vainqueur | non |
 
@@ -44,7 +44,7 @@ de la valeur.
 
 ### Rester gratuit
 
-L'outil télécharge une compétition entière en environ 5 requêtes, puis analyse
+L'outil télécharge une compétition entière en 5 à 8 requêtes, puis analyse
 tous les matchs à venir en local et simultanément — au lieu d'une requête par
 match. Les réponses sont mises en cache dans le navigateur (calendrier 8 h,
 marqueurs 24 h, cotes 15 min, liste des compétitions 30 jours), un compteur
@@ -67,6 +67,20 @@ d'avertissement sur chaque écran. Aucune de ces rencontres n'existe : il doit
 
 Les clés restent dans le navigateur (`localStorage`) et ne sont envoyées qu'aux
 API concernées.
+
+### Blessés et suspendus
+
+Le modèle tient compte des absences, au football uniquement — l'API basket ne
+publie pas ces données. Une requête couvre toute une journée de championnat.
+
+Un absent ne fait pas disparaître sa production : un remplaçant joue à sa place.
+On ne retire donc que ce que le joueur apportait **au-dessus d'un remplaçant
+ordinaire**, soit la moitié de sa part dans les buts de l'équipe. Un joueur
+annoncé incertain compte pour moitié de cela, et la correction est plafonnée.
+
+Seule l'absence d'un buteur connu peut être chiffrée. Un défenseur ou un gardien
+est **signalé mais jamais chiffré** : aucune donnée gratuite ne dit ce qu'il
+valait, et inventer un chiffre serait pire que de ne rien dire.
 
 ### Diagnostic
 
@@ -92,7 +106,7 @@ modèle sans ces données produirait des probabilités qui ont l'air sérieuses 
 l'être. L'outil s'en tient donc à la comparaison des bookmakers, qui reste utile :
 les écarts entre books y sont plus larges que dans les grands championnats.
 
-**Dans tous les cas**, l'outil ignore les blessures, les compositions, le
-contexte d'un match et la qualité réelle des occasions. Un écart signalé est une
+**Dans tous les cas**, l'outil ignore les compositions annoncées une heure avant
+le coup d'envoi, le contexte d'un match et la qualité réelle des occasions. Un écart signalé est une
 hypothèse chiffrée, pas une prédiction. Interdit aux mineurs ; en France, ne
 jouer que chez un opérateur agréé par l'ANJ.
