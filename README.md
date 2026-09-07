@@ -60,7 +60,10 @@ gratuit.
   des tournois est gratuite et illimitée.
 
 Sans aucune clé, le **mode démo** fonctionne sans limite pour les trois sports,
-avec le même moteur d'analyse.
+avec le même moteur d'analyse. Ses équipes, joueurs, matchs et cotes sont
+**entièrement inventés** — noms fictifs, championnats fictifs, et un bandeau
+d'avertissement sur chaque écran. Aucune de ces rencontres n'existe : il doit
+être impossible de miser de l'argent réel sur ce que la démo affiche.
 
 Les clés restent dans le navigateur (`localStorage`) et ne sont envoyées qu'aux
 API concernées.
