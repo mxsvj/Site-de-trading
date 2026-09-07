@@ -85,7 +85,10 @@
     background:linear-gradient(90deg,rgba(255,255,255,.05),transparent);
     padding:15px 20px;margin:20px 0;font-size:14px;color:#CDD0D9;
   }
-  .callout b{color:var(--gold-bright);display:block;font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px}
+  /* Seul le premier <b> est le titre de l'encadré ; les suivants sont de
+     l'emphase dans le texte et doivent rester en ligne. */
+  .callout b{color:var(--text);font-weight:600}
+  .callout > b:first-child{color:var(--gold-bright);display:block;font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px}
   .callout.warn{border-left-color:var(--warn)}
   .callout.warn b{color:var(--warn)}
 
@@ -677,11 +680,13 @@ var AS = {
   oddsForDate: function(sp, league, season, date, page){
     return this.req(sp.host, '/odds', { league:league, season:season, date:date, page:page||1 }, 15, 1,
       function(j){
+        var diag = blankDiag();
         return { rows:(j.response || []).map(function(row){
                    var id = row.fixture ? row.fixture.id : (row.game ? row.game.id : row.id);
-                   return { id:id, odds:parseApiSportsOdds(row) };
+                   return { id:id, odds:parseApiSportsOdds(row, diag) };
                  }).filter(function(r){ return r.id; }),
-                 paging:j.paging || { current:1, total:1 } };
+                 paging:j.paging || { current:1, total:1 },
+                 diag:diag };
       });
   },
   oddsForGame: function(sp, id){
@@ -790,8 +795,11 @@ function normGame(sp, g){
   if(!g.teams) return null;
   var st = g.status ? g.status.short : '';
   var sc = g.scores || {};
+  // « done » dépend du STATUT seul : un match terminé dont le score est
+  // illisible doit rester un match terminé, sinon il se retrouverait dans la
+  // liste des rencontres à venir. Le modèle, lui, ignore les scores absents.
   return { id:g.id, date:g.date,
-           done:['FT','AOT','POST'].indexOf(st) >= 0 && sc.home && sc.home.total != null,
+           done:['FT','AOT','AET','PEN'].indexOf(st) >= 0,
            homeId:g.teams.home.id, home:g.teams.home.name, homeLogo:g.teams.home.logo,
            awayId:g.teams.away.id, away:g.teams.away.name, awayLogo:g.teams.away.logo,
            hs:sc.home ? sc.home.total : null, as:sc.away ? sc.away.total : null };
@@ -815,18 +823,32 @@ function normScorers(resp){
 /* --- Lecture des cotes API-Sports ---
    On classe chaque pari d'après la FORME de ses issues, pas d'après son nom :
    les libellés changent d'un sport à l'autre, la forme non. */
-function parseApiSportsOdds(row){
-  var acc = {};
-  function put(mkey, line, book, vals){
+/* Paris portant sur une fraction du match, ou dérivés : même forme que les
+   marchés principaux, sens complètement différent. « Race to 20 Points » a
+   exactement la forme d'un vainqueur de match. */
+var PARTIAL = /\b(1st|2nd|3rd|4th|first|second|third|fourth|quarter|quarters|half|halftime|half-time|period|set|sets|inning|overtime|race|margin|exact|player|team total|mi-temps|periode|période|prolongation|minute|minutes)\b/i;
+/* Noms qui annoncent franchement le marché principal : ils priment sur une
+   simple correspondance de forme. */
+var WINNERISH = /(winner|1x2|moneyline|money line|home\s*\/\s*away|match result|full time result|vainqueur|résultat)/i;
+
+function parseApiSportsOdds(row, diag){
+  var acc = {}, src = {}, hit = false;
+  function put(mkey, line, book, vals, trusted){
     var L = line == null ? 'x' : String(line);
+    hit = true;
+    var tag = mkey + '|' + L + '|' + book;
+    if(acc[mkey] && acc[mkey][L] && acc[mkey][L][book] && src[tag] && !trusted) return;  // ne pas écraser un nom fiable
     acc[mkey] = acc[mkey] || {};
     acc[mkey][L] = acc[mkey][L] || {};
     acc[mkey][L][book] = vals;
+    src[tag] = !!trusted;
   }
 
   (row.bookmakers || []).forEach(function(bk){
     var book = bk.name;
+    if(diag) diag.books[book] = 1;
     (bk.bets || []).forEach(function(bet){
+      hit = false;
       var v = {};
       (bet.values || []).forEach(function(x){
         var o = parseFloat(x.odd);
@@ -835,8 +857,19 @@ function parseApiSportsOdds(row){
       var keys = Object.keys(v);
       if(!keys.length) return;
 
-      if(v.home && v.draw && v.away) put('1x2', null, book, { home:v.home, draw:v.draw, away:v.away });
-      else if(v.home && v.away && keys.length === 2) put('ml', null, book, { home:v.home, away:v.away });
+      var name = bet.name || '';
+      if(PARTIAL.test(name)){                       // pari sur une fraction du match
+        if(diag){
+          diag.unknown[name] = (diag.unknown[name] || 0) + 1;
+          if(diag.samples.length < 4 && keys.length <= 6)
+            diag.samples.push(name + ' → ' + keys.slice(0,4).join(' / '));
+        }
+        return;
+      }
+      var trusted = WINNERISH.test(name);
+
+      if(v.home && v.draw && v.away) put('1x2', null, book, { home:v.home, draw:v.draw, away:v.away }, trusted);
+      else if(v.home && v.away && keys.length === 2) put('ml', null, book, { home:v.home, away:v.away }, trusted);
 
       var tot = {}, hcp = {};
       keys.forEach(function(k){
@@ -849,18 +882,27 @@ function parseApiSportsOdds(row){
         }
       });
       Object.keys(tot).forEach(function(L){
-        if(tot[L].over && tot[L].under) put('ou', parseFloat(L), book, tot[L]);
+        if(tot[L].over && tot[L].under) put('ou', parseFloat(L), book, tot[L], true);
       });
       Object.keys(hcp).forEach(function(L){
-        if(hcp[L].home && hcp[L].away) put('ah', parseFloat(L), book, hcp[L]);
+        if(hcp[L].home && hcp[L].away) put('ah', parseFloat(L), book, hcp[L], true);
       });
 
       if(v.yes && v.no && /both teams|deux[ -]?[ée]quipes/i.test(bet.name || ''))
-        put('btts', null, book, { yes:v.yes, no:v.no });
+        put('btts', null, book, { yes:v.yes, no:v.no }, true);
+
+      if(diag && !hit){
+        var nm = name || ('pari #' + bet.id);
+        diag.unknown[nm] = (diag.unknown[nm] || 0) + 1;
+        if(diag.samples.length < 4 && keys.length <= 6)
+          diag.samples.push(nm + ' → ' + keys.slice(0,4).join(' / '));
+      }
     });
   });
   return reduceLines(acc);
 }
+
+function blankDiag(){ return { books:{}, unknown:{}, samples:[] }; }
 
 /* --- Lecture des cotes The Odds API --- */
 function parseOaEvent(ev){
@@ -1743,7 +1785,7 @@ function paintQuota(){
 }
 
 function paintTabs(){
-  var tabs = [['scan','Scanner'],['settings','Réglages'],['help','Comment ça marche']];
+  var tabs = [['scan','Scanner'],['diag','Diagnostic'],['settings','Réglages'],['help','Comment ça marche']];
   $('#tabs').innerHTML = tabs.map(function(t){
     return '<button class="tab' + (VIEW === t[0] ? ' active' : '') + '" data-t="' + t[0] + '">' + t[1] + '</button>';
   }).join('');
@@ -1753,6 +1795,7 @@ function paintTabs(){
 function go(v, arg){
   VIEW = v; paintTabs(); window.scrollTo(0,0);
   if(v === 'scan') renderScanner();
+  else if(v === 'diag') renderDiag();
   else if(v === 'settings') renderSettings();
   else if(v === 'help') renderHelp();
   else if(v === 'match') renderMatch(arg);
@@ -2411,6 +2454,280 @@ function renderHelp(){
     + '<p class="lede">Le tennis passe par The Odds API, dont la liste des tournois est gratuite et illimitée ; '
     + 'seules les cotes coûtent 2 crédits sur les 500 mensuels.</p>'
     + footer();
+}
+
+/* ==========================================================================
+   9. DIAGNOSTIC
+   Vérifie que ce que l'API renvoie vraiment correspond à ce que le code
+   attend, et le dit en clair. Sert deux fois : la première pour savoir si ça
+   marche du tout, et plus tard le jour où un fournisseur change sa réponse
+   sans prévenir — au lieu d'un scanner qui échoue sans raison visible.
+   ========================================================================== */
+
+/* Une clé ne doit jamais se retrouver dans un rapport qu'on recopie ailleurs. */
+function redact(t){
+  t = String(t == null ? '' : t);
+  [CFG.afKey, CFG.oaKey].forEach(function(k){
+    if(k && k.length > 6) t = t.split(k).join('«clé masquée»');
+  });
+  return t;
+}
+
+function check(name, state, detail){ return { name:name, state:state, detail:detail || '' }; }
+
+function diagnose(step){
+  var sp = sport(), comp = currentComp(), season = seasonOf();
+  var out = { sport:sp.label, comp:comp ? comp.name : '—', season:sp.oaOnly ? null : season, checks:[], t0:Date.now() };
+  var add = function(c){ out.checks.push(c); return c; };
+  var timed = function(p){
+    var t = Date.now();
+    return p.then(function(r){ return { r:r, ms:Date.now() - t }; },
+                  function(e){ throw Object.assign(e, { ms:Date.now() - t }); });
+  };
+
+  if(CFG.demo){
+    add(check('Mode démo actif', 'warn',
+      'Il n\'y a rien à diagnostiquer : les données sont fabriquées en local. '
+      + 'Passe la source sur « Données réelles » dans le scanner, puis reviens ici.'));
+    return Promise.resolve(out);
+  }
+
+  var key = sp.oaOnly ? CFG.oaKey : CFG.afKey;
+  if(!key){
+    add(check(sp.oaOnly ? 'Clé The Odds API' : 'Clé API-Sports', 'ko',
+      'Absente. Ajoute-la dans Réglages — elle est gratuite.'));
+    return Promise.resolve(out);
+  }
+  add(check(sp.oaOnly ? 'Clé The Odds API' : 'Clé API-Sports', 'ok',
+    key.length + ' caractères, enregistrée dans ce navigateur.'));
+
+  return (sp.oaOnly ? diagTennis(sp, comp, add, timed, step) : diagTeam(sp, comp, season, add, timed, step))
+    .catch(function(e){
+      add(check('Échec', 'ko', redact(e.message || String(e))));
+    })
+    .then(function(){ out.ms = Date.now() - out.t0; return out; });
+}
+
+/* --- Football et basket : calendrier, puis cotes --- */
+function diagTeam(sp, comp, season, add, timed, step){
+  var first = null;
+
+  var pre = Promise.resolve(null);
+  if(sp.discover){
+    step('Liste des compétitions…');
+    pre = timed(AS.leagues(sp)).then(function(x){
+      add(check('Liste des compétitions', x.r.length ? 'ok' : 'ko',
+        x.r.length + ' compétitions renvoyées en ' + x.ms + ' ms'
+        + (x.r.length ? ' — dont ' + x.r.slice(0,3).map(function(l){ return l.name; }).join(', ') + '…' : '')));
+    }, function(e){ add(check('Liste des compétitions', 'ko', redact(e.message))); });
+  }
+
+  return pre.then(function(){
+    step('Calendrier de ' + comp.name + '…');
+    return timed(AS.games(sp, comp.id, season));
+  }).then(function(x){
+    var games = x.r;
+    if(!games.length){
+      add(check('Calendrier', 'ko', 'Zéro match renvoyé pour ' + comp.name + ' en ' + season
+        + '. La saison est probablement mal choisie : essaie une autre valeur dans Réglages.'));
+      return;
+    }
+    var played = games.filter(function(g){ return g.done; });
+    var soon = games.filter(function(g){ return !g.done && new Date(g.date) > Date.now() - 3600000; })
+                    .sort(function(a,b){ return new Date(a.date) - new Date(b.date); });
+    first = soon[0];
+
+    add(check('Calendrier', 'ok', games.length + ' matchs en ' + x.ms + ' ms · '
+      + played.length + ' joués, ' + soon.length + ' à venir'));
+
+    var named = games.filter(function(g){ return g.home && g.away && g.homeId && g.awayId; }).length;
+    add(check('Lecture des équipes', named === games.length ? 'ok' : 'ko',
+      named === games.length
+        ? 'Noms et identifiants lus sur les ' + games.length + ' matchs — ex. ' + games[0].home + ' – ' + games[0].away
+        : named + ' matchs sur ' + games.length + ' seulement. Le code ne trouve pas les équipes où il les attend.'));
+
+    var withScore = played.filter(function(g){ return g.hs != null && g.as != null; });
+    add(check('Lecture des scores',
+      !played.length ? 'warn' : (withScore.length === played.length ? 'ok' : 'ko'),
+      !played.length ? 'Aucun match terminé pour l\'instant : le modèle ira chercher la saison précédente.'
+        : withScore.length === played.length
+          ? withScore.length + ' scores lus — ex. ' + withScore[withScore.length-1].hs + '-' + withScore[withScore.length-1].as
+          : withScore.length + ' score(s) lisible(s) sur ' + played.length + ' matchs terminés. '
+            + 'Les scores ne sont pas là où le code les cherche : c\'est à me signaler.'));
+
+    if(played.length >= 5){
+      var R = buildRatings(games, 1);
+      if(sp.kind === 'points') R.sig = calibrate(R);
+      var mp = first ? buildModel(sp, first.homeId, first.awayId, R) : null;
+      add(check('Modèle', mp ? 'ok' : 'warn', mp
+        ? (sp.kind === 'goals'
+            ? mp.lh.toFixed(2) + ' – ' + mp.la.toFixed(2) + ' buts attendus sur ' + first.home + ' – ' + first.away
+            : Math.round(mp.lh) + ' – ' + Math.round(mp.la) + ' points attendus, écart-type mesuré ' + R.sig.sigMargin.toFixed(1))
+          + ' · moyennes du championnat ' + R.muHome.toFixed(2) + ' / ' + R.muAway.toFixed(2)
+        : 'Pas assez d\'historique pour les deux équipes du prochain match.'));
+    }
+
+    if(!first){ add(check('Cotes', 'warn', 'Aucun match à venir : rien à coter pour l\'instant.')); return; }
+
+    step('Cotes du ' + first.date.slice(0,10) + '…');
+    return timed(AS.oddsForDate(sp, comp.id, season, first.date.slice(0,10), 1)).then(function(y){
+      var rows = y.r.rows, diag = y.r.diag || blankDiag();
+      var books = Object.keys(diag.books);
+
+      if(!rows.length){
+        add(check('Cotes', 'ko', 'Zéro cote renvoyée pour cette date (' + y.ms + ' ms). '
+          + 'Le scanner basculera sur la récupération match par match, plus coûteuse.'));
+        return;
+      }
+      add(check('Cotes', 'ok', rows.length + ' matchs cotés en ' + y.ms + ' ms · '
+        + books.length + ' bookmakers : ' + books.slice(0,6).join(', ') + (books.length > 6 ? '…' : '')));
+
+      var mine = rows.filter(function(r){ return r.id === first.id; })[0] || rows[0];
+      var found = Object.keys(mine.odds);
+      sp.markets.forEach(function(mk){
+        var o = mine.odds[mk];
+        add(check('Marché « ' + MARKETS[mk].label + ' »', o ? 'ok' : 'ko',
+          o ? Object.keys(o.books).length + ' bookmakers'
+              + (o.line != null ? ' · ligne retenue ' + fmtNum(o.line) : '')
+              + (o.otherLines ? ' · ' + o.otherLines + ' autre(s) ligne(s) écartée(s)' : '')
+            : 'Non reconnu dans la réponse. C\'est ce marché qu\'il faut me signaler.'));
+      });
+      var extra = found.filter(function(k){ return sp.markets.indexOf(k) < 0; });
+      if(extra.length) add(check('Marchés lus mais non utilisés', 'warn',
+        extra.join(', ') + ' — reconnus, mais pas au programme de ce sport.'));
+
+      var unk = Object.keys(diag.unknown);
+      add(check('Paris non reconnus', unk.length ? 'warn' : 'ok',
+        unk.length
+          ? unk.length + ' types de paris ignorés (c\'est normal, on n\'en exploite que quelques-uns) : '
+            + unk.slice(0, 8).join(' · ') + (unk.length > 8 ? '…' : '')
+            + (diag.samples.length ? '\nForme de ces paris : ' + diag.samples.join(' | ') : '')
+          : 'Tous les paris de la réponse ont été compris.'));
+    }, function(e){ add(check('Cotes', 'ko', redact(e.message))); });
+  });
+}
+
+/* --- Tennis : liste des tournois (gratuite), puis cotes --- */
+function diagTennis(sp, comp, add, timed, step){
+  step('Liste des tournois…');
+  return timed(OA.sports()).then(function(x){
+    var all = x.r || [];
+    var tennis = all.filter(function(s){ return s.group === 'Tennis' || /^tennis_/.test(s.key); });
+    var live = tennis.filter(function(s){ return s.active !== false; });
+    add(check('Liste des tournois', tennis.length ? 'ok' : 'ko',
+      tennis.length + ' tournois de tennis en ' + x.ms + ' ms, dont ' + live.length + ' en cours'
+      + (live.length ? ' : ' + live.slice(0,4).map(function(s){ return s.title; }).join(', ') : '')
+      + '. Cet appel ne coûte aucun crédit.'));
+    if(!live.length){
+      add(check('Cotes', 'warn', 'Aucun tournoi en cours : il n\'y a rien à coter aujourd\'hui. '
+        + 'Ce n\'est pas une panne — le tennis s\'arrête entre les tournois.'));
+      return;
+    }
+    if(!comp) { add(check('Cotes', 'warn', 'Clique sur « Actualiser la liste » dans le scanner pour choisir un tournoi.')); return; }
+
+    step('Cotes de ' + comp.name + '…');
+    return timed(OA.odds(comp.oa, 'h2h')).then(function(y){
+      var evs = y.r || [];
+      if(!evs.length){ add(check('Cotes', 'warn', 'Aucun match à venir chez ' + comp.name + ' (' + y.ms + ' ms).')); return; }
+      var parsed = parseOaEvent(evs[0]);
+      var books = parsed.ml ? Object.keys(parsed.ml.books) : [];
+      add(check('Cotes', 'ok', evs.length + ' matchs en ' + y.ms + ' ms · ex. '
+        + evs[0].home_team + ' – ' + evs[0].away_team));
+      add(check('Marché « Vainqueur »', books.length ? 'ok' : 'ko',
+        books.length ? books.length + ' bookmakers : ' + books.slice(0,6).join(', ') + (books.length > 6 ? '…' : '')
+                     : 'Non reconnu — les noms des joueurs ne se rattachent pas aux issues.'));
+      add(check('Crédits restants', 'ok', Quota.left('oa') + ' sur 500 ce mois-ci.'));
+    }, function(e){ add(check('Cotes', 'ko', redact(e.message))); });
+  }, function(e){ add(check('Liste des tournois', 'ko', redact(e.message))); });
+}
+
+/* Rapport en texte brut, prêt à être recopié — sans la clé. */
+function diagReport(d){
+  var icon = { ok:'[OK]  ', ko:'[KO]  ', warn:'[!]   ' };
+  return redact(
+    'Diagnostic Flux Odds — ' + new Date().toLocaleString('fr-FR') + '\n'
+    + 'Sport : ' + d.sport + ' · Compétition : ' + d.comp
+    + (d.season ? ' · Saison : ' + d.season : '') + '\n'
+    + (d.ms ? 'Durée totale : ' + d.ms + ' ms\n' : '')
+    + '\n'
+    + d.checks.map(function(c){
+        return icon[c.state] + c.name + (c.detail ? '\n        ' + c.detail.split('\n').join('\n        ') : '');
+      }).join('\n')
+  );
+}
+
+function renderDiag(){
+  var sp = sport();
+  $('#app').innerHTML = ''
+    + '<div class="eyebrow">Diagnostic</div>'
+    + '<h1 class="title">Est-ce que l\'API répond<br>ce que le code attend ?</h1>'
+    + '<p class="lede">Ce test appelle les mêmes adresses que le scanner et vérifie, ligne par ligne, que chaque chose '
+    + 'se trouve là où le code va la chercher : les équipes, les scores, les bookmakers, chaque marché. '
+    + 'Il dit aussi quels paris il n\'a <b>pas</b> su lire — c\'est cette liste qui permet de corriger.</p>'
+    + '<div class="callout"><b>Coût</b>Jusqu\'à 3 requêtes sur ton quota, et <b>zéro</b> si les données sont déjà en cache. '
+    + 'Ta clé n\'apparaît jamais dans le rapport : elle est remplacée par « clé masquée » avant l\'affichage.</div>'
+    + '<div class="scanbar" style="margin-bottom:10px">'
+    + '  <button class="btn btn-primary" id="diagRun">Lancer le diagnostic — ' + esc(sp.label) + '</button>'
+    + '  <button class="btn btn-ghost btn-sm" id="diagCopy" disabled>Copier le rapport</button>'
+    + '</div>'
+    + '<div class="status" id="status">Sport et compétition se choisissent dans le scanner.</div>'
+    + '<div id="diagOut"></div>'
+    + footer();
+
+  var last = null;
+
+  $('#diagRun').addEventListener('click', function(){
+    var b = this; b.disabled = true;
+    $('#diagOut').innerHTML = '';
+    diagnose(function(s){ setStatus(s, true); }).then(function(d){
+      last = d;
+      var kos = d.checks.filter(function(c){ return c.state === 'ko'; }).length;
+      var warns = d.checks.filter(function(c){ return c.state === 'warn'; }).length;
+      setStatus(kos ? kos + ' problème' + (kos>1?'s':'') + ' détecté' + (kos>1?'s':'')
+                    : (warns ? 'Tout fonctionne, avec ' + warns + ' remarque' + (warns>1?'s':'') + '.'
+                             : 'Tout fonctionne.'));
+      $('#diagOut').innerHTML = diagHtml(d);
+      $('#diagCopy').disabled = false;
+      paintQuota();
+    }).then(function(){ b.disabled = false; });
+  });
+
+  $('#diagCopy').addEventListener('click', function(){
+    if(!last) return;
+    var txt = diagReport(last), btn = this;
+    var done = function(){ btn.textContent = 'Rapport copié ✓'; setTimeout(function(){ btn.textContent = 'Copier le rapport'; }, 2500); };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(done, fallback);
+    } else fallback();
+    function fallback(){
+      // Certains navigateurs refusent le presse-papiers sur un fichier local :
+      // on affiche le texte, il n'y a plus qu'à le sélectionner.
+      $('#diagOut').insertAdjacentHTML('afterbegin',
+        '<div class="panel"><div class="panel-h"><div class="t">Rapport à recopier</div></div>'
+        + '<textarea readonly style="width:100%;min-height:220px;background:#0A0908;color:var(--text);'
+        + 'border:1px solid var(--line);border-radius:10px;padding:12px;font-family:var(--mono);font-size:12px">'
+        + esc(txt) + '</textarea></div>');
+      done();
+    }
+  });
+}
+
+function diagHtml(d){
+  var badge = { ok:'<span class="badge arb">OK</span>',
+                ko:'<span class="badge" style="background:rgba(var(--bad-rgb),.15);border-color:rgba(var(--bad-rgb),.45);color:var(--bad)">Problème</span>',
+                warn:'<span class="badge warn">Remarque</span>' };
+  return '<div class="panel" style="margin-top:18px">'
+    + '<div class="panel-h"><div class="t">' + esc(d.sport) + ' · ' + esc(d.comp) + '</div>'
+    + '<div class="s">' + (d.season ? 'saison ' + esc(String(d.season)) + ' · ' : '') + (d.ms || 0) + ' ms</div></div>'
+    + '<div class="teamcol">'
+    + d.checks.map(function(c){
+        return '<div style="display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)">'
+          + '<div style="flex-shrink:0;width:82px">' + badge[c.state] + '</div>'
+          + '<div><div style="font-size:14px;font-weight:600">' + esc(c.name) + '</div>'
+          + (c.detail ? '<div style="font-size:13px;color:var(--muted);white-space:pre-wrap;margin-top:2px">' + esc(redact(c.detail)) + '</div>' : '')
+          + '</div></div>';
+      }).join('')
+    + '</div></div>';
 }
 
 /* ------------------------------------------------------------------ Boot */

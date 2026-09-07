@@ -65,6 +65,18 @@ avec le même moteur d'analyse.
 Les clés restent dans le navigateur (`localStorage`) et ne sont envoyées qu'aux
 API concernées.
 
+### Diagnostic
+
+Un onglet **Diagnostic** appelle les mêmes adresses que le scanner et vérifie,
+ligne par ligne, que chaque chose se trouve là où le code va la chercher :
+équipes, scores, bookmakers, chaque marché — et il liste les paris qu'il n'a
+*pas* su lire. Utile la première fois pour savoir si tout fonctionne, et plus
+tard le jour où un fournisseur change sa réponse sans prévenir, au lieu d'un
+scanner qui échoue sans raison visible.
+
+Il coûte jusqu'à 3 requêtes, zéro si les données sont en cache, et produit un
+rapport copiable dont la clé est retirée avant affichage.
+
 ### Limites
 
 **Pas de statistiques joueur au basket** : l'API ne les fournit pas sur son
