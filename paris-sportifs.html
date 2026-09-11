@@ -594,6 +594,7 @@ var SPORTS = {
   foot: {
     id:'foot', label:'Football', kind:'goals', unit:'buts',
     host:'v3.football.api-sports.io', gamesPath:'/fixtures',
+    rapidHost:'api-football-v1.p.rapidapi.com', rapidPrefix:'/v3',
     players:true, markets:['1x2','ou','btts'], defLine:2.5,
     comps:[
       { id:61,  name:'Ligue 1',             country:'France',     oa:'soccer_france_ligue_one' },
@@ -614,6 +615,7 @@ var SPORTS = {
   basket: {
     id:'basket', label:'Basket', kind:'points', unit:'points',
     host:'v1.basketball.api-sports.io', gamesPath:'/games',
+    rapidHost:'api-basketball.p.rapidapi.com', rapidPrefix:'',
     players:false, markets:['ml','ou','ah'],
     // Les identifiants de ligue du basket sont moins stables que ceux du
     // football : on part de la NBA et on va chercher le reste auprès de l'API
@@ -655,28 +657,50 @@ function seasonOf(){
 /* Une seule clé donne accès à tous les sports si elle vient de
    dashboard.api-sports.io ; une clé prise sur api-football.com ne couvre
    que le football. Le palier gratuit est de 100 requêtes par jour. */
+/* La même API se vend par deux portes : en direct chez le fournisseur, ou via
+   la place de marché RapidAPI. L'adresse du serveur ET le nom de l'en-tête
+   changent selon la porte. Plutôt que d'obliger l'utilisateur à savoir laquelle
+   il a prise, on essaie la première, et si la clé est refusée on essaie l'autre.
+   Le résultat est mémorisé : l'essai n'a lieu qu'une fois. */
+function accessRoutes(sp){
+  var out = [{ id:'direct', host:sp.host, prefix:'', headers:{ 'x-apisports-key':CFG.afKey } }];
+  if(sp.rapidHost) out.push({ id:'rapidapi', host:sp.rapidHost, prefix:sp.rapidPrefix || '',
+                              headers:{ 'x-rapidapi-key':CFG.afKey, 'x-rapidapi-host':sp.rapidHost } });
+  var known = LS.get('route:' + sp.id, null);
+  if(known) out.sort(function(a,b){ return (b.id === known) - (a.id === known); });
+  return out;
+}
+
 var AS = {
-  req: function(host, path, params, ttl, cost, slim){
+  req: function(sp, path, params, ttl, cost, slim){
     var qs = Object.keys(params).map(function(k){ return k+'='+encodeURIComponent(params[k]); }).join('&');
-    var key = host + path + '?' + qs;
+    var key = sp.id + path + '?' + qs;
     var hit = Cache.get(key, ttl);
     if(hit) return Promise.resolve(hit);
 
-    if(!CFG.afKey) return Promise.reject(new Error('Aucune clé API-Sports. Ajoute-la dans Réglages (gratuit, 100 requêtes/jour) ou reste en mode démo.'));
+    if(!CFG.afKey) return Promise.reject(new Error('Aucune clé. Colle-la dans Réglages, ou reste en mode démo.'));
     Quota.guard('af', cost||1);
 
-    return fetch('https://' + host + path + '?' + qs, { headers:{ 'x-apisports-key': CFG.afKey } })
-      .then(function(r){
-        if(r.status === 429) throw new Error('Limite de requêtes atteinte chez API-Sports. Attends une minute, ou reviens demain (100/jour en gratuit).');
-        if(r.status === 401 || r.status === 403) throw new Error('Clé API-Sports refusée. Vérifie-la dans Réglages — et prends-la sur dashboard.api-sports.io si tu veux le basket en plus du football.');
-        if(!r.ok) throw new Error('API-Sports a répondu ' + r.status + '.');
-        return r.json();
-      })
+    var routes = accessRoutes(sp);
+    function essayer(i){
+      var rt = routes[i];
+      return fetch('https://' + rt.host + rt.prefix + path + '?' + qs, { headers:rt.headers })
+        .then(function(r){
+          if((r.status === 401 || r.status === 403) && i + 1 < routes.length) return essayer(i + 1);
+          if(r.status === 429) throw new Error('Limite de requêtes atteinte chez le fournisseur. Attends une minute, ou reviens demain.');
+          if(r.status === 401 || r.status === 403) throw new Error('Clé refusée, par les deux voies d\'accès essayées. Vérifie que tu l\'as copiée en entier, sans espace avant ou après.');
+          if(!r.ok) throw new Error('Le fournisseur a répondu ' + r.status + '.');
+          LS.set('route:' + sp.id, rt.id);
+          return r.json();
+        });
+    }
+
+    return essayer(0)
       .then(function(j){
         Quota.bump('af', cost||1);
         if(j.errors && !Array.isArray(j.errors) && Object.keys(j.errors).length){
           var msg = Object.keys(j.errors).map(function(k){ return j.errors[k]; }).join(' · ');
-          throw new Error('API-Sports : ' + msg);
+          throw new Error('Le fournisseur signale : ' + msg);
         }
         var out = slim ? slim(j) : j;
         Cache.set(key, out);
@@ -685,15 +709,15 @@ var AS = {
   },
 
   games: function(sp, league, season){
-    return this.req(sp.host, sp.gamesPath, { league:league, season:season }, 60*8, 1,
+    return this.req(sp, sp.gamesPath, { league:league, season:season }, 60*8, 1,
       function(j){ return (j.response || []).map(function(g){ return normGame(sp, g); }).filter(Boolean); });
   },
   topscorers: function(sp, league, season){
-    return this.req(sp.host, '/players/topscorers', { league:league, season:season }, 60*24, 1,
+    return this.req(sp, '/players/topscorers', { league:league, season:season }, 60*24, 1,
       function(j){ return normScorers(j.response || []); });
   },
   oddsForDate: function(sp, league, season, date, page){
-    return this.req(sp.host, '/odds', { league:league, season:season, date:date, page:page||1 }, 15, 1,
+    return this.req(sp, '/odds', { league:league, season:season, date:date, page:page||1 }, 15, 1,
       function(j){
         var diag = blankDiag();
         return { rows:(j.response || []).map(function(row){
@@ -708,7 +732,7 @@ var AS = {
      couvre toute une journée de championnat. Le football seul — l'API basket
      ne publie pas ces données. */
   injuries: function(sp, league, season, date){
-    return this.req(sp.host, '/injuries', { league:league, season:season, date:date }, 180, 1,
+    return this.req(sp, '/injuries', { league:league, season:season, date:date }, 180, 1,
       function(j){
         return (j.response || []).map(function(r){
           return { fixtureId: r.fixture ? r.fixture.id : null,
@@ -722,13 +746,13 @@ var AS = {
   },
   oddsForGame: function(sp, id){
     var p = sp.kind === 'points' ? { game:id } : { fixture:id };
-    return this.req(sp.host, '/odds', p, 15, 1, function(j){
+    return this.req(sp, '/odds', p, 15, 1, function(j){
       var row = (j.response || [])[0];
       return row ? parseApiSportsOdds(row) : null;
     });
   },
   leagues: function(sp){
-    return this.req(sp.host, '/leagues', {}, 60*24*30, 1, function(j){
+    return this.req(sp, '/leagues', {}, 60*24*30, 1, function(j){
       return (j.response || []).map(function(l){
         var seasons = (l.seasons || []).map(function(s){ return s.season; });
         return { id:l.id, name:l.name,
@@ -2455,10 +2479,11 @@ function renderSettings(){
     + '<div class="grid g2">'
     + '<div class="field"><label>Clé API-Sports <span style="color:var(--muted-2)">(football, basket)</span></label>'
     + '<input id="afKey" type="password" placeholder="colle ta clé ici" value="' + esc(CFG.afKey) + '">'
-    + '<div class="hint">Calendrier, résultats, cotes de ~30 bookmakers, marqueurs. 100 requêtes par jour, sans carte bancaire. '
-    + 'Une analyse complète en consomme environ 5.<br><b style="color:var(--gold-bright)">Prends ta clé sur '
-    + '<a href="https://dashboard.api-sports.io/register" target="_blank" rel="noopener">dashboard.api-sports.io</a></b> : '
-    + 'elle couvre tous les sports. Une clé prise sur api-football.com ne marchera que pour le football.</div></div>'
+    + '<div class="hint">Calendrier, résultats, cotes de ~30 bookmakers, marqueurs, blessés. '
+    + '100 requêtes par jour, sans carte bancaire ; une analyse en consomme 5 à 8.<br>'
+    + '<b>Peu importe d\'où vient ta clé</b> — prise en direct chez le fournisseur (API-SPORTS) ou via la place '
+    + 'de marché RapidAPI : la page essaie les deux façons de s\'en servir et garde celle qui marche. '
+    + 'Tu n\'as rien d\'autre à régler.</div></div>'
     + '<div class="field"><label>Clé The Odds API <span style="color:var(--muted-2)">(tennis, et bookmakers en plus)</span></label>'
     + '<input id="oaKey" type="password" placeholder="colle ta clé ici" value="' + esc(CFG.oaKey) + '">'
     + '<div class="hint">Indispensable pour le tennis, qui n\'a aucune source de statistiques gratuite. '
@@ -2684,8 +2709,10 @@ function diagnose(step){
       'Absente. Ajoute-la dans Réglages — elle est gratuite.'));
     return Promise.resolve(out);
   }
-  add(check(sp.oaOnly ? 'Clé The Odds API' : 'Clé API-Sports', 'ok',
-    key.length + ' caractères, enregistrée dans ce navigateur.'));
+  var route = LS.get('route:' + sp.id, null);
+  add(check(sp.oaOnly ? 'Clé The Odds API' : 'Clé', 'ok',
+    key.length + ' caractères, enregistrée dans ce navigateur.'
+    + (route ? ' Voie d\'accès retenue : ' + (route === 'direct' ? 'directe chez le fournisseur.' : 'via RapidAPI.') : '')));
 
   return (sp.oaOnly ? diagTennis(sp, comp, add, timed, step) : diagTeam(sp, comp, season, add, timed, step))
     .catch(function(e){
