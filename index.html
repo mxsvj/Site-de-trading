@@ -432,6 +432,8 @@
   .hc-t{font-family:var(--display);font-size:17px;font-weight:700;letter-spacing:-.4px}
   .hc-d{font-size:13px;color:var(--muted);line-height:1.5}
   .hc-go{font-family:var(--mono);font-size:11px;color:var(--gold-bright);margin-top:6px;letter-spacing:.5px}
+  .hubcard.wide{grid-column:1/-1}
+  .hubcard.wide .hc-d{max-width:640px}
   .lx-search{width:100%;background:#0d0a08;border:1px solid rgba(var(--accent-rgb),.2);border-radius:10px;color:var(--text);font-family:var(--body);font-size:15px;padding:12px 14px;outline:none;margin:24px 0 16px;transition:border-color .15s,box-shadow .15s}
   .lx-cats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
   .lx-cat{font-family:var(--mono);font-size:12px;letter-spacing:.3px;padding:8px 14px;border-radius:99px;border:1px solid rgba(var(--accent-rgb),.2);background:#0d0a08;color:var(--muted);cursor:pointer;transition:.15s}
@@ -2074,7 +2076,8 @@ function renderHub(){
     plan:'<rect x="5.5" y="3.5" width="13" height="17" rx="2"/><path d="M9 8.5l1.2 1.2L12.5 7"/><path d="M14.5 8.2h2.5M9 13h8M9 16.5h5"/>',
     exam:'<path d="M8.5 3.5h7a1.5 1.5 0 0 1 1.5 1.5v15l-5-2.4-5 2.4V5a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M9.7 9.5l1.6 1.6 3.2-3.2"/>',
     profile:'<circle cx="12" cy="8.5" r="3.5"/><path d="M5.5 19.5c0-3.4 2.9-5.8 6.5-5.8s6.5 2.4 6.5 5.8"/>',
-    connect:'<rect x="3" y="9" width="7" height="6" rx="2"/><rect x="14" y="9" width="7" height="6" rx="2"/><path d="M10 12h4"/>'
+    connect:'<rect x="3" y="9" width="7" height="6" rx="2"/><rect x="14" y="9" width="7" height="6" rx="2"/><path d="M10 12h4"/>',
+    paris:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.6l3.5 2.5-1.3 4.1H9.8L8.5 10.1z"/><path d="M12 3.5v4.1M4.4 9.7l4.1.4M7 18.3l2.8-3.9M17 18.3l-2.8-3.9M19.6 9.7l-4.1.4"/>'
   };
   var families=[
     {fam:"Calcul & exécution", cards:[
@@ -2091,19 +2094,22 @@ function renderHub(){
       {v:"exam",t:"Examen final",d:"Teste toutes tes connaissances et décroche le certificat.",ic:"exam"},
       {v:"profile",t:"Profil & stratégie",d:"Découvre ton profil de trader et reçois une stratégie sur mesure.",ic:"profile"},
       {v:"connect",t:"Prop firm ↔ Broker",d:"Comment connecter ton compte prop firm à une plateforme.",ic:"connect"}
+    ]},
+    {fam:"Un autre terrain", cards:[
+      {v:"paris",t:"Analyseur de paris sportifs",d:"Compare les cotes de tous les bookmakers, analyse la forme des équipes et la cadence des joueurs, et ne signale que ce qui a une valeur mathématique. Outil séparé, sans rapport avec le trading.",ic:"paris",wide:true,ext:true}
     ]}
   ];
   var html='<div class="eyebrow">Boîte à outils</div><h1 class="lesson-title">Tous tes outils</h1><p class="lesson-lede">Le complément des leçons : calcule, révise, teste-toi et construis ta stratégie.</p>';
   families.forEach(function(F){
     html+='<div class="hub-fam">'+F.fam+'</div><div class="hubgrid">';
     html+=F.cards.map(function(c){
-      return '<button class="hubcard" data-go="'+c.v+'"><span class="hc-ic"><svg viewBox="0 0 24 24">'+(IC[c.ic]||'')+'</svg></span><span class="hc-t">'+c.t+'</span><span class="hc-d">'+c.d+'</span><span class="hc-go">Ouvrir &#8594;</span></button>';
+      return '<button class="hubcard'+(c.wide?' wide':'')+'" data-go="'+c.v+'"><span class="hc-ic"><svg viewBox="0 0 24 24">'+(IC[c.ic]||'')+'</svg></span><span class="hc-t">'+c.t+'</span><span class="hc-d">'+c.d+'</span><span class="hc-go">'+(c.ext?'Ouvrir la page &#8599;':'Ouvrir &#8594;')+'</span></button>';
     }).join('');
     html+='</div>';
   });
   html+='<div style="margin-top:34px;text-align:center"><button class="btn btn-ghost" id="hubReset">Réinitialiser ma progression</button></div>';
   $('#content').innerHTML=html;
-  document.querySelectorAll('.hubcard').forEach(function(b){b.addEventListener('click',function(){var v=b.dataset.go;if(v==='risk')renderRisk();else if(v==='indic')renderIndicators();else if(v==='lexique')renderLexique();else if(v==='plan')renderPlan();else if(v==='exam')renderExam();else if(v==='profile')renderProfile();else if(v==='connect')renderConnect();else if(v==='backtest')renderBacktest();else if(v==='charts')renderCharts();else if(v==='signals')renderSignals();});});
+  document.querySelectorAll('.hubcard').forEach(function(b){b.addEventListener('click',function(){var v=b.dataset.go;if(v==='risk')renderRisk();else if(v==='indic')renderIndicators();else if(v==='lexique')renderLexique();else if(v==='plan')renderPlan();else if(v==='exam')renderExam();else if(v==='profile')renderProfile();else if(v==='connect')renderConnect();else if(v==='backtest')renderBacktest();else if(v==='charts')renderCharts();else if(v==='signals')renderSignals();else if(v==='paris')window.location.href='paris-sportifs.html';});});
   var hr=document.getElementById('hubReset');if(hr)hr.addEventListener('click',function(){resetProgress();hr.textContent='Progression réinitialisée \u2713';});
   renderNav();renderTabs();window.scrollTo(0,0);
 }
