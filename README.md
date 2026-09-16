@@ -42,6 +42,27 @@ chaque estimation par l'inverse de son erreur donne 20 %. C'est aussi pourquoi l
 seuil d'écart minimum est à 4 % — en dessous, on lirait le bruit du modèle pour
 de la valeur.
 
+### Trois modes
+
+Le sélecteur « Source » du scanner choisit d'où viennent les données :
+
+| Mode | Données | Modèle | Ce qu'il faut |
+|---|---|---|---|
+| **Démo** | inventées | oui | rien |
+| **Cotes réelles** | vrais matchs, vraies cotes | non | clé The Odds API (gratuite) |
+| **Complet** | vrais matchs, vraies cotes | oui | clé API-Sports **payante** |
+
+Le mode **Cotes réelles** est le seul qui fonctionne entièrement sur les paliers
+gratuits. Il donne la comparaison multi-bookmakers, le retrait des marges, le
+consensus et les surebets — c'est-à-dire toute la partie dont les mathématiques
+sont certaines. Il ne donne pas le modèle de forme, qui exige les résultats de la
+saison en cours : le palier gratuit d'API-Sports s'arrête aux saisons 2022-2024
+et répond « Free plans do not have access to this season » pour la saison
+courante.
+
+Le mode **Complet** reste disponible pour qui a un abonnement, et pour les
+saisons passées.
+
 ### Rester gratuit
 
 L'outil télécharge une compétition entière en 5 à 8 requêtes, puis analyse

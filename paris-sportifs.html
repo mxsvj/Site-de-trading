@@ -446,10 +446,18 @@ var DEFAULTS = {
   devig:'shin',
   useOddsApi:false,
   useInjuries:true,           // blessés et suspendus (football, 1 requête/date)
-  demo:true,
+  /* mode : 'demo'   → données fabriquées, aucune clé
+            'market' → vrais matchs et vraies cotes, sans modèle (The Odds API)
+            'full'   → modèle + cotes (API-Sports, saison en cours payante) */
+  mode:'demo',
   expMinutes:75                   // minutes attendues pour un titulaire
 };
 var CFG = Object.assign({}, DEFAULTS, LS.get('cfg', {}));
+// Les réglages enregistrés avant l'arrivée des modes n'avaient qu'un booléen.
+if(CFG.mode == null) CFG.mode = CFG.demo === false ? 'full' : 'demo';
+Object.defineProperty(CFG, 'demo', { get:function(){ return this.mode === 'demo'; },
+                                     set:function(v){ this.mode = v ? 'demo' : 'full'; },
+                                     enumerable:false, configurable:true });
 function saveCfg(){ LS.set('cfg', CFG); }
 
 /* ==========================================================================
@@ -596,6 +604,7 @@ var SPORTS = {
     host:'v3.football.api-sports.io', gamesPath:'/fixtures',
     rapidHost:'api-football-v1.p.rapidapi.com', rapidPrefix:'/v3',
     players:true, markets:['1x2','ou','btts'], defLine:2.5,
+    oaGroup:'Soccer', oaPrefix:'soccer_',
     comps:[
       { id:61,  name:'Ligue 1',             country:'France',     oa:'soccer_france_ligue_one' },
       { id:62,  name:'Ligue 2',             country:'France',     oa:'soccer_france_ligue_two' },
@@ -617,6 +626,7 @@ var SPORTS = {
     host:'v1.basketball.api-sports.io', gamesPath:'/games',
     rapidHost:'api-basketball.p.rapidapi.com', rapidPrefix:'',
     players:false, markets:['ml','ou','ah'],
+    oaGroup:'Basketball', oaPrefix:'basketball_',
     // Les identifiants de ligue du basket sont moins stables que ceux du
     // football : on part de la NBA et on va chercher le reste auprès de l'API
     // elle-même (1 requête, gardée un mois) plutôt que de les deviner.
@@ -627,7 +637,8 @@ var SPORTS = {
   },
   tennis: {
     id:'tennis', label:'Tennis', kind:'none', unit:null,
-    host:null, players:false, markets:['ml'], oaOnly:true, discoverOa:'Tennis',
+    host:null, players:false, markets:['ml'], oaOnly:true,
+    oaGroup:'Tennis', oaPrefix:'tennis_',
     comps:[]
   }
 };
@@ -1723,19 +1734,24 @@ function bestEventMatch(m, events){
 
 function loadCompetition(step){
   var sp = sport();
-  if(CFG.demo){ step('Génération du jeu de démonstration…'); return Promise.resolve(demoBundle(sp.id)); }
-  if(sp.oaOnly) return loadMarketOnly(sp, step);
+  if(CFG.mode === 'demo'){ step('Génération du jeu de démonstration…'); return Promise.resolve(demoBundle(sp.id)); }
+  if(CFG.mode === 'market' || sp.oaOnly) return loadMarketOnly(sp, step);
   return loadWithModel(sp, step);
 }
 
 /* --- Tennis : aucune API de forme gratuite n'existe, on analyse le marché --- */
+/* Mode « cotes réelles » : de vrais matchs à venir et de vraies cotes, sans
+   modèle de forme. C'est le seul chemin qui fonctionne entièrement sur les
+   paliers gratuits — les statistiques de la saison en cours sont payantes
+   chez API-Sports, mais les cotes des matchs à venir ne le sont pas ici. */
 function loadMarketOnly(sp, step){
   var comp = currentComp();
-  if(!comp) return Promise.reject(new Error('Choisis un tournoi. Si la liste est vide, clique sur « Actualiser les tournois » : seuls les tournois en cours ont des cotes.'));
-  if(!CFG.oaKey) return Promise.reject(new Error('Le tennis a besoin d\'une clé The Odds API (gratuite, 500 crédits/mois) : aucune API de statistiques tennis n\'est gratuite. Ajoute-la dans Réglages.'));
+  if(!comp || !comp.oa) return Promise.reject(new Error('Choisis une compétition. Si la liste est vide, clique sur « Actualiser la liste » : seules les compétitions en cours ont des cotes.'));
+  if(!CFG.oaKey) return Promise.reject(new Error('Ce mode a besoin d\'une clé The Odds API (gratuite, 500 crédits par mois). Ajoute-la dans Réglages.'));
 
+  var markets = sp.kind === 'points' ? 'h2h,totals,spreads' : 'h2h,totals';
   step('Cotes de tous les bookmakers pour ' + comp.name + '…');
-  return OA.odds(comp.oa, 'h2h').then(function(events){
+  return OA.odds(comp.oa, markets).then(function(events){
     if(!events || !events.length) throw new Error('Aucun match à venir chez ' + comp.name + '. Les bookmakers ouvrent leurs marchés quelques jours avant.');
     var upcoming = [], oddsMap = {};
     events.slice(0, 14).forEach(function(ev){
@@ -1879,11 +1895,15 @@ function prevSeason(s){
    on demande la liste à l'API elle-même, une fois par mois. */
 function refreshComps(step){
   var sp = sport();
-  if(sp.discoverOa){
+  // En mode « cotes réelles », les compétitions viennent de The Odds API :
+  // seules celles qui ont des matchs cotés en ce moment y figurent.
+  if(sp.oaOnly || CFG.mode === 'market'){
     return OA.sports().then(function(list){
-      sp.comps = (list || [])
-        .filter(function(s){ return s.active !== false && (s.group === sp.discoverOa || /^tennis_/.test(s.key)); })
-        .map(function(s){ return { id:s.key, name:s.title, country:s.description || '', oa:s.key }; });
+      var found = (list || []).filter(function(x){
+        return x.active !== false
+          && (x.group === sp.oaGroup || (sp.oaPrefix && x.key.indexOf(sp.oaPrefix) === 0));
+      }).map(function(x){ return { id:x.key, name:x.title, country:x.description || '', oa:x.key }; });
+      if(found.length) sp.comps = found;
       return sp.comps;
     });
   }
@@ -1912,14 +1932,15 @@ var ANALYSES = [], VIEW = 'scan', SCAN_META = null;
 
 function paintQuota(){
   var el = $('#quotapill'); if(!el) return;
-  if(CFG.demo){ el.className = 'quotapill'; el.innerHTML = 'Mode démo · <b>illimité</b>'; return; }
-  var la = Quota.left('af'), lo = Quota.left('oa');
-  var cls = la === 0 ? 'out' : (la < 15 ? 'low' : '');
-  var parts = [];
-  if(!sport().oaOnly) parts.push('API-Sports <b>' + la + '/100</b>');
-  if(CFG.oaKey && (CFG.useOddsApi || sport().oaOnly)) parts.push('Odds API <b>' + lo + '/500</b>');
-  el.className = 'quotapill ' + (sport().oaOnly ? '' : cls);
-  el.innerHTML = parts.join(' · ') || '—';
+  if(CFG.mode === 'demo'){ el.className = 'quotapill'; el.innerHTML = 'Mode démo · <b>illimité</b>'; return; }
+  var la = Quota.left('af'), lo = Quota.left('oa'), parts = [];
+  var marche = CFG.mode === 'market' || sport().oaOnly;
+  if(!marche) parts.push('API-Sports <b>' + la + '/100</b>');
+  if(CFG.oaKey && (marche || CFG.useOddsApi)) parts.push('Odds API <b>' + lo + '/500</b>');
+  var reste = marche ? lo : la, plafond = marche ? 500 : 100;
+  if(!parts.length){ el.className = 'quotapill low'; el.innerHTML = '<b>clé manquante</b>'; return; }
+  el.className = 'quotapill ' + (reste === 0 ? 'out' : (reste < plafond*0.15 ? 'low' : ''));
+  el.innerHTML = parts.join(' · ');
 }
 
 function paintTabs(){
@@ -1983,9 +2004,14 @@ function renderScanner(){
     + (CFG.demo ? demoBanner() : '')
     + '<div class="eyebrow">Analyseur multi-bookmakers</div>'
     + '<h1 class="title">Toutes les cotes, toute la forme,<br>tous les matchs en même temps.</h1>'
-    + '<p class="lede">Le scanner télécharge une compétition entière en quelques requêtes, puis analyse chaque match à venir '
-    + 'en parallèle : comparaison de tous les bookmakers, retrait de leur marge, et — pour le football et le basket — un modèle '
-    + 'nourri par la forme récente des équipes. Il ressort ce qui a une valeur mathématique, et le dit quand il n\'y a rien.</p>'
+    + '<p class="lede">' + (CFG.mode === 'market' || sp.oaOnly
+        ? 'Le scanner récupère les matchs à venir et les cotes de dizaines de bookmakers, puis les analyse tous en parallèle : '
+          + 'meilleure cote par issue, marge de chaque book, consensus une fois cette marge retirée, et détection des surebets. '
+          + 'Il ressort ce qui a une valeur mathématique, et le dit quand il n\'y a rien.'
+        : 'Le scanner télécharge une compétition entière en quelques requêtes, puis analyse chaque match à venir '
+          + 'en parallèle : comparaison de tous les bookmakers, retrait de leur marge, et — pour le football et le basket — un modèle '
+          + 'nourri par la forme récente des équipes. Il ressort ce qui a une valeur mathématique, et le dit quand il n\'y a rien.')
+    + '</p>'
 
     + '<div class="panel">'
     + '  <div class="scanbar">'
@@ -1993,9 +2019,11 @@ function renderScanner(){
     + '    <div class="field"><label>Compétition</label><select id="cpSel"' + (CFG.demo ? ' disabled' : '') + '>' + compOptions(sp) + '</select></div>'
     + (sp.discover || sp.discoverOa
         ? '    <button class="btn btn-ghost btn-sm" id="refreshComps">Actualiser la liste</button>' : '')
-    + '    <div class="field" style="max-width:150px"><label>Source</label><select id="srcSel">'
-    + '      <option value="1"' + (CFG.demo ? ' selected' : '') + '>Démo (gratuit)</option>'
-    + '      <option value="0"' + (!CFG.demo ? ' selected' : '') + '>Données réelles</option>'
+    + '    <div class="field" style="max-width:215px"><label>Source</label><select id="srcSel">'
+    + '      <option value="demo"' + (CFG.mode==='demo' ? ' selected' : '') + '>Démo — données inventées</option>'
+    + '      <option value="market"' + (CFG.mode==='market' ? ' selected' : '') + '>Cotes réelles — sans modèle</option>'
+    + (sp.oaOnly ? ''
+       : '      <option value="full"' + (CFG.mode==='full' ? ' selected' : '') + '>Complet — modèle + cotes</option>')
     + '    </select></div>'
     + '    <button class="btn btn-primary" id="scanBtn">Lancer l\'analyse</button>'
     + '    <button class="btn btn-ghost btn-sm" id="clearCache">Vider le cache</button>'
@@ -2003,17 +2031,7 @@ function renderScanner(){
     + '  <div class="progress"><i id="prog"></i></div>'
     + '  <div class="status" id="status">' + esc(sourceNote(sp)) + '</div>'
     + '</div>'
-    + (sp.kind === 'none'
-      ? '<div class="callout warn"><b>Tennis : marché seul</b>Aucune API de statistiques tennis n\'a de palier gratuit — '
-        + 'il n\'y a donc pas de modèle de forme ici. L\'outil compare les bookmakers entre eux, retire leur marge, '
-        + 'et repère les surebets et les cotes qui s\'écartent du consensus. C\'est moins riche que le football, mais ce n\'est pas rien : '
-        + 'les écarts entre books sont plus larges en tennis que dans les grands championnats.</div>'
-      : '')
-    + (sp.kind === 'points'
-      ? '<div class="callout"><b>Basket</b>Le modèle raisonne en points, pas en buts : forces offensive et défensive de chaque équipe, '
-        + 'puis loi normale sur l\'écart et sur le total. L\'écart-type n\'est pas posé à la main, il est mesuré sur les matchs déjà joués. '
-        + 'Pas de statistiques joueur en revanche : l\'API basket n\'en fournit pas sur son palier gratuit.</div>'
-      : '')
+    + modeNote(sp)
     + '<div id="results"></div>'
     + footer();
 
@@ -2026,8 +2044,7 @@ function renderScanner(){
   });
   if(!CFG.demo) $('#cpSel').addEventListener('change', function(){ CFG.comp = this.value; CFG.season = 0; saveCfg(); });
   $('#srcSel').addEventListener('change', function(){
-    CFG.demo = this.value === '1'; saveCfg(); paintQuota();
-    $('#status').textContent = sourceNote(sport());
+    CFG.mode = this.value; saveCfg(); ANALYSES = []; renderScanner(); paintQuota();
   });
   $('#clearCache').addEventListener('click', function(){
     Cache.clear(); $('#status').textContent = 'Cache vidé. La prochaine analyse retéléchargera les données.';
@@ -2050,13 +2067,38 @@ function renderScanner(){
 }
 
 function sourceNote(sp){
-  if(CFG.demo) return 'Mode démo : données simulées et 14 bookmakers, sans aucune clé ni limite.';
-  if(sp.oaOnly) return CFG.oaKey
-    ? 'Coût : 2 crédits The Odds API sur tes 500 mensuels. Résultat mis en cache 15 minutes.'
-    : 'Le tennis a besoin d\'une clé The Odds API (gratuite) — va dans Réglages.';
+  if(CFG.mode === 'demo') return 'Données simulées et 14 bookmakers, sans aucune clé ni limite.';
+  if(CFG.mode === 'market' || sp.oaOnly) return CFG.oaKey
+    ? 'Vrais matchs, vraies cotes. Coût : 4 à 6 crédits sur tes 500 mensuels, mis en cache 15 minutes.'
+    : 'Ce mode a besoin d\'une clé The Odds API (gratuite, 500 crédits/mois) — va dans Réglages.';
   return CFG.afKey
-    ? 'Coût estimé : 5 à 8 requêtes sur tes 100 quotidiennes (les absents en ajoutent une par journée). Les résultats sont mis en cache.'
-    : 'Il te faut une clé API-Sports gratuite — va dans Réglages, c\'est expliqué en trois lignes.';
+    ? 'Coût estimé : 5 à 8 requêtes sur tes 100 quotidiennes. Attention : le palier gratuit d\'API-Sports ne donne pas accès à la saison en cours.'
+    : 'Il te faut une clé API-Sports — va dans Réglages.';
+}
+
+/* Ce que chaque mode fait et ne fait pas — dit à l'écran, pas seulement
+   dans l'aide, parce que c'est la chose qu'on doit comprendre avant de lire
+   un seul chiffre. */
+function modeNote(sp){
+  if(CFG.mode === 'market' || sp.oaOnly){
+    return '<div class="callout"><b>Cotes réelles, sans modèle</b>'
+      + 'De vrais matchs à venir et les vraies cotes de dizaines de bookmakers. L\'outil les compare, retire leur marge, '
+      + 'calcule le consensus et repère les <b>surebets</b> — la partie dont les mathématiques sont certaines.<br>'
+      + 'En revanche <b>pas de modèle de forme</b> : le calcul des forces d\'équipe demande les résultats de la saison en cours, '
+      + 'que le palier gratuit d\'API-Sports ne donne pas. Les colonnes « modèle » sont donc absentes, et la probabilité retenue '
+      + 'est celle du marché seul.</div>';
+  }
+  if(CFG.mode === 'full'){
+    return '<div class="callout warn"><b>Mode complet</b>'
+      + 'Ce mode ajoute le modèle de forme, mais il a besoin des résultats de la <b>saison en cours</b> — et le palier gratuit '
+      + 'd\'API-Sports s\'arrête aux saisons 2022 à 2024. Sans abonnement payant, il échouera avec le message '
+      + '« Free plans do not have access to this season ». Passe sur <b>Cotes réelles</b> pour analyser de vrais matchs dès maintenant.</div>';
+  }
+  if(sp.kind === 'points'){
+    return '<div class="callout"><b>Basket</b>Le modèle raisonne en points : forces offensive et défensive de chaque équipe, '
+      + 'puis loi normale sur l\'écart et sur le total. L\'écart-type est mesuré sur les matchs joués, pas posé à la main.</div>';
+  }
+  return '';
 }
 
 function setStatus(s, spin){ var e = $('#status'); if(e) e.innerHTML = (spin ? '<span class="spin"></span>' : '') + esc(s); }
@@ -2326,12 +2368,17 @@ function modelPanel(a){
   var mktP = function(key, i){ return mk[key] ? mk[key].picks[i].pMarket : null; };
 
   if(!a.model){
-    return SPORTS[a.sport].kind === 'none'
-      ? '<div class="callout"><b>Pas de modèle en tennis</b>Aucune source gratuite ne donne la forme, la surface, les confrontations '
+    if(SPORTS[a.sport].kind === 'none')
+      return '<div class="callout"><b>Pas de modèle en tennis</b>Aucune source gratuite ne donne la forme, la surface, les confrontations '
         + 'directes ou l\'état physique des joueurs. Plutôt que d\'inventer des probabilités, l\'outil s\'en tient à ce qu\'il sait vraiment : '
-        + 'ce que les bookmakers pensent, une fois leur marge retirée, et là où ils se contredisent.</div>'
-      : '<div class="callout warn"><b>Modèle indisponible</b>Pas assez d\'historique pour ces deux équipes. '
-        + 'L\'analyse repose uniquement sur la comparaison des bookmakers entre eux.</div>';
+        + 'ce que les bookmakers pensent, une fois leur marge retirée, et là où ils se contredisent.</div>';
+    if(CFG.mode === 'market')
+      return '<div class="callout"><b>Pas de modèle dans ce mode</b>Les forces d\'équipe se calculent sur les résultats de la saison '
+        + 'en cours, que le palier gratuit ne fournit pas. Ce que tu vois ci-dessous ne vient donc que des bookmakers : leur consensus '
+        + 'une fois la marge retirée, et les endroits où ils se contredisent. C\'est moins riche, mais c\'est solide — et les surebets, eux, '
+        + 'ne dépendent d\'aucun modèle.</div>';
+    return '<div class="callout warn"><b>Modèle indisponible</b>Pas assez d\'historique pour ces deux équipes. '
+      + 'L\'analyse repose uniquement sur la comparaison des bookmakers entre eux.</div>';
   }
 
   if(a.model.kind === 'goals'){
@@ -2566,7 +2613,7 @@ function renderSettings(){
     CFG.minEdge = clamp(+$('#minEdge').value, 0, 30);
     CFG.devig = $('#devig').value;
     CFG.expMinutes = clamp(+$('#expMinutes').value || 75, 15, 90);
-    if(CFG.afKey || CFG.oaKey) CFG.demo = false;
+    if(CFG.mode === 'demo' && (CFG.afKey || CFG.oaKey)) CFG.mode = 'market';
     saveCfg(); paintQuota();
     $('#saved').textContent = 'Enregistré ✓' + ((CFG.afKey || CFG.oaKey) ? ' — les données réelles sont actives.' : '');
     ANALYSES = [];
@@ -2696,25 +2743,27 @@ function diagnose(step){
                   function(e){ throw Object.assign(e, { ms:Date.now() - t }); });
   };
 
-  if(CFG.demo){
+  if(CFG.mode === 'demo'){
     add(check('Mode démo actif', 'warn',
       'Il n\'y a rien à diagnostiquer : les données sont fabriquées en local. '
-      + 'Passe la source sur « Données réelles » dans le scanner, puis reviens ici.'));
+      + 'Dans le scanner, choisis « Cotes réelles » ou « Complet » comme source, puis reviens ici.'));
     return Promise.resolve(out);
   }
 
-  var key = sp.oaOnly ? CFG.oaKey : CFG.afKey;
+  // Le diagnostic doit interroger la même API que le scanner, donc suivre le mode.
+  var marche = CFG.mode === 'market' || sp.oaOnly;
+  var key = marche ? CFG.oaKey : CFG.afKey;
   if(!key){
-    add(check(sp.oaOnly ? 'Clé The Odds API' : 'Clé API-Sports', 'ko',
+    add(check(marche ? 'Clé The Odds API' : 'Clé API-Sports', 'ko',
       'Absente. Ajoute-la dans Réglages — elle est gratuite.'));
     return Promise.resolve(out);
   }
   var route = LS.get('route:' + sp.id, null);
-  add(check(sp.oaOnly ? 'Clé The Odds API' : 'Clé', 'ok',
+  add(check(marche ? 'Clé The Odds API' : 'Clé', 'ok',
     key.length + ' caractères, enregistrée dans ce navigateur.'
     + (route ? ' Voie d\'accès retenue : ' + (route === 'direct' ? 'directe chez le fournisseur.' : 'via RapidAPI.') : '')));
 
-  return (sp.oaOnly ? diagTennis(sp, comp, add, timed, step) : diagTeam(sp, comp, season, add, timed, step))
+  return (marche ? diagMarket(sp, comp, add, timed, step) : diagTeam(sp, comp, season, add, timed, step))
     .catch(function(e){
       add(check('Échec', 'ko', redact(e.message || String(e))));
     })
@@ -2837,35 +2886,40 @@ function diagTeam(sp, comp, season, add, timed, step){
   });
 }
 
-/* --- Tennis : liste des tournois (gratuite), puis cotes --- */
-function diagTennis(sp, comp, add, timed, step){
-  step('Liste des tournois…');
+/* --- Mode cotes réelles : liste des compétitions (gratuite), puis cotes --- */
+function diagMarket(sp, comp, add, timed, step){
+  step('Liste des compétitions…');
   return timed(OA.sports()).then(function(x){
     var all = x.r || [];
-    var tennis = all.filter(function(s){ return s.group === 'Tennis' || /^tennis_/.test(s.key); });
+    var tennis = all.filter(function(s){
+      return s.group === sp.oaGroup || (sp.oaPrefix && s.key.indexOf(sp.oaPrefix) === 0);
+    });
     var live = tennis.filter(function(s){ return s.active !== false; });
-    add(check('Liste des tournois', tennis.length ? 'ok' : 'ko',
-      tennis.length + ' tournois de tennis en ' + x.ms + ' ms, dont ' + live.length + ' en cours'
+    add(check('Liste des compétitions', tennis.length ? 'ok' : 'ko',
+      tennis.length + ' compétitions en ' + sp.label.toLowerCase() + ' en ' + x.ms + ' ms, dont ' + live.length + ' en cours'
       + (live.length ? ' : ' + live.slice(0,4).map(function(s){ return s.title; }).join(', ') : '')
       + '. Cet appel ne coûte aucun crédit.'));
     if(!live.length){
-      add(check('Cotes', 'warn', 'Aucun tournoi en cours : il n\'y a rien à coter aujourd\'hui. '
-        + 'Ce n\'est pas une panne — le tennis s\'arrête entre les tournois.'));
+      add(check('Cotes', 'warn', 'Aucune compétition en cours : il n\'y a rien à coter aujourd\'hui. Ce n\'est pas une panne.'));
       return;
     }
-    if(!comp) { add(check('Cotes', 'warn', 'Clique sur « Actualiser la liste » dans le scanner pour choisir un tournoi.')); return; }
+    if(!comp || !comp.oa) { add(check('Cotes', 'warn', 'Clique sur « Actualiser la liste » dans le scanner pour choisir une compétition.')); return; }
 
     step('Cotes de ' + comp.name + '…');
-    return timed(OA.odds(comp.oa, 'h2h')).then(function(y){
+    return timed(OA.odds(comp.oa, sp.kind === 'points' ? 'h2h,totals,spreads' : 'h2h,totals')).then(function(y){
       var evs = y.r || [];
       if(!evs.length){ add(check('Cotes', 'warn', 'Aucun match à venir chez ' + comp.name + ' (' + y.ms + ' ms).')); return; }
       var parsed = parseOaEvent(evs[0]);
-      var books = parsed.ml ? Object.keys(parsed.ml.books) : [];
       add(check('Cotes', 'ok', evs.length + ' matchs en ' + y.ms + ' ms · ex. '
         + evs[0].home_team + ' – ' + evs[0].away_team));
-      add(check('Marché « Vainqueur »', books.length ? 'ok' : 'ko',
-        books.length ? books.length + ' bookmakers : ' + books.slice(0,6).join(', ') + (books.length > 6 ? '…' : '')
-                     : 'Non reconnu — les noms des joueurs ne se rattachent pas aux issues.'));
+      sp.markets.forEach(function(mk){
+        var o = parsed[mk];
+        add(check('Marché « ' + MARKETS[mk].label + ' »', o ? 'ok' : 'warn',
+          o ? Object.keys(o.books).length + ' bookmakers'
+              + (o.line != null ? ' · ligne retenue ' + fmtNum(o.line) : '')
+              + ' : ' + Object.keys(o.books).slice(0,5).join(', ')
+            : 'Absent de la réponse — ce bookmaker ne cote peut-être pas ce marché sur cette compétition.'));
+      });
       add(check('Crédits restants', 'ok', Quota.left('oa') + ' sur 500 ce mois-ci.'));
     }, function(e){ add(check('Cotes', 'ko', redact(e.message))); });
   }, function(e){ add(check('Liste des tournois', 'ko', redact(e.message))); });
@@ -2962,7 +3016,7 @@ function diagHtml(d){
 
 /* ------------------------------------------------------------------ Boot */
 (function boot(){
-  if(CFG.demo == null) CFG.demo = !(CFG.afKey || CFG.oaKey);
+  if(!CFG.mode) CFG.mode = (CFG.afKey || CFG.oaKey) ? 'market' : 'demo';
   if(!SPORTS[CFG.sport]) CFG.sport = 'foot';
   if(!CFG.comp && sport().comps.length) CFG.comp = sport().comps[0].id;
   paintQuota();
