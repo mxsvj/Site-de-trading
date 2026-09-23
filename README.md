@@ -116,7 +116,9 @@ jouer que chez un opérateur agréé par l'ANJ.
 
 Page autonome (`journal.html`) : on y note ses trades — actif, sens, setup,
 session, entrée, stop, objectif, sortie, P&L, frais, émotion, respect du plan,
-notes et leçon — et elle en tire :
+notes, leçon et **captures d'écran** — ainsi que ses **pas de trade** : les
+jours où l'on reste dehors, avec la raison, les marchés surveillés et si l'on a
+été tenté de forcer un trade. Le journal en tire :
 
 - le résultat de chaque trade **en R** (depuis les prix, ou depuis le risque
   prévu en argent) et en P&L net de frais ;
@@ -124,8 +126,14 @@ notes et leçon — et elle en tire :
   drawdown max, séries, courbe du compte ;
 - la répartition par setup, actif, session, jour, émotion, qualité du setup,
   sens et respect du plan, avec quelques constats chiffrés ;
-- un calendrier du P&L jour par jour et semaine par semaine.
+- un calendrier du P&L jour par jour et semaine par semaine, où les pas de
+  trade apparaissent aussi ;
+- la part des jours sans trade, leurs raisons et les tentations résistées.
 
-Tout reste dans le navigateur (`localStorage`). Sauvegarde et restauration en
-JSON, export CSV pour Excel. Un bouton charge des trades d'exemple, signalés
+Tout reste dans le navigateur : les entrées dans `localStorage`, les captures
+dans IndexedDB (le `localStorage` est limité à ~5 Mo). Les captures s'ajoutent
+par glisser-déposer, copier-coller ou sélection de fichiers, jusqu'à 8 par
+entrée ; elles sont réduites à 1920 px et ré-encodées, ce qui divise leur poids
+par 5 à 10. Sauvegarde et restauration en JSON, captures incluses ; export CSV
+pour Excel. Un bouton charge des trades d'exemple, signalés
 comme tels et supprimables d'un clic.
