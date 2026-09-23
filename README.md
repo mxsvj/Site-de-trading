@@ -6,6 +6,7 @@ Deux pages statiques, sans build ni dépendances : il suffit d'ouvrir le fichier
 |---|---|
 | `index.html` | **Flux** — l'académie de trading (leçons, boîte à outils, examen). |
 | `paris-sportifs.html` | **Flux Odds** — l'analyseur de paris sportifs. |
+| `journal.html` | **Journal de trading** — page autonome, sans lien avec les autres. |
 
 ## Flux Odds — analyseur de paris sportifs
 
@@ -110,3 +111,21 @@ les écarts entre books y sont plus larges que dans les grands championnats.
 le coup d'envoi, le contexte d'un match et la qualité réelle des occasions. Un écart signalé est une
 hypothèse chiffrée, pas une prédiction. Interdit aux mineurs ; en France, ne
 jouer que chez un opérateur agréé par l'ANJ.
+
+## Journal de trading
+
+Page autonome (`journal.html`) : on y note ses trades — actif, sens, setup,
+session, entrée, stop, objectif, sortie, P&L, frais, émotion, respect du plan,
+notes et leçon — et elle en tire :
+
+- le résultat de chaque trade **en R** (depuis les prix, ou depuis le risque
+  prévu en argent) et en P&L net de frais ;
+- taux de réussite, espérance, profit factor, gains et pertes moyens,
+  drawdown max, séries, courbe du compte ;
+- la répartition par setup, actif, session, jour, émotion, qualité du setup,
+  sens et respect du plan, avec quelques constats chiffrés ;
+- un calendrier du P&L jour par jour et semaine par semaine.
+
+Tout reste dans le navigateur (`localStorage`). Sauvegarde et restauration en
+JSON, export CSV pour Excel. Un bouton charge des trades d'exemple, signalés
+comme tels et supprimables d'un clic.
