@@ -282,6 +282,22 @@
   .lb-n{right:14px;top:50%;transform:translateY(-50%)}
   .lb-c{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);color:#fff;font-family:var(--mono);font-size:12px;opacity:.75}
 
+  /* ---------- Pas de cotation ---------- */
+  .ticks tbody tr{cursor:default}
+  .ticks tbody tr:hover{background:none}
+  .ticks td{padding:8px 12px}
+  .ticks input{background:var(--field);border:1px solid var(--line);border-radius:9px;color:var(--text);font-family:var(--mono);font-size:13px;padding:7px 10px;width:130px;outline:none}
+  .ticks input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.18)}
+  .ticks input.bad{border-color:var(--bad)}
+  .src{font-size:11.5px;border-radius:999px;padding:2px 9px;white-space:nowrap}
+  .src.preset{color:var(--muted);border:1px solid var(--line-2)}
+  .src.perso{color:var(--accent);background:rgba(var(--accent-rgb),.1);border:1px solid rgba(var(--accent-rgb),.25)}
+  .src.none{color:var(--warn)}
+  .tickadd{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:14px}
+  .tickadd .field{width:150px}
+  .iconbtn{border:0;background:none;color:var(--muted);cursor:pointer;font-size:12.5px;font-family:var(--body);padding:4px 6px;border-radius:7px}
+  .iconbtn:hover{color:var(--text);background:var(--panel-2)}
+
   /* ---------- Pas de trade ---------- */
   .dir.skip{background:rgba(var(--accent-2-rgb),.14);color:var(--accent-2)}
   .skiprow td{color:var(--text-2)}
@@ -474,6 +490,41 @@ function compressImage(file){
 var SESSIONS=['Asie','Londres','New York','Hors session'];
 var REASONS=['Pas de setup valide','News à fort impact','Marché sans direction','Marché trop volatil','Pas en condition (fatigue, émotions)','Limite de perte atteinte','Objectif atteint','Pas disponible','Autre'];
 var MAX_SHOTS=8;
+
+/* Pas de cotation (tick) : plus petit écart de prix possible, et ce qu'il
+   rapporte pour 1 contrat ou 1 lot, dans la devise du contrat. Valeurs
+   standard des bourses (CME, Eurex) et du forex en lot de 100 000 ; les CFD
+   varient d'un broker à l'autre, d'où la possibilité de tout modifier. */
+var TICK_PRESETS={
+  ES:[0.25,12.5,'E-mini S&P 500 ($)'], MES:[0.25,1.25,'Micro S&P 500 ($)'],
+  NQ:[0.25,5,'E-mini Nasdaq 100 ($)'], MNQ:[0.25,0.5,'Micro Nasdaq 100 ($)'],
+  YM:[1,5,'E-mini Dow ($)'], MYM:[1,0.5,'Micro Dow ($)'],
+  RTY:[0.1,5,'E-mini Russell 2000 ($)'], M2K:[0.1,0.5,'Micro Russell 2000 ($)'],
+  CL:[0.01,10,'Pétrole WTI ($)'], MCL:[0.01,1,'Micro WTI ($)'], NG:[0.001,10,'Gaz naturel ($)'],
+  GC:[0.1,10,'Or ($)'], MGC:[0.1,1,'Micro or ($)'], SI:[0.005,25,'Argent ($)'],
+  '6E':[0.00005,6.25,'Euro FX ($)'], '6B':[0.0001,6.25,'Livre sterling ($)'],
+  FDAX:[0.5,12.5,'DAX (€)'], FDXM:[1,5,'Mini-DAX (€)'], FESX:[1,10,'Euro Stoxx 50 (€)'],
+  EURUSD:[0.00001,1,'Forex, 1 lot ($)'], GBPUSD:[0.00001,1,'Forex, 1 lot ($)'], AUDUSD:[0.00001,1,'Forex, 1 lot ($)'], NZDUSD:[0.00001,1,'Forex, 1 lot ($)'],
+  XAUUSD:[0.01,1,'Or spot, 1 lot de 100 oz ($)'], XAGUSD:[0.001,5,'Argent spot, 1 lot de 5 000 oz ($)']
+};
+/* « NQ1! » (TradingView) ou « MNQZ25 » (échéance) renvoient au contrat de base. */
+function tickKey(asset){
+  var a=String(asset||'').trim().toUpperCase(); if(!a) return '';
+  var own=DB.settings.ticks||{};
+  if(own[a] || TICK_PRESETS[a]) return a;
+  var b=a.replace(/\d*!$/,''); if(own[b] || TICK_PRESETS[b]) return b;
+  var c=a.replace(/[FGHJKMNQUVXZ]\d{1,2}$/,''); if(c!==a && (own[c] || TICK_PRESETS[c])) return c;
+  return a;
+}
+function tickSpec(asset){
+  var k=tickKey(asset); if(!k) return null;
+  var own=(DB.settings.ticks||{})[k];
+  if(own) return { key:k, tick:String(own.tick), value:own.value==null?'':String(own.value), src:'perso' };
+  var p=TICK_PRESETS[k];
+  return p?{ key:k, tick:String(p[0]), value:String(p[1]), src:'preset', name:p[2] }:null;
+}
+function tfmt(v,sign){ if(v==null||!isFinite(v)) return '—'; var r=Math.round(v*10)/10; return (r<0?'−':(sign&&r>0?'+':''))+String(Math.abs(r)).replace('.',',')+' tick'+(Math.abs(r)>1?'s':''); }
+function offGrid(v,tk){ if(v==null||!tk) return false; var q=v/tk; return Math.abs(q-Math.round(q))>1e-4; }
 var EMOTIONS=['Calme','Confiant','Hésitant','Impatient','Frustré','Euphorique','Peur de rater (FOMO)','Revanche'];
 var GRADES=['A+','A','B','C'];
 
@@ -505,14 +556,20 @@ function derive(t){
   var move=(e!=null && x!=null)?(x-e)*sign:null;
   var r=null, rSrc='';
   if(risk && move!=null){ r=move/risk; rSrc='prix'; }
-  var pnl=num(t.pnl), pnlCalc=false;
-  if(pnl==null && move!=null && q!=null){ pnl=move*q; pnlCalc=true; }
+  var tk=num(t.tick), tv=num(t.tickValue); if(!(tk>0)) tk=null;
+  var ticks=(move!=null && tk)?move/tk:null;
+  var pnl=num(t.pnl), pnlCalc='';
+  if(pnl==null && q!=null){
+    if(ticks!=null && tv!=null){ pnl=ticks*tv*q; pnlCalc='ticks'; }
+    else if(move!=null){ pnl=move*q; pnlCalc='ecart'; }
+  }
   var fees=num(t.fees)||0;
   var net=pnl!=null?pnl-fees:null;
   var riskMoney=num(t.riskMoney);
   if(r==null && net!=null && riskMoney){ r=net/riskMoney; rSrc='risque'; }
   var planned=(risk && tp!=null)?Math.abs(tp-e)/risk:null;
-  return { r:r, rSrc:rSrc, pnl:pnl, pnlCalc:pnlCalc, net:net, planned:planned, risk:risk };
+  return { r:r, rSrc:rSrc, pnl:pnl, pnlCalc:pnlCalc, net:net, planned:planned, risk:risk,
+    ticks:ticks, riskTicks:(risk!=null && tk)?risk/tk:null, tpTicks:(tp!=null && e!=null && tk)?Math.abs(tp-e)/tk:null };
 }
 function outcome(d){
   var v=d.net!=null?d.net:d.r;
@@ -791,7 +848,7 @@ function renderJournal(){
   var clr=$('#clr'); if(clr) clr.onclick=function(){ UI.filt={ q:'', asset:'', setup:'', res:'', from:'', to:'' }; renderJournal(); };
   $$('tbody tr[data-id]').forEach(function(tr){ tr.onclick=function(){ UI.open=UI.open===tr.dataset.id?null:tr.dataset.id; renderJournal(); }; });
   var ed=$('#edit'); if(ed) ed.onclick=function(e){ e.stopPropagation(); resetForm(true); UI.editing=UI.open; go('new'); };
-  var dup=$('#dup'); if(dup) dup.onclick=function(e){ e.stopPropagation(); var src=findTrade(UI.open); resetForm(true); UI.kind='trade'; UI.form=Object.assign(blank(),src,{id:null,date:nowLocal(),exit:'',pnl:'',fees:'',notes:'',lesson:'',shots:[],demo:false}); go('new'); };
+  var dup=$('#dup'); if(dup) dup.onclick=function(e){ e.stopPropagation(); var src=findTrade(UI.open); resetForm(true); UI.kind='trade'; UI.form=Object.assign(blank(),src,{id:null,date:nowLocal(),exit:'',pnl:'',fees:'',notes:'',lesson:'',shots:[],demo:false,tickAuto:!(src.tick||src.tickValue)}); go('new'); };
   var del=$('#del'); if(del) del.onclick=function(e){
     e.stopPropagation();
     var en=findEntry(UI.open), sk=en && en.kind==='skip';
@@ -812,12 +869,14 @@ function fmtDate(dt){
 function detailRow(t,d){
   var bits=[];
   if(t.session) bits.push('Session <b>'+esc(t.session)+'</b>');
-  if(t.stop) bits.push('Stop <b>'+esc(t.stop)+'</b>');
-  if(t.target) bits.push('Objectif <b>'+esc(t.target)+'</b>');
+  if(t.stop) bits.push('Stop <b>'+esc(t.stop)+'</b>'+(d.riskTicks!=null?' <span class="mut">('+tfmt(d.riskTicks)+')</span>':''));
+  if(t.target) bits.push('Objectif <b>'+esc(t.target)+'</b>'+(d.tpTicks!=null?' <span class="mut">('+tfmt(d.tpTicks)+')</span>':''));
+  if(d.ticks!=null) bits.push('Mouvement <b class="'+cls(d.ticks)+'">'+tfmt(d.ticks,true)+'</b>');
+  if(num(t.tick)) bits.push('Pas de cotation <b>'+esc(String(t.tick).replace('.',','))+'</b>'+(num(t.tickValue)!=null?' · valeur du tick <b>'+esc(String(t.tickValue).replace('.',','))+'</b>':''));
   if(d.planned!=null) bits.push('R:R prévu <b>'+d.planned.toFixed(2)+'</b>');
   if(t.qty) bits.push('Taille <b>'+esc(t.qty)+'</b>');
   if(num(t.fees)) bits.push('Frais <b>'+money(num(t.fees))+'</b>');
-  if(d.pnl!=null) bits.push('P&amp;L brut <b>'+money(d.pnl,true)+'</b>'+(d.pnlCalc?' <span class="mut">(calculé : écart × taille)</span>':''));
+  if(d.pnl!=null) bits.push('P&amp;L brut <b>'+money(d.pnl,true)+'</b>'+(d.pnlCalc==='ticks'?' <span class="mut">(calculé : ticks × valeur du tick × taille)</span>':(d.pnlCalc==='ecart'?' <span class="mut">(calculé : écart × taille)</span>':'')));
   if(d.rSrc==='risque') bits.push('<span class="mut">R calculé depuis le risque en argent</span>');
   if(t.grade) bits.push('Qualité <b>'+esc(t.grade)+'</b>');
   if(t.emotion) bits.push('Émotion <b>'+esc(t.emotion)+'</b>');
@@ -853,14 +912,18 @@ function kpiRow(s){
 function blank(){
   var last=sortByDate(DB.trades).slice(-1)[0]||{};
   var dt=nowLocal();
-  return { id:null, date:dt, asset:last.asset||'', dir:'long', setup:'', session:guessSession(dt), entry:'', stop:'', target:'', exit:'', qty:'', riskMoney:'', pnl:'', fees:'', grade:'', emotion:'', plan:null, notes:'', lesson:'', link:'', shots:[],
+  return { id:null, date:dt, asset:last.asset||'', dir:'long', setup:'', session:guessSession(dt), entry:'', stop:'', target:'', exit:'', qty:'', riskMoney:'', pnl:'', fees:'', tick:'', tickValue:'', tickAuto:true, grade:'', emotion:'', plan:null, notes:'', lesson:'', link:'', shots:[],
     day:ymd(new Date()), reason:'', tempted:null };
 }
 function renderForm(){
   if(!UI.form){
     var src=findEntry(UI.editing);
     if(src && src.kind==='skip'){ UI.kind='skip'; UI.form=Object.assign(blank(),src,{ day:src.date, date:nowLocal(), shots:(src.shots||[]).slice() }); }
-    else { if(src) UI.kind='trade'; UI.form=Object.assign(blank(),src||{}); UI.form.shots=(UI.form.shots||[]).slice(); }
+    else {
+      if(src) UI.kind='trade';
+      UI.form=Object.assign(blank(),src||{}); UI.form.shots=(UI.form.shots||[]).slice();
+      if(src && (src.tick || src.tickValue)) UI.form.tickAuto=false;
+    }
   }
   if(UI.kind==='skip') return renderSkipForm();
   var t=UI.form;
@@ -877,7 +940,7 @@ function renderForm(){
       +'<div class="field"><label for="f_session">Session</label>'+sel('f_session',SESSIONS,t.session)+'</div>'
       +inp('f_setup','Setup',t.setup,'list="dl_setup" placeholder="Sweep + ChoCh, OB retest…" autocomplete="off"')
       +'<div class="field"><label for="f_grade">Qualité du setup</label>'+sel('f_grade',GRADES,t.grade)+'</div>'
-      +inp('f_qty','Taille',t.qty,numAttr+' placeholder="lots, contrats, unités"','Sert à calculer le P&amp;L si tu ne le saisis pas.')
+      +inp('f_qty','Taille',t.qty,numAttr+' placeholder="lots, contrats, unités"','Nombre de contrats ou de lots : sert à calculer le P&amp;L si tu ne le saisis pas.')
       +inp('f_risk','Risque prévu ('+esc(DB.settings.currency)+')',t.riskMoney,numAttr+' placeholder="ex. 100"','Pour le R quand il n\'y a pas de stop.')
     +'</div></div>'
     +'<div class="panel"><div class="panel-h"><span class="t">Prix</span><span class="s">Laisse la sortie vide si le trade est encore ouvert.</span></div><div class="grid g4">'
@@ -886,9 +949,11 @@ function renderForm(){
       +inp('f_target','Objectif (TP)',t.target,numAttr)
       +inp('f_exit','Sortie',t.exit,numAttr)
     +'</div><div class="grid g4" style="margin-top:14px">'
-      +inp('f_pnl','P&amp;L brut ('+esc(DB.settings.currency)+')',t.pnl,numAttr+' placeholder="ex. 250 ou -100"','Ce que ton broker affiche. Vide = écart × taille.')
+      +inp('f_tick','Pas de cotation',t.tick,numAttr+' placeholder="ex. 0.25"','<span id="tickSrc"></span>')
+      +inp('f_tickv','Valeur d\'un tick',t.tickValue,numAttr+' placeholder="ex. 5"','Pour 1 contrat ou 1 lot.')
+      +inp('f_pnl','P&amp;L brut ('+esc(DB.settings.currency)+')',t.pnl,numAttr+' placeholder="ex. 250 ou -100"','Ce que ton broker affiche. Vide = calculé.')
       +inp('f_fees','Frais ('+esc(DB.settings.currency)+')',t.fees,numAttr+' placeholder="0"','Commissions et swap, déduits du P&amp;L.')
-      +'<div class="field span2"><label>Aperçu</label><div class="preview" id="pv"></div></div>'
+      +'<div class="field span4"><label>Aperçu</label><div class="preview" id="pv"></div></div>'
     +'</div></div>'
     +'<div class="panel"><div class="panel-h"><span class="t">Toi</span><span class="s">La partie que personne ne note — et celle qui explique le plus.</span></div><div class="grid g4">'
       +'<div class="field"><label for="f_emotion">Émotion à l\'entrée</label>'+sel('f_emotion',EMOTIONS,t.emotion)+'</div>'
@@ -901,21 +966,41 @@ function renderForm(){
     +formFoot()
     +'</form>'+dl('dl_asset',uniq('asset'))+dl('dl_setup',uniq('setup'));
 
-  var map={ f_date:'date', f_asset:'asset', f_session:'session', f_setup:'setup', f_grade:'grade', f_qty:'qty', f_risk:'riskMoney', f_entry:'entry', f_stop:'stop', f_target:'target', f_exit:'exit', f_pnl:'pnl', f_fees:'fees', f_emotion:'emotion', f_link:'link', f_notes:'notes', f_lesson:'lesson' };
+  var map={ f_date:'date', f_asset:'asset', f_session:'session', f_setup:'setup', f_grade:'grade', f_qty:'qty', f_risk:'riskMoney', f_entry:'entry', f_stop:'stop', f_target:'target', f_exit:'exit', f_pnl:'pnl', f_fees:'fees', f_tick:'tick', f_tickv:'tickValue', f_emotion:'emotion', f_link:'link', f_notes:'notes', f_lesson:'lesson' };
   Object.keys(map).forEach(function(id){
     var el=$('#'+id);
     el.addEventListener('input',function(){
       var prevGuess=guessSession(t.date);
       t[map[id]]=el.value;
       if(id==='f_date' && (!t.session || t.session===prevGuess)){ t.session=guessSession(t.date); $('#f_session').value=t.session; }
+      if(id==='f_tick' || id==='f_tickv') t.tickAuto=false;
+      if(id==='f_asset') applyTickSpec();
       el.classList.remove('bad');
+      paintTickSrc();
       preview();
     });
   });
+  applyTickSpec();
+  paintTickSrc();
   $$('#f_dir button').forEach(function(b){ b.onclick=function(){ t.dir=b.dataset.v; $$('#f_dir button').forEach(function(x){ x.classList.toggle('on',x===b); }); preview(); }; });
   $$('#f_plan button').forEach(function(b){ b.onclick=function(){ var v=b.dataset.v==='1'; t.plan=(t.plan===v)?null:v; $$('#f_plan button').forEach(function(x){ x.classList.toggle('on',t.plan!==null && (x.dataset.v==='1')===t.plan); }); }; });
   bindFormCommon();
   preview();
+}
+/* Remplit le pas de cotation d'après l'actif, tant que l'utilisateur ne l'a
+   pas saisi lui-même pour ce trade. */
+function applyTickSpec(){
+  var t=UI.form, sp=tickSpec(t.asset);
+  if(!t.tickAuto && (t.tick || t.tickValue)) return;
+  t.tick=sp?sp.tick:''; t.tickValue=sp?sp.value:''; t.tickAuto=true;
+  $('#f_tick').value=t.tick; $('#f_tickv').value=t.tickValue;
+  $('#f_tick').classList.remove('bad'); $('#f_tickv').classList.remove('bad');
+}
+function paintTickSrc(){
+  var t=UI.form, sp=tickSpec(t.asset), el=$('#tickSrc'); if(!el) return;
+  if(t.tickAuto && sp) el.textContent=sp.src==='perso'?'Ton réglage pour '+sp.key+'.':'Préréglage '+sp.key+' : '+sp.name+'.';
+  else if(t.tickAuto) el.textContent=t.asset?'Actif inconnu : saisis-le, il sera retenu.':'Rempli selon l\'actif.';
+  else el.textContent='Saisi à la main : retenu pour '+(tickKey(t.asset)||'cet actif')+'.';
 }
 function formHead(editTitle,newTitle,lede){
   var kinds='';
@@ -978,7 +1063,15 @@ function preview(){
     if((t.dir==='long' && s>=e) || (t.dir==='short' && s<=e)) warn='Le stop est du mauvais côté de l\'entrée pour un '+(t.dir==='short'?'short':'long')+'.';
   }
   if(!warn && e!=null && tp!=null && ((t.dir==='long' && tp<=e) || (t.dir==='short' && tp>=e))) warn='L\'objectif est du mauvais côté de l\'entrée.';
+  var tk=num(t.tick);
+  if(!warn && tk>0){
+    var off=[['entrée',e],['stop',s],['objectif',tp],['sortie',num(t.exit)]].filter(function(x){ return offGrid(x[1],tk); }).map(function(x){ return x[0]; });
+    if(off.length) warn='Prix hors du pas de cotation ('+String(tk).replace('.',',')+') : '+off.join(', ')+'.';
+  }
+  if(d.riskTicks!=null) bits.push('Stop <b>'+tfmt(d.riskTicks)+'</b>');
+  if(d.tpTicks!=null) bits.push('Objectif <b>'+tfmt(d.tpTicks)+'</b>');
   if(d.planned!=null) bits.push('R:R prévu <b>'+d.planned.toFixed(2)+'</b>');
+  if(d.ticks!=null) bits.push('Mouvement <b class="'+cls(d.ticks)+'">'+tfmt(d.ticks,true)+'</b>');
   bits.push('Résultat <b class="'+cls(d.r)+'">'+rfmt(d.r)+'</b>');
   bits.push('P&amp;L net <b class="'+cls(d.net)+'">'+money(d.net,true)+'</b>');
   if(outcome(d)==='open') bits.push('<span>Trade ouvert</span>');
@@ -988,12 +1081,18 @@ function submit(){
   var t=UI.form, bad=[];
   if(!t.date) bad.push('f_date');
   if(!String(t.asset||'').trim()) bad.push('f_asset');
-  ['f_entry','f_stop','f_target','f_exit','f_pnl','f_fees','f_qty','f_risk'].forEach(function(id){ var v=$('#'+id).value.trim(); if(v!=='' && num(v)==null) bad.push(id); });
+  ['f_entry','f_stop','f_target','f_exit','f_pnl','f_fees','f_qty','f_risk','f_tickv'].forEach(function(id){ var v=$('#'+id).value.trim(); if(v!=='' && num(v)==null) bad.push(id); });
+  var tkv=$('#f_tick').value.trim(); if(tkv!=='' && !(num(tkv)>0)) bad.push('f_tick');
   if(t.link && !/^https?:\/\//i.test(t.link)) bad.push('f_link');
   if(bad.length){ bad.forEach(function(id){ $('#'+id).classList.add('bad'); }); $('#'+bad[0]).focus(); toast('Vérifie les champs en rouge'); return; }
   t.asset=String(t.asset).trim().toUpperCase(); t.setup=String(t.setup||'').trim();
   var rec=Object.assign({},t); rec.shots=t.shots.slice();
-  delete rec.day; delete rec.reason; delete rec.tempted; delete rec.kind;
+  rec.tick=num(t.tick)>0?String(num(t.tick)):''; rec.tickValue=num(t.tickValue)!=null?String(num(t.tickValue)):'';
+  delete rec.day; delete rec.reason; delete rec.tempted; delete rec.kind; delete rec.tickAuto;
+  if(!t.tickAuto && num(t.tick)>0){
+    DB.settings.ticks=DB.settings.ticks||{};
+    DB.settings.ticks[tickKey(t.asset)]={ tick:String(num(t.tick)), value:num(t.tickValue) };
+  }
   if(UI.editing){
     rec.id=UI.editing; delete rec.demo;
     DB.trades=DB.trades.map(function(x){ return x.id===UI.editing?Object.assign(rec,{demo:x.demo}):x; });
@@ -1188,6 +1287,7 @@ function renderSettings(){
     +'<div class="field"><label>Apparence</label><div class="seg" id="s_theme"><button type="button" data-v="dark"'+(currentTheme()==='dark'?' class="on"':'')+'>Sombre</button><button type="button" data-v="light"'+(currentTheme()==='light'?' class="on"':'')+'>Clair</button></div></div>'
     +'<div class="field"><label for="s_cur">Devise</label><select id="s_cur">'+['€','$','£','CHF'].map(function(c){ return '<option'+(c===st.currency?' selected':'')+'>'+c+'</option>'; }).join('')+'</select></div>'
     +'</div></div>'
+    +tickPanel()
     +'<div class="panel"><div class="panel-h"><span class="t">Sauvegarde</span><span class="s" id="svCount">'+DB.trades.length+' trade'+(DB.trades.length>1?'s':'')+' · '+DB.skips.length+' pas de trade</span></div>'
     +'<p style="font-size:14px;color:var(--text-2);margin-bottom:14px">Le journal vit dans ce navigateur uniquement. Vider les données du site, changer de navigateur ou d\'appareil le fait disparaître : exporte une sauvegarde régulièrement.</p>'
     +'<div class="row"><button class="btn btn-primary btn-sm" id="exJson">Exporter la sauvegarde, captures incluses (.json)</button><button class="btn btn-ghost btn-sm" id="exCsv">Exporter pour Excel (.csv)</button><button class="btn btn-ghost btn-sm" id="imBtn">Importer une sauvegarde</button><input type="file" id="imFile" accept=".json,application/json" hidden></div></div>'
@@ -1195,6 +1295,7 @@ function renderSettings(){
   $('#s_cap').onchange=function(){ var v=num(this.value); if(v==null||v<0){ this.classList.add('bad'); return; } this.classList.remove('bad'); st.capital=v; save(); toast('Capital enregistré'); };
   $$('#s_theme button').forEach(function(b){ b.onclick=function(){ setTheme(b.dataset.v); renderSettings(); }; });
   $('#s_cur').onchange=function(){ st.currency=this.value; save(); toast('Devise enregistrée'); };
+  bindTickPanel();
   var nShots=Object.keys(usedShots()).length;
   if(nShots) $('#svCount').textContent+=' · '+nShots+' capture'+(nShots>1?'s':'');
   $('#exJson').onclick=function(){
@@ -1241,21 +1342,65 @@ function renderSettings(){
     DB.trades=[]; DB.skips=[]; save(); imgKeys().then(imgDel); toast('Journal effacé'); renderSettings();
   };
 }
+function tickPanel(){
+  var own=DB.settings.ticks||{}, keys={};
+  DB.trades.forEach(function(t){ if(t.asset) keys[tickKey(t.asset)]=1; });
+  Object.keys(own).forEach(function(k){ keys[k]=1; });
+  var rows=Object.keys(keys).sort(function(a,b){ return a.localeCompare(b,'fr'); }).map(function(k){
+    var sp=tickSpec(k), pre=TICK_PRESETS[k];
+    var src=!sp?'<span class="src none">à renseigner</span>':(sp.src==='perso'?'<span class="src perso">Ton réglage</span>':'<span class="src preset" title="'+esc(sp.name)+'">Préréglage</span>');
+    var act=sp && sp.src==='perso'?'<button class="iconbtn" data-reset="'+esc(k)+'">'+(pre?'Rétablir le préréglage':'Supprimer')+'</button>':'';
+    return '<tr><td><b>'+esc(k)+'</b>'+(pre?'<div class="mut" style="font-size:11.5px">'+esc(pre[2])+'</div>':'')+'</td>'
+      +'<td><input data-k="'+esc(k)+'" data-f="tick" inputmode="decimal" value="'+esc(sp?sp.tick:'')+'" placeholder="ex. 0.25" aria-label="Pas de cotation '+esc(k)+'"></td>'
+      +'<td><input data-k="'+esc(k)+'" data-f="value" inputmode="decimal" value="'+esc(sp?sp.value:'')+'" placeholder="ex. 5" aria-label="Valeur d\'un tick '+esc(k)+'"></td>'
+      +'<td>'+src+'</td><td style="text-align:right">'+act+'</td></tr>';
+  }).join('');
+  return '<div class="panel"><div class="panel-h"><span class="t">Pas de cotation</span><span class="s">Par actif · valeur pour 1 contrat ou 1 lot</span></div>'
+    +'<p style="font-size:14px;color:var(--text-2);margin-bottom:14px">Le pas de cotation est le plus petit mouvement de prix possible ; la valeur d\'un tick est ce qu\'il rapporte. Ils servent à afficher stops et résultats en ticks, et à calculer le P&amp;L quand tu ne le saisis pas. Les préréglages sont les valeurs standard, dans la devise du contrat : chez un broker CFD, vérifie les siennes.</p>'
+    +(rows?'<div class="tablewrap" style="box-shadow:none"><table class="ticks"><thead><tr><th>Actif</th><th>Pas de cotation</th><th>Valeur d\'un tick</th><th>Source</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="mut" style="font-size:13.5px">Aucun actif pour l\'instant.</p>')
+    +'<div class="tickadd"><div class="field"><label for="ta_k">Actif</label><input id="ta_k" placeholder="ex. MNQ" autocomplete="off"></div>'
+    +'<div class="field"><label for="ta_t">Pas de cotation</label><input id="ta_t" inputmode="decimal" placeholder="0.25"></div>'
+    +'<div class="field"><label for="ta_v">Valeur d\'un tick</label><input id="ta_v" inputmode="decimal" placeholder="0.5"></div>'
+    +'<button class="btn btn-ghost btn-sm" id="ta_add" style="height:44px">Ajouter</button></div></div>';
+}
+function bindTickPanel(){
+  function put(k,tick,value){
+    DB.settings.ticks=DB.settings.ticks||{};
+    DB.settings.ticks[k]={ tick:String(tick), value:value };
+    save();
+  }
+  $$('.ticks input').forEach(function(inp){
+    inp.onchange=function(){
+      var k=inp.dataset.k, row=inp.closest('tr'), tIn=row.querySelector('[data-f=tick]'), vIn=row.querySelector('[data-f=value]');
+      var tk=num(tIn.value), tv=vIn.value.trim()===''?null:num(vIn.value);
+      tIn.classList.toggle('bad',!(tk>0)); vIn.classList.toggle('bad',vIn.value.trim()!=='' && tv==null);
+      if(!(tk>0) || (vIn.value.trim()!=='' && tv==null)) return;
+      put(k,tk,tv); toast('Pas de cotation de '+k+' enregistré'); renderSettings();
+    };
+  });
+  $$('[data-reset]').forEach(function(b){ b.onclick=function(){ delete DB.settings.ticks[b.dataset.reset]; save(); toast(TICK_PRESETS[b.dataset.reset]?'Préréglage rétabli':'Réglage supprimé'); renderSettings(); }; });
+  $('#ta_add').onclick=function(){
+    var k=String($('#ta_k').value||'').trim().toUpperCase(), tk=num($('#ta_t').value), tv=$('#ta_v').value.trim()===''?null:num($('#ta_v').value);
+    $('#ta_k').classList.toggle('bad',!k); $('#ta_t').classList.toggle('bad',!(tk>0)); $('#ta_v').classList.toggle('bad',$('#ta_v').value.trim()!=='' && tv==null);
+    if(!k || !(tk>0) || ($('#ta_v').value.trim()!=='' && tv==null)){ toast('Renseigne l\'actif et un pas de cotation positif'); return; }
+    put(k,tk,tv); toast('Pas de cotation de '+k+' enregistré'); renderSettings();
+  };
+}
 function download(name,content,type){
   var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([content],{type:type})); a.download=name;
   document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
 }
 function toCsv(){
-  var cols=[['Date','date'],['Actif','asset'],['Sens','dir'],['Setup','setup'],['Session','session'],['Qualité','grade'],['Entrée','entry'],['Stop','stop'],['Objectif','target'],['Sortie','exit'],['Taille','qty'],['P&L brut','pnl'],['Frais','fees'],['Émotion','emotion'],['Plan respecté','plan'],['Notes','notes'],['Leçon','lesson'],['Lien','link']];
+  var cols=[['Date','date'],['Actif','asset'],['Sens','dir'],['Setup','setup'],['Session','session'],['Qualité','grade'],['Entrée','entry'],['Stop','stop'],['Objectif','target'],['Sortie','exit'],['Taille','qty'],['Pas de cotation','tick'],['Valeur tick','tickValue'],['P&L brut','pnl'],['Frais','fees'],['Émotion','emotion'],['Plan respecté','plan'],['Notes','notes'],['Leçon','lesson'],['Lien','link']];
   var q=function(v){ v=v==null?'':String(v); return /[;"\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   var dec=function(v){ return v==null?'':String(Math.round(v*100)/100).replace('.',','); };
-  var lines=[['Type'].concat(cols.map(function(c){ return c[0]; })).concat(['R','P&L net','Raison (pas de trade)','Captures']).join(';')];
+  var lines=[['Type'].concat(cols.map(function(c){ return c[0]; })).concat(['R','Ticks','P&L net','Raison (pas de trade)','Captures']).join(';')];
   sortByDate(allEntries()).forEach(function(t){
     var n=(t.shots||[]).length||'';
     if(t.kind==='skip'){
       lines.push(['Pas de trade'].concat(cols.map(function(c){
         return q(c[1]==='date'||c[1]==='asset'||c[1]==='emotion'||c[1]==='notes'?t[c[1]]:'');
-      })).concat(['','',q(t.reason),n]).join(';'));
+      })).concat(['','','',q(t.reason),n]).join(';'));
       return;
     }
     var d=derive(t);
@@ -1263,9 +1408,9 @@ function toCsv(){
       var v=t[c[1]];
       if(c[1]==='plan') v=v===true?'oui':(v===false?'non':'');
       else if(c[1]==='dir') v=v==='short'?'Short':'Long';
-      else if(/^(entry|stop|target|exit|qty|pnl|fees)$/.test(c[1]) && v!=='' && v!=null) v=String(v).replace('.',',');
+      else if(/^(entry|stop|target|exit|qty|pnl|fees|tick|tickValue)$/.test(c[1]) && v!=='' && v!=null) v=String(v).replace('.',',');
       return q(v);
-    })).concat([dec(d.r),dec(d.net),'',n]).join(';'));
+    })).concat([dec(d.r),d.ticks==null?'':String(Math.round(d.ticks*10)/10).replace('.',','),dec(d.net),'',n]).join(';'));
   });
   return lines.join('\r\n');
 }
@@ -1291,10 +1436,12 @@ function loadDemo(){
     var p=edge[st]-(plan?0:.2);
     var entry=a[1]*(1+(rnd()-.5)*.04), risk=a[2]*(.7+rnd()*.6), rr=[1.5,2,2,2.5,3][Math.floor(rnd()*5)];
     var r=rnd()<p?rr*(rnd()<.8?1:.5):(rnd()<.12?0:(plan?-1:-(1+rnd()*.8)));
-    var dp=a[1]<10?5:(a[1]<5000?2:0), f=function(v){ return v.toFixed(dp); };
+    var pre=TICK_PRESETS[a[0]], tk=pre?pre[0]:1, dp=a[1]<10?5:(a[1]<5000?2:0);
+    var f=function(v){ return (Math.round(v/tk)*tk).toFixed(dp); };
     var qty=Math.round(100/(risk*a[3])*a[3]*100)/100;
     out.push({ id:uid(), demo:true, date:dt, asset:a[0], dir:dir, setup:st, session:guessSession(dt), grade:plan?(rnd()<.4?'A+':'A'):(rnd()<.5?'B':'C'),
       entry:f(entry), stop:f(entry-sg*risk), target:f(entry+sg*risk*rr), exit:f(entry+sg*risk*r), qty:'', riskMoney:'100',
+      tick:pre?String(pre[0]):'', tickValue:pre?String(pre[1]):'',
       pnl:String(Math.round(r*100*100)/100), fees:String((2+rnd()*4).toFixed(2)), emotion:emo, plan:plan,
       notes:'Trade d\'exemple (inventé).', lesson:'', link:'', shots:[] });
   }

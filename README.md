@@ -120,6 +120,11 @@ notes, leçon et **captures d'écran** — ainsi que ses **pas de trade** : les
 jours où l'on reste dehors, avec la raison, les marchés surveillés et si l'on a
 été tenté de forcer un trade. Le journal en tire :
 
+- le stop, l'objectif et le résultat **en ticks**, grâce au **pas de cotation**
+  de chaque actif (préréglé pour les futures CME/Eurex courants, le forex et
+  l'or spot, modifiable dans les Réglages), et le P&L calculé en
+  ticks × valeur du tick × taille quand on ne le saisit pas ; un prix qui ne
+  tombe pas sur le pas est signalé ;
 - le résultat de chaque trade **en R** (depuis les prix, ou depuis le risque
   prévu en argent) et en P&L net de frais ;
 - taux de réussite, espérance, profit factor, gains et pertes moyens,
